@@ -1,1 +1,30 @@
+:root{
+  --bg:#F9FAFB; --text:#0F172A; --accent:#2563EB; --muted:#6B7280;
+}
+*{box-sizing:border-box}
+body{font-family:Inter,system-ui,Arial; background:var(--bg); color:var(--text); margin:0; padding:32px;}
+.container{max-width:880px; margin:0 auto;}
+.hero{margin-bottom:18px}
+.hero h1{font-size:28px; margin:0 0 6px}
+.hero .accent{color:var(--accent)}
+.tag{color:var(--muted); margin:0 0 18px}
+
+.field{margin-bottom:12px}
+.field label{display:block; margin-bottom:6px; color:var(--muted); font-size:13px}
+textarea{width:100%; min-height:84px; padding:12px; border-radius:8px; border:1px solid #e6e9ee; font-size:15px}
+input[type="email"], .subject{width:100%; padding:10px; border-radius:8px; border:1px solid #e6e9ee; margin-top:8px}
+.controls{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:12px}
+.controls label{margin-right:6px}
+
+.actions{display:flex; gap:12px; margin-bottom:12px}
+.btn{padding:10px 14px; border-radius:8px; border:1px solid #ddd; background:white; cursor:pointer}
+.btn.primary{background:var(--accent); color:white; border:none}
+.hidden{display:none}
+
+.output{background:#fff; border:1px solid #e6e9ee; padding:14px; border-radius:10px}
+.output h3{margin-top:0}
+.generated{min-height:180px; width:100%; padding:12px; border-radius:8px; border:1px solid #e6e9ee}
+.output-actions{display:flex; gap:10px; margin-top:10px}
+.status{margin-top:10px; color:var(--muted); font-size:13px}
+.footer{margin-top:24px; text-align:center; color:var(--muted)}
 
