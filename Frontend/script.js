@@ -1,5 +1,4 @@
 // Frontend/script.js
-// Simple JS to call backend endpoints
 const generateBtn = document.getElementById('generateBtn');
 const recompileBtn = document.getElementById('recompileBtn');
 const sendBtn = document.getElementById('sendBtn');
