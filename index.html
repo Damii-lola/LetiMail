@@ -1,1 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AIPC — AI Personal Communicator (MVP)</title>
+  <link rel="stylesheet" href="Frontend/style.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <h1>Write emails that sound like <span class="accent">you</span></h1>
+      <p class="tag">Type two lines and pick a mood — generate, edit, recompile, send.</p>
+    </header>
+
+    <section class="app">
+      <div class="field">
+        <label>1) Describe your business / brand (one short paragraph)</label>
+        <textarea id="businessContext" placeholder="I run a small marketing agency that helps indie apps with growth..."></textarea>
+      </div>
+
+      <div class="field">
+        <label>2) Email purpose / brief context</label>
+        <textarea id="emailContext" placeholder="Following up on the proposal I sent last week..."></textarea>
+      </div>
+
+      <div class="controls">
+        <label for="tone">Tone</label>
+        <select id="tone">
+          <option value="friendly">Friendly</option>
+          <option value="formal">Formal</option>
+          <option value="confident">Confident</option>
+          <option value="persuasive">Persuasive</option>
+          <option value="neutral" selected>Neutral</option>
+        </select>
+
+        <label for="recipient">Recipient email (optional)</label>
+        <input id="recipient" placeholder="client@example.com" type="email" />
+      </div>
+
+      <div class="actions">
+        <button id="generateBtn" class="btn primary">Generate Email</button>
+        <button id="saveDraftBtn" class="btn">Save Draft</button>
+      </div>
+
+      <section id="outputSection" class="output hidden">
+        <h3>Generated email</h3>
+        <input id="subject" placeholder="Email subject" class="subject" />
+        <textarea id="generatedEmail" class="generated"></textarea>
+
+        <div class="output-actions">
+          <button id="recompileBtn" class="btn">Recompile (use edits)</button>
+          <button id="sendBtn" class="btn primary">Send</button>
+        </div>
+
+        <div id="status" class="status"></div>
+      </section>
+    </section>
+
+    <footer class="footer">
+      <small>Built with Llama + Groq • Backend sends via SendGrid • Stored on Supabase</small>
+    </footer>
+  </main>
+
+  <script src="Frontend/script.js"></script>
+</body>
+</html>
 
