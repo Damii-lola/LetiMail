@@ -12,25 +12,52 @@ app.get("/", (req, res) => {
 
 app.post("/generate", async (req, res) => {
   const { business, context, tone } = req.body;
+  
+  const toneInstructions = {
+    friendly: "Warm, approachable, and conversational while maintaining professionalism. Use contractions naturally, show genuine interest, and keep it personable.",
+    formal: "Polished, respectful, and structured. Use complete sentences, proper salutations, and maintain a professional distance while being courteous.",
+    persuasive: "Confident, compelling, and benefit-focused. Use persuasive language, highlight value propositions, and create urgency while being respectful.",
+    casual: "Relaxed, conversational, and direct. Use casual language, shorter sentences, and friendly tone while keeping it appropriate for business contexts."
+  };
+
   const prompt = `
-You are LetiMail, an award-winning AI email copywriter that crafts high-impact professional emails.
+You are LetiMail, an expert email crafting AI that creates professionally formatted, visually appealing emails that balance casual professionalism with emotional intelligence.
 
-Goal: Write an email that is clear, visually structured, emotionally engaging, and tailored for conversion.
+CRITICAL FORMATTING REQUIREMENTS:
+- Start with "Subject: [Compelling Subject Line]"
+- Use proper email structure with visual spacing
+- Include clear sections with strategic line breaks
+- Use emojis sparingly and only when appropriate for the tone
+- Create visual hierarchy without markdown
 
-Follow these non-negotiable principles:
-1. **Visual & structural clarity:** Use short paragraphs, headers (if appropriate), and natural flow.
-2. **Personalization:** Reference recipient name, role, or context if provided.
-3. **Powerful subject line:** Start your response with "Subject:" and a compelling subject line.
-4. **Tone:** Match the tone style provided (${tone}) but keep it elegant and authentic.
-5. **Strong CTA:** Make the reader clearly understand what to do next.
-6. **Memorability:** Include a closing line that leaves an emotional impression or brand value.
-7. **Accessibility:** Keep language readable (grade 7–9 level).
+VISUAL & STRUCTURAL GUIDELINES:
+1. **Subject Line**: Clear, benefit-focused, 5-8 words max
+2. **Salutation**: Professional but warm (e.g., "Hi [Name]," or "Hello [Name],")
+3. **Opening**: 1-2 lines establishing context and warmth
+4. **Body**: 2-3 short paragraphs with clear visual separation
+   - Each paragraph 2-4 lines max
+   - Strategic line breaks between ideas
+   - Bullet points for key points (using • character)
+5. **Closing**: Professional sign-off with emotional touch
+6. **Signature**: Name and optional title/company
 
-Details to base this on:
+TONE & EMOTIONAL BALANCE:
+- **Target Tone**: ${tone} - ${toneInstructions[tone]}
+- **Overall Vibe**: Casual professionalism - professional but human, approachable but credible
+- **Emotional Mix**: Blend competence with warmth, authority with approachability
+- **Language Level**: Grade 8-10 readability - sophisticated but accessible
+
+CONTENT CONTEXT:
 - Business: ${business}
-- Email context: ${context}
+- Email Purpose: ${context}
 
-Return only the completed email content with a subject line, body, and closing signature (no explanations or code).
+IMPORTANT: 
+- DO NOT use markdown, HTML, or special formatting
+- DO use strategic spacing and line breaks for visual appeal
+- DO maintain consistent casual-professional voice throughout
+- DO make it feel human-written and emotionally intelligent
+
+Return only the perfectly formatted email content.
 `;
 
   try {
@@ -44,6 +71,7 @@ Return only the completed email content with a subject line, body, and closing s
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
+        max_tokens: 800,
       }),
     });
 
@@ -60,35 +88,55 @@ Return only the completed email content with a subject line, body, and closing s
 app.post("/refine-email", async (req, res) => {
   const { business, context, tone, originalEmail, editedEmail } = req.body;
   
+  const toneInstructions = {
+    friendly: "Warm, approachable, and conversational while maintaining professionalism",
+    formal: "Polished, respectful, and structured",
+    persuasive: "Confident, compelling, and benefit-focused", 
+    casual: "Relaxed, conversational, and direct"
+  };
+
   const prompt = `
-You are LetiMail, an expert email refinement AI. Your task is to analyze the user's edits and professionally incorporate them while maintaining the original email's style and structure.
+You are LetiMail, an expert email refinement AI. Your task is to professionally incorporate user edits while maintaining visual appeal and the perfect casual-professional balance.
 
-ORIGINAL BUSINESS CONTEXT:
+ORIGINAL CONTEXT:
 - Business: ${business}
-- Email Context: ${context}
-- Desired Tone: ${tone}
+- Purpose: ${context}
+- Desired Tone: ${tone} - ${toneInstructions[tone]}
 
-ORIGINAL GENERATED EMAIL:
+ORIGINAL EMAIL:
 ${originalEmail}
 
-USER-EDITED VERSION:
+USER EDITED VERSION:
 ${editedEmail}
 
-INSTRUCTIONS:
-1. Carefully compare the original and edited versions
-2. Identify what the user:
-   - Added (new content)
-   - Removed (deleted content) 
-   - Modified (changed content)
-3. Preserve the original email's:
-   - Overall structure and format
-   - Professional vibe and tone (${tone})
-   - Visual clarity and paragraph flow
-4. Seamlessly integrate the user's changes while making them sound professional and natural
-5. Maintain the subject line format if it was edited
-6. Keep the email engaging and conversion-focused
+REFINEMENT PRIORITIES:
 
-Return ONLY the refined email content (no analysis or explanations). Make sure the final result feels cohesive and professional.
+1. **CONTENT ANALYSIS**:
+   - Identify added, removed, and modified content
+   - Understand the user's intent behind changes
+   - Preserve the core message and purpose
+
+2. **VISUAL INTEGRATION**:
+   - Maintain clean, professional formatting
+   - Keep strategic spacing and paragraph structure
+   - Ensure visual hierarchy remains intact
+   - Use bullet points (•) where appropriate
+
+3. **TONE PERFECTION**:
+   - Blend user changes seamlessly into ${tone} voice
+   - Maintain casual-professional balance throughout
+   - Keep emotional intelligence in language
+   - Ensure consistency in warmth and professionalism
+
+4. **PROFESSIONAL POLISH**:
+   - Make edits sound natural and intentional
+   - Improve flow and readability where needed
+   - Maintain proper email structure
+   - Keep subject line compelling and relevant
+
+CRITICAL: Preserve the user's voice while enhancing professionalism. Make the email feel like it was professionally written from scratch with their input.
+
+Return only the refined, perfectly formatted email.
 `;
 
   try {
@@ -101,7 +149,8 @@ Return ONLY the refined email content (no analysis or explanations). Make sure t
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.5, // Lower temperature for more consistent refinements
+        temperature: 0.5,
+        max_tokens: 800,
       }),
     });
 
@@ -124,7 +173,7 @@ app.post("/send-email", async (req, res) => {
   }
 
   try {
-    // Format the email content for SendGrid
+    // Format the email content for SendGrid - preserve the visual formatting
     const formattedContent = formatEmailContent(content, senderName);
 
     const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -164,25 +213,36 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
-// Helper function to format email content
+// Enhanced email formatting that preserves visual structure
 function formatEmailContent(content, senderName) {
-  // Remove "Subject:" line from the content since we're using it separately
+  // Remove "Subject:" line but preserve all other formatting
   let formatted = content.replace(/^Subject:\s*.+\n?/i, '').trim();
   
-  // Ensure proper formatting
-  formatted = formatted.replace(/\n\s*\n/g, '\n\n'); // Normalize line breaks
+  // Preserve the existing visual spacing and structure
+  // Just ensure we have proper line breaks
+  formatted = formatted.replace(/\r\n/g, '\n').replace(/\n+/g, '\n');
   
-  // Add sender name to signature if not already present
-  if (senderName && !formatted.includes(senderName)) {
-    const lines = formatted.split('\n');
-    const lastLine = lines[lines.length - 1];
+  // Add sender name to closing if not present, but preserve the existing structure
+  if (senderName) {
+    const closingLines = formatted.split('\n').slice(-3);
+    const hasNameInClosing = closingLines.some(line => 
+      line.includes(senderName) || 
+      (line.length > 2 && line.length < 50 && !line.match(/[.!?@]/))
+    );
     
-    // If last line looks like a signature (short line, might be a name)
-    if (lastLine && lastLine.length < 50 && !lastLine.includes('@')) {
-      lines[lines.length - 1] = `${senderName}\n${lastLine}`;
-      formatted = lines.join('\n');
-    } else {
-      formatted += `\n\nBest regards,\n${senderName}`;
+    if (!hasNameInClosing) {
+      // Find the best place to add the name - usually before the last line
+      const lines = formatted.split('\n');
+      const lastLine = lines[lines.length - 1];
+      
+      if (lastLine && lastLine.trim() && !lastLine.match(/[.!?@]/)) {
+        // Last line might be a signature already
+        lines[lines.length - 1] = `${senderName}\n${lastLine}`;
+        formatted = lines.join('\n');
+      } else {
+        // Add professional closing with name
+        formatted += `\n\nBest regards,\n${senderName}`;
+      }
     }
   }
   
