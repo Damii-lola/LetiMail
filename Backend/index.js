@@ -6,6 +6,84 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Function to clean AI comments from responses
+function cleanAIResponse(content) {
+  if (!content) return content;
+  
+  // Remove common AI explanatory text patterns
+  let cleaned = content
+    .replace(/^(Here is|Here's) your (.+? email|refined email|email)[\s\S]*?(?=Subject:)/i, '')
+    .replace(/\n*Note:[\s\S]*?(?=\n\n|$)/gi, '')
+    .replace(/\n*Please note:[\s\S]*?(?=\n\n|$)/gi, '')
+    .replace(/\n*I have (preserved|applied|maintained)[\s\S]*?(?=\n\n|$)/gi, '')
+    .replace(/\n*This email[\s\S]*?(?=\n\n|$)/gi, '')
+    .trim();
+  
+  if (!cleaned.startsWith('Subject:')) {
+    const subjectIndex = cleaned.indexOf('Subject:');
+    if (subjectIndex > 0) {
+      cleaned = cleaned.substring(subjectIndex);
+    }
+  }
+  
+  return cleaned || content;
+}
+
+// Anti-spam validation function
+function validateEmailContent(content, business, context) {
+  const spamIndicators = [
+    // Spammy phrases
+    /\b(act now|limited time|urgent|immediate|don't miss|once in a lifetime)\b/gi,
+    /\b(risk-free|guaranteed|miracle|cure|amazing|incredible)\b/gi,
+    /\b(millionaire|billionaire|get rich|make money|earn cash)\b/gi,
+    /\b(free money|no cost|zero cost|no fees)\b/gi,
+    /\b(winner|prize|reward|bonus|discount|sale)\b/gi,
+    /\b(click here|buy now|order now|sign up today)\b/gi,
+    /\b(no obligation|no purchase necessary|not spam)\b/gi,
+    /\b(viagra|cialis|pharmacy|prescription)\b/gi,
+    /\b(adult|dating|singles|meet people)\b/gi,
+    /\b(investment|bitcoin|crypto|forex|stocks)\b/gi
+  ];
+
+  // Check for spam indicators
+  for (const pattern of spamIndicators) {
+    if (pattern.test(content)) {
+      return false;
+    }
+  }
+
+  // Check for excessive capitalization
+  const excessiveCaps = (content.match(/[A-Z]{3,}/g) || []).length;
+  if (excessiveCaps > 3) {
+    return false;
+  }
+
+  // Check for excessive exclamation marks
+  const excessiveExclamations = (content.match(/!/g) || []).length;
+  if (excessiveExclamations > 2) {
+    return false;
+  }
+
+  // Ensure content is relevant to business and context
+  const businessWords = business.toLowerCase().split(/\s+/);
+  const contextWords = context.toLowerCase().split(/\s+/);
+  const contentLower = content.toLowerCase();
+
+  let relevanceScore = 0;
+  [...businessWords, ...contextWords].forEach(word => {
+    if (word.length > 3 && contentLower.includes(word)) {
+      relevanceScore++;
+    }
+  });
+
+  // Require some relevance to the original request
+  if (relevanceScore < 2 && businessWords.length + contextWords.length > 3) {
+    return false;
+  }
+
+  return true;
+}
+
 app.get("/", (req, res) => {
   res.send("✅ LetiMail backend running with Groq AI");
 });
@@ -13,96 +91,83 @@ app.get("/", (req, res) => {
 app.post("/generate", async (req, res) => {
   const { business, context, tone } = req.body;
   
+  // Validate input to prevent spam generation
+  if (!business || !context) {
+    return res.status(400).json({ email: "Business description and context are required." });
+  }
+
+  // Check for spammy input patterns
+  const spamInputPatterns = [
+    /make money|get rich|earn cash|work from home/gi,
+    /free|discount|sale|limited time/gi,
+    /viagra|cialis|pharmacy|prescription/gi,
+    /bitcoin|crypto|investment|forex/gi
+  ];
+
+  for (const pattern of spamInputPatterns) {
+    if (pattern.test(business) || pattern.test(context)) {
+      return res.status(400).json({ 
+        email: "❌ Unable to generate email. Please provide legitimate business context." 
+      });
+    }
+  }
+
   const emotionalProfiles = {
     friendly: {
       primary: "Warmth and genuine connection",
       secondary: "Enthusiasm and approachability", 
-      expressions: "Show excitement, use friendly language, express genuine interest, be encouraging",
-      avoid: "Being overly formal or distant"
     },
     formal: {
       primary: "Respect and professionalism",
       secondary: "Confidence and consideration",
-      expressions: "Show appreciation, acknowledge importance, express gratitude, maintain dignity",
-      avoid: "Casual slang or overly familiar language"
     },
     persuasive: {
-      primary: "Conviction and excitement",
-      secondary: "Urgency and value",
-      expressions: "Create enthusiasm, highlight benefits, show confidence, build anticipation",
-      avoid: "Being pushy or aggressive"
+      primary: "Conviction and value-focused",
+      secondary: "Professional enthusiasm",
     },
     casual: {
       primary: "Relaxed connection",
       secondary: "Authenticity and ease",
-      expressions: "Be genuine, use conversational language, show personality, keep it real",
-      avoid: "Corporate jargon or stiff language"
     }
   };
 
   const emotion = emotionalProfiles[tone];
 
   const prompt = `
-You are an expert email writer crafting emotionally intelligent business communication.
+Create a legitimate, professional email that provides genuine value. This must be a real business communication, NOT spam.
 
-CRITICAL RULES:
-- ABSOLUTELY DO NOT mention "LetiMail" or any AI tool in the email content
-- This email should sound 100% human-written and personal
-- The email comes directly from the business/person, not from any tool
+STRICT ANTI-SPAM REQUIREMENTS:
+- NO "act now" or urgency language
+- NO "free money" or get-rich-quick schemes
+- NO excessive capitalization or exclamation marks
+- NO fake offers or deceptive claims
+- NO inappropriate or illegal content
+- Focus on genuine business value and relationship building
 
-EMOTIONAL INTELLIGENCE FRAMEWORK:
-- Primary Emotion: ${emotion.primary}
-- Secondary Emotion: ${emotion.secondary}
-- Emotional Expressions: ${emotion.expressions}
-- Avoid: ${emotion.avoid}
+BUSINESS CONTEXT:
+- Business: ${business}
+- Purpose: ${context}
+- Tone: ${tone} (${emotion.primary} with ${emotion.secondary})
 
-EMOTIONAL DEPTH TECHNIQUES TO APPLY:
-1. **Empathy Statements**: Show understanding of recipient's situation
-2. **Value Alignment**: Connect to recipient's goals and values
-3. **Authentic Enthusiasm**: Genuine excitement about the opportunity
-4. **Personal Connection**: Relate to recipient's needs and interests
-5. **Confident Warmth**: Assurance without arrogance
-6. **Gratitude Expression**: Sincere appreciation for time/consideration
-7. **Positive Framing**: Focus on benefits and solutions
+EMAIL GUIDELINES:
+- Provide legitimate value to the recipient
+- Focus on relationship building, not quick sales
+- Use professional, authentic language
+- Offer genuine insights or helpful information
+- Build trust and credibility
+- Be transparent and honest
 
 EMAIL STRUCTURE:
-Subject: [Emotionally compelling subject line 5-8 words]
-
-Salutation: [Warm, personalized greeting]
-
-Opening: 
-- Emotional hook that connects with recipient
-- Context with genuine tone
-- Express appreciation or understanding
+Subject: [Professional, non-spammy subject line]
 
 Body:
-- Core message with emotional resonance
-- Benefits framed around recipient's emotions
-- Clear value proposition with feeling
-- Specific, emotionally engaging details
+- Professional greeting
+- Clear context and purpose
+- Value proposition focused on recipient benefits
+- Professional call-to-action (if appropriate)
+- Polite closing
 
-Closing:
-- Reinforce positive emotional connection
-- Clear call-to-action with enthusiasm
-- Warm, professional sign-off
-
-Signature:
-[Name]
-[Optional: Title/Company - based on business context]
-
-CONTEXT:
-- Business: ${business}
-- Email Purpose: ${context}
-- Emotional Tone: ${tone} - focusing on ${emotion.primary} and ${emotion.secondary}
-
-CRITICAL: 
-- DO NOT use "LetiMail", "AI", "generated", or any tool references
-- DO incorporate emotional intelligence naturally
-- DO make it sound authentically human
-- DO use strategic spacing for visual appeal
-- DO maintain professional credibility with emotional warmth
-
-Return only the email content with emotional depth and professional formatting.
+Return ONLY the email content starting with "Subject:".
 `;
 
   try {
@@ -123,8 +188,15 @@ Return only the email content with emotional depth and professional formatting.
     const data = await groqResponse.json();
     let email = data.choices?.[0]?.message?.content?.trim() || "Error generating email.";
     
-    // Double-check: Remove any accidental LetiMail mentions
-    email = email.replace(/LetiMail/gi, '').replace(/AI-generated/gi, '').replace(/generated by/gi, '');
+    // Clean the response
+    email = cleanAIResponse(email);
+    
+    // Validate email content against spam
+    if (!validateEmailContent(email, business, context)) {
+      return res.status(400).json({ 
+        email: "❌ Unable to generate appropriate email content. Please refine your business description and context." 
+      });
+    }
     
     res.json({ email });
   } catch (error) {
@@ -133,65 +205,34 @@ Return only the email content with emotional depth and professional formatting.
   }
 });
 
-// Updated endpoint that RESPECTS all user edits without filtering
 app.post("/refine-email", async (req, res) => {
   const { business, context, tone, originalEmail, editedEmail } = req.body;
-  
-  const emotionalProfiles = {
-    friendly: { primary: "Warmth and genuine connection", secondary: "Enthusiasm and approachability" },
-    formal: { primary: "Respect and professionalism", secondary: "Confidence and consideration" },
-    persuasive: { primary: "Conviction and excitement", secondary: "Urgency and value" },
-    casual: { primary: "Relaxed connection", secondary: "Authenticity and ease" }
-  };
 
-  const emotion = emotionalProfiles[tone];
+  // Validate edited content against spam
+  if (!validateEmailContent(editedEmail, business, context)) {
+    return res.status(400).json({ 
+      email: "❌ Unable to process edits. Content appears inappropriate for professional email communication." 
+    });
+  }
 
   const prompt = `
-You are a formatting assistant. Your ONLY job is to apply professional formatting and emotional tone consistency to the user's edited email while PRESERVING ALL USER CONTENT EXACTLY as written.
+Apply professional formatting to this legitimate business email while preserving ALL user content exactly. Return ONLY the formatted email.
 
-CRITICAL RULES:
-- PRESERVE EVERY WORD, PHRASE, AND SENTENCE exactly as the user wrote them
-- DO NOT change, remove, or "improve" any content for any reason
-- ABSOLUTELY DO NOT mention "LetiMail" or any AI tool
-- YOUR ROLE: Apply formatting and ensure emotional tone consistency only
+STRICT REQUIREMENTS:
+- Preserve all user content exactly
+- Ensure professional, non-spammy formatting
+- Maintain legitimate business communication standards
+- No spam indicators or deceptive language
 
-EMOTIONAL TONE CONTEXT (for reference):
-- Business: ${business}
-- Purpose: ${context}
-- Target Tone: ${tone}
-- Emotional Focus: ${emotion.primary} with ${emotion.secondary}
-
-USER'S EDITED EMAIL (PRESERVE THIS EXACTLY):
+USER'S EDITED CONTENT (PRESERVE EXACTLY):
 ${editedEmail}
 
-YOUR TASKS (FORMATTING AND TONE CONSISTENCY ONLY):
+CONTEXT (for formatting reference only):
+- Business: ${business}
+- Purpose: ${context} 
+- Tone: ${tone}
 
-1. **STRUCTURE FORMATTING**:
-   - Ensure proper email structure
-   - Apply consistent spacing and line breaks
-   - Maintain visual hierarchy
-   - Use bullet points (•) if user included lists
-
-2. **EMOTIONAL CONSISTENCY**:
-   - Ensure the formatting supports the ${tone} tone
-   - Maintain emotional flow through spacing
-   - Preserve any emotional language the user included
-   - Keep the emotional authenticity intact
-
-3. **CONTENT PRESERVATION**:
-   - ALL user content stays exactly as written
-   - Word order, phrasing, and intent remain unchanged
-   - If user content seems unusual, preserve it anyway
-   - Remove any accidental "LetiMail" mentions if present
-
-4. **PROFESSIONAL POLISH**:
-   - Clean up formatting while keeping content identical
-   - Ensure visual appeal without changing meaning
-   - Maintain email structure integrity
-
-IMPORTANT: If the user's edited email already has good formatting and emotional flow, make minimal changes. Only adjust what's necessary for professional presentation.
-
-Return the formatted email with ALL user content preserved exactly and emotional tone maintained.
+Return ONLY the professionally formatted email starting with "Subject:" if present.
 `;
 
   try {
@@ -210,38 +251,62 @@ Return the formatted email with ALL user content preserved exactly and emotional
     });
 
     const data = await groqResponse.json();
-    let email = data.choices?.[0]?.message?.content?.trim() || "Error refining email.";
+    let email = data.choices?.[0]?.message?.content?.trim() || editedEmail;
     
-    // Fallback: If anything goes wrong, return the user's original edited email
-    if (email === "Error refining email." || email.length < 10) {
-      email = editedEmail;
+    // Clean the response
+    email = cleanAIResponse(email);
+    
+    // Validate the final content
+    if (!validateEmailContent(email, business, context)) {
+      return res.json({ email: editedEmail }); // Return user's original if validation fails
     }
     
-    // Double-check: Remove any LetiMail mentions
-    email = email.replace(/LetiMail/gi, '').replace(/AI-generated/gi, '').replace(/generated by/gi, '');
+    // Fallback to user's original if cleaning removed everything
+    if (!email || email.length < 10) {
+      email = editedEmail;
+    }
     
     res.json({ email });
   } catch (error) {
     console.error("Groq API Error:", error);
-    // Critical: Return user's edited email if API fails
     res.json({ email: editedEmail });
   }
 });
 
-// SendGrid email sending endpoint - Add LetiMail mention only in sent emails
+// SendGrid email sending endpoint with spam prevention
 app.post("/send-email", async (req, res) => {
   const { to, subject, content, senderName } = req.body;
 
-  // Validate required fields
   if (!to || !subject || !content) {
     return res.status(400).json({ error: "Missing required fields: to, subject, content" });
   }
 
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(to)) {
+    return res.status(400).json({ error: "Invalid recipient email address" });
+  }
+
+  // Final spam check before sending
+  const spamIndicators = [
+    /\b(act now|limited time|urgent|immediate)\b/gi,
+    /\b(free money|get rich|millionaire)\b/gi,
+    /\b(click here|buy now|order now)\b/gi,
+    /\b(viagra|cialis|pharmacy)\b/gi
+  ];
+
+  for (const pattern of spamIndicators) {
+    if (pattern.test(content) || pattern.test(subject)) {
+      return res.status(400).json({ 
+        error: "Unable to send email. Content appears inappropriate for professional communication." 
+      });
+    }
+  }
+
   try {
-    // Format the email content for SendGrid - add LetiMail mention only here
     const formattedContent = formatEmailContent(content, senderName);
 
-    const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    const sendGridResponse = await fetch("https://api.sendGrid.com/v3/mail/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -254,7 +319,7 @@ app.post("/send-email", async (req, res) => {
         }],
         from: {
           email: process.env.FROM_EMAIL,
-          name: senderName || "LetiMail User"
+          name: senderName || "Professional Contact"
         },
         content: [
           {
@@ -270,7 +335,15 @@ app.post("/send-email", async (req, res) => {
     } else {
       const errorData = await sendGridResponse.text();
       console.error("SendGrid Error:", errorData);
-      res.status(500).json({ error: "Failed to send email via SendGrid" });
+      
+      // Check if SendGrid rejected due to spam concerns
+      if (errorData.includes('spam') || errorData.includes('rejected')) {
+        res.status(400).json({ 
+          error: "Email rejected by provider. Please review content and try again." 
+        });
+      } else {
+        res.status(500).json({ error: "Failed to send email via SendGrid" });
+      }
     }
   } catch (error) {
     console.error("Send Email Error:", error);
@@ -278,20 +351,14 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
-// Enhanced email formatting - Add LetiMail mention only in sent emails
 function formatEmailContent(content, senderName) {
-  // Remove "Subject:" line but preserve all other formatting
   let formatted = content.replace(/^Subject:\s*.+\n?/i, '').trim();
-  
-  // Preserve the existing visual spacing and structure
   formatted = formatted.replace(/\r\n/g, '\n').replace(/\n+/g, '\n');
   
-  // Add professional closing with sender name
   if (senderName) {
     const lines = formatted.split('\n');
     const lastFewLines = lines.slice(-4).join('\n');
     
-    // Check if there's already a signature
     const hasSignature = lastFewLines.includes('Best') || 
                         lastFewLines.includes('Regards') || 
                         lastFewLines.includes('Sincerely') ||
@@ -303,8 +370,8 @@ function formatEmailContent(content, senderName) {
     }
   }
   
-  // Add LetiMail mention ONLY in the sent email (not in the displayed version)
-  formatted += `\n\n---\nCrafted with care using LetiMail`;
+  // Only add LetiMail attribution for legitimate professional emails
+  formatted += `\n\n---\nProfessional email crafted with LetiMail`;
   
   return formatted;
 }
