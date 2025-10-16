@@ -103,98 +103,66 @@ app.post("/generate", async (req, res) => {
     }
   }
 
-  const humanWritingStyles = {
-    friendly: {
-      style: "Warm and conversational like you're writing to a colleague you like",
-      phrases: [
-        "Hope you're having a great week",
-        "Just wanted to quickly follow up",
-        "I was thinking about our conversation",
-        "Would love to hear your thoughts",
-        "No rush at all on this"
-      ],
-      imperfections: ["Quick question", "Circling back", "Touching base", "Following up on"]
-    },
-    formal: {
-      style: "Polished but personal, like a senior professional writing to a respected counterpart",
-      phrases: [
-        "I hope this message finds you well",
-        "I'm writing to discuss",
-        "I would appreciate your perspective",
-        "Thank you for your time and consideration",
-        "I look forward to hearing from you"
-      ],
-      imperfections: ["I wanted to briefly mention", "In reference to", "With regard to"]
-    },
-    persuasive: {
-      style: "Confident and compelling but authentic, like a trusted advisor",
-      phrases: [
-        "I believe this could be valuable for",
-        "What stood out to me was",
-        "This aligns well with your goals",
-        "I'm confident this could help",
-        "The key benefit I see is"
-      ],
-      imperfections: ["What if we", "Have you considered", "One thought that occurred to me"]
-    },
-    casual: {
-      style: "Relaxed and direct, like you're messaging a work friend",
-      phrases: [
-        "Hey, just wanted to check in",
-        "Quick update for you",
-        "Let me know what you think",
-        "No pressure either way",
-        "Happy to chat more about this"
-      ],
-      imperfections: ["BTW", "Quick one", "Just a heads up", "When you get a moment"]
-    }
-  };
-
-  const style = humanWritingStyles[tone];
-
   const prompt = `
-Write a completely human-sounding email that sounds like a real person wrote it naturally. This should NOT sound like AI-generated content.
+Create a formal business letter following proper formal letter structure. This should be structured exactly like a traditional formal letter, regardless of the specific tone requested.
 
-IMPORTANT: Make it sound authentically human with:
-- Natural conversational flow
-- Occasional informal phrasing
-- Varied sentence lengths
-- Personal touches and specifics
-- Minor imperfections that make it feel real
-- Context-appropriate details
+FORMAL LETTER STRUCTURE (MUST FOLLOW THIS EXACT FORMAT):
 
-BUSINESS CONTEXT:
-- My business: ${business}
-- What I'm writing about: ${context}
-- Tone style: ${tone} - ${style.style}
+[Current Date]
 
-HUMAN WRITING TECHNIQUES TO USE:
-1. Start with a natural greeting that fits the relationship
-2. Include specific, believable details that relate to the context
-3. Use occasional conversational phrases like "${style.phrases[0]}" or "${style.phrases[1]}"
-4. Vary sentence structure - mix short and long sentences
-5. Add personal observations or thoughts
-6. Use natural transitions between ideas
-7. Include minor imperfections that make it feel human-written
-8. End with a genuine, appropriate closing
+[Recipient's Name]
+[Recipient's Title]
+[Recipient's Company/Organization]
+[Recipient's Address]
 
-AVOID:
-- Perfect, robotic language
-- Overly formal or stiff phrasing
-- Generic, template-like content
-- Repetitive sentence structures
-- Anything that sounds like AI
+SUBJECT: [Clear and concise subject line]
 
-EMAIL STRUCTURE (make it flow naturally):
-Subject: [Human-sounding subject line - not too perfect]
+Dear [Appropriate Salutation],
 
-[Natural opening that sets context]
-[Body with authentic details and personal touch]
-[Genuine closing that matches the tone]
+[Body Paragraph 1: Introduction and purpose of the letter]
+- State who you are and your business
+- Clearly state the purpose of the letter
+- Provide necessary context
 
-Remember: This should sound like a busy professional wrote it quickly, not like a perfectly crafted corporate message.
+[Body Paragraph 2: Main content and details]
+- Elaborate on the main points
+- Provide specific details and information
+- Support your purpose with relevant facts
 
-Return ONLY the email content starting with "Subject:".
+[Body Paragraph 3: Conclusion and call to action]
+- Summarize key points
+- State what you expect or hope for
+- Provide clear next steps or call to action
+
+[Closing Paragraph: Polite conclusion]
+- Express appreciation
+- Offer availability for further discussion
+- Restate your contact information
+
+Sincerely,
+
+[Your Name]
+[Your Title]
+[Your Company]
+[Your Contact Information]
+
+BUSINESS CONTEXT TO INCORPORATE:
+- Your Business: ${business}
+- Purpose of Letter: ${context}
+- Overall Approach: Professional and formal
+
+IMPORTANT RULES:
+1. MUST use the exact formal letter structure shown above
+2. Include placeholders in square brackets for personalization (e.g., [Recipient's Name])
+3. Use formal business language throughout
+4. Maintain professional tone and formatting
+5. Do not use casual language or slang
+6. Ensure proper spacing and paragraph structure
+7. Include all standard formal letter elements
+
+Fill in the structure with appropriate content based on the business context provided. Use professional, formal business language that would be appropriate for any business communication.
+
+Return ONLY the formal letter content following the exact structure above.
 `;
 
   try {
@@ -207,8 +175,8 @@ Return ONLY the email content starting with "Subject:".
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.8, // Higher temperature for more varied, human-like output
-        max_tokens: 800,
+        temperature: 0.7,
+        max_tokens: 1000,
       }),
     });
 
@@ -217,9 +185,6 @@ Return ONLY the email content starting with "Subject:".
     
     // Clean the response
     email = cleanAIResponse(email);
-    
-    // Add final human touches
-    email = addHumanTouches(email, tone);
     
     // Validate email content against spam
     if (!validateEmailContent(email, business, context)) {
@@ -235,25 +200,6 @@ Return ONLY the email content starting with "Subject:".
   }
 });
 
-// Function to add human touches to the email
-function addHumanTouches(email, tone) {
-  if (!email) return email;
-  
-  // Remove any remaining overly perfect phrasing
-  let humanEmail = email
-    .replace(/per your request/gi, 'as we discussed')
-    .replace(/please be advised/gi, 'just wanted to let you know')
-    .replace(/it is imperative that/gi, 'it would be great if')
-    .replace(/utilize/gi, 'use')
-    .replace(/commence/gi, 'start')
-    .replace(/terminate/gi, 'end');
-  
-  // Ensure natural paragraph breaks
-  humanEmail = humanEmail.replace(/\n\s*\n\s*\n/g, '\n\n');
-  
-  return humanEmail;
-}
-
 app.post("/refine-email", async (req, res) => {
   const { business, context, tone, originalEmail, editedEmail } = req.body;
 
@@ -265,30 +211,30 @@ app.post("/refine-email", async (req, res) => {
   }
 
   const prompt = `
-The user has edited their email. Please apply natural formatting while keeping ALL their exact words and making it sound human-written.
+The user has edited their formal business letter. Please ensure it maintains proper formal letter structure while preserving ALL their exact words.
 
 USER'S EXACT WORDS (DO NOT CHANGE CONTENT):
 ${editedEmail}
 
-CONTEXT (for tone reference only):
-- Business: ${business}
-- Situation: ${context}
-- Preferred tone: ${tone}
+FORMAL LETTER STRUCTURE REQUIREMENTS:
+- Must maintain formal business letter format
+- Proper date, recipient information, subject line
+- Formal salutation and closing
+- Structured paragraphs with clear purpose
+- Professional language throughout
 
 YOUR TASK:
 1. Preserve every single word exactly as the user wrote them
-2. Apply natural email formatting that sounds human-written
-3. Maintain the ${tone} tone while keeping it authentic
-4. Ensure it flows like a real person wrote it
-5. Don't make it sound "perfect" or corporate
+2. Ensure the content follows formal letter structure
+3. Maintain professional formatting and spacing
+4. Keep all placeholders and formal elements intact
+5. Do not change the user's content, only adjust structure if needed
 
-IMPORTANT: 
-- Keep all the user's phrasing, even if it seems imperfect
-- Maintain any personal touches or unique wording they used
-- Only adjust formatting and structure for readability
-- Make it sound like a genuine human email
+CONTEXT (for reference only):
+- Business: ${business}
+- Purpose: ${context}
 
-Return ONLY the formatted email starting with "Subject:" if present.
+Return ONLY the formatted formal letter maintaining proper structure.
 `;
 
   try {
@@ -301,8 +247,8 @@ Return ONLY the formatted email starting with "Subject:" if present.
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.4,
-        max_tokens: 800,
+        temperature: 0.3,
+        max_tokens: 1000,
       }),
     });
 
@@ -311,9 +257,6 @@ Return ONLY the formatted email starting with "Subject:" if present.
     
     // Clean the response
     email = cleanAIResponse(email);
-    
-    // Add human touches to refined email
-    email = addHumanTouches(email, tone);
     
     // Validate the final content
     if (!validateEmailContent(email, business, context)) {
@@ -331,7 +274,7 @@ Return ONLY the formatted email starting with "Subject:" if present.
   }
 });
 
-// SendGrid email sending endpoint
+// SendGrid email sending endpoint - Updated for formal letters
 app.post("/send-email", async (req, res) => {
   const { to, subject, content, senderName } = req.body;
 
@@ -360,7 +303,7 @@ app.post("/send-email", async (req, res) => {
   }
 
   try {
-    const formattedContent = formatEmailContent(content, senderName);
+    const formattedContent = formatFormalLetterContent(content, senderName);
 
     const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
@@ -387,7 +330,7 @@ app.post("/send-email", async (req, res) => {
     });
 
     if (sendGridResponse.ok) {
-      res.json({ success: true, message: "Email sent successfully" });
+      res.json({ success: true, message: "Formal letter sent successfully" });
     } else {
       const errorData = await sendGridResponse.text();
       console.error("SendGrid Error:", errorData);
@@ -406,26 +349,16 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
-function formatEmailContent(content, senderName) {
-  let formatted = content.replace(/^Subject:\s*.+\n?/i, '').trim();
-  formatted = formatted.replace(/\r\n/g, '\n').replace(/\n+/g, '\n');
+// Updated formatting function for formal letters
+function formatFormalLetterContent(content, senderName) {
+  let formatted = content;
   
-  if (senderName) {
-    const lines = formatted.split('\n');
-    const lastFewLines = lines.slice(-4).join('\n');
-    
-    const hasSignature = lastFewLines.includes('Best') || 
-                        lastFewLines.includes('Regards') || 
-                        lastFewLines.includes('Sincerely') ||
-                        lastFewLines.includes('Thanks') ||
-                        lastFewLines.includes('Thank you');
-    
-    if (!hasSignature) {
-      formatted += `\n\nBest regards,\n${senderName}`;
-    }
-  }
+  // Ensure the letter maintains its formal structure
+  // Just clean up any extra line breaks but preserve the format
+  formatted = formatted.replace(/\r\n/g, '\n').replace(/\n\s*\n\s*\n/g, '\n\n');
   
-  formatted += `\n\n---\nProfessional email crafted with LetiMail`;
+  // Add LetiMail attribution at the very end, after the formal closing
+  formatted += `\n\n---\nFormal letter crafted with LetiMail`;
   
   return formatted;
 }
