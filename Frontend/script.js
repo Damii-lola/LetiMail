@@ -1,4 +1,3 @@
-const themeToggle = document.getElementById("themeToggle");
 const generateBtn = document.getElementById("generateBtn");
 const outputDiv = document.getElementById("output");
 const actionButtons = document.getElementById("actionButtons");
@@ -10,20 +9,6 @@ let originalEmail = "";
 let isEditing = false;
 let isGenerating = false;
 let isRefining = false;
-
-document.addEventListener("DOMContentLoaded", () => {
-  const savedTheme = localStorage.getItem("theme") || "light";
-  document.documentElement.setAttribute("data-theme", savedTheme);
-  themeToggle.textContent = savedTheme === "dark" ? "☀️" : "🌙";
-});
-
-themeToggle.addEventListener("click", () => {
-  const current = document.documentElement.getAttribute("data-theme");
-  const newTheme = current === "light" ? "dark" : "light";
-  document.documentElement.setAttribute("data-theme", newTheme);
-  themeToggle.textContent = newTheme === "dark" ? "☀️" : "🌙";
-  localStorage.setItem("theme", newTheme);
-});
 
 generateBtn.addEventListener("click", async () => {
   // Prevent multiple simultaneous generations
@@ -43,9 +28,9 @@ generateBtn.addEventListener("click", async () => {
 
   isGenerating = true;
   generateBtn.disabled = true;
-  generateBtn.textContent = "Generating...";
+  generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Generating...';
 
-  outputDiv.innerHTML = "Generating your email <span class='dots'>...</span>";
+  outputDiv.innerHTML = '<div class="output-placeholder"><div class="placeholder-icon">⏳</div><p>Generating your email...</p><small>Powered by adaptive AI that learns your style</small></div>';
   hideActionButtons();
 
   try {
@@ -56,10 +41,7 @@ generateBtn.addEventListener("click", async () => {
     });
 
     const data = await response.json();
-    let email = data.email || "Something went wrong.";
-    
-    // Clean any AI comments from the email
-    email = cleanAIComments(email);
+    const email = data.email || "Something went wrong.";
     
     outputDiv.innerText = email;
     originalEmail = email;
@@ -72,7 +54,7 @@ generateBtn.addEventListener("click", async () => {
   } finally {
     isGenerating = false;
     generateBtn.disabled = false;
-    generateBtn.textContent = "✨ Generate Email";
+    generateBtn.innerHTML = '<span class="btn-icon">✨</span> Generate My Email';
   }
 });
 
@@ -137,7 +119,7 @@ async function submitEditedEmail(editedEmail) {
   cancelBtn.disabled = true;
   submitBtn.textContent = "Refining...";
 
-  outputDiv.innerHTML = "Refining your email <span class='dots'>...</span>";
+  outputDiv.innerHTML = '<div class="output-placeholder"><div class="placeholder-icon">⏳</div><p>Refining your email...</p><small>Preserving your unique voice</small></div>';
 
   try {
     const response = await fetch("https://letimail-production.up.railway.app/refine-email", {
@@ -153,10 +135,7 @@ async function submitEditedEmail(editedEmail) {
     });
 
     const data = await response.json();
-    let refinedEmail = data.email || "Something went wrong.";
-    
-    // Clean any AI comments from the refined email
-    refinedEmail = cleanAIComments(refinedEmail);
+    const refinedEmail = data.email || "Something went wrong.";
     
     outputDiv.innerText = refinedEmail;
     originalEmail = refinedEmail;
@@ -190,61 +169,6 @@ function showActionButtons() {
 
 function hideActionButtons() {
   actionButtons.style.display = 'none';
-}
-
-// Function to clean AI comments and notes from email content
-function cleanAIComments(emailContent) {
-  if (!emailContent) return emailContent;
-  
-  // Remove common AI comment patterns
-  let cleaned = emailContent
-    // Remove "Note:" sections and similar
-    .replace(/Note:\s*.+?(?=\n\n|\n[A-Z]|$)/gis, '')
-    .replace(/Please note:\s*.+?(?=\n\n|\n[A-Z]|$)/gis, '')
-    .replace(/Important:\s*.+?(?=\n\n|\n[A-Z]|$)/gis, '')
-    
-    // Remove "I have preserved" type comments
-    .replace(/I have preserved.+?(?=\n\n|\n[A-Z]|$)/gis, '')
-    .replace(/I've preserved.+?(?=\n\n|\n[A-Z]|$)/gis, '')
-    
-    // Remove "Here is" type introductions
-    .replace(/Here is your.+?(?=Subject:)/gis, '')
-    .replace(/Here's your.+?(?=Subject:)/gis, '')
-    
-    // Remove explanatory paragraphs about formatting
-    .replace(/I have applied.+?(?=\n\n|\n[A-Z]|$)/gis, '')
-    .replace(/The email has been.+?(?=\n\n|\n[A-Z]|$)/gis, '')
-    
-    // Remove any lines that are clearly AI explanations
-    .split('\n')
-    .filter(line => {
-      const lowerLine = line.toLowerCase();
-      return !(
-        lowerLine.includes('note:') ||
-        lowerLine.includes('important:') ||
-        lowerLine.includes('i have preserved') ||
-        lowerLine.includes("i've preserved") ||
-        lowerLine.includes('here is your') ||
-        lowerLine.includes("here's your") ||
-        lowerLine.includes('i applied') ||
-        lowerLine.includes('formatting adjustments') ||
-        lowerLine.includes('professional presentation') ||
-        lowerLine.includes('maintaining the') ||
-        (lowerLine.includes('preserved') && lowerLine.includes('content'))
-      );
-    })
-    .join('\n')
-    
-    // Clean up extra line breaks
-    .replace(/\n\s*\n\s*\n/g, '\n\n')
-    .trim();
-  
-  // If we removed everything accidentally, return original
-  if (!cleaned || cleaned.length < 10) {
-    return emailContent.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
-  }
-  
-  return cleaned;
 }
 
 // Send Email Modal Functions
@@ -340,13 +264,11 @@ async function sendEmail() {
 }
 
 function extractSubject(emailContent) {
-  // Extract subject from email content (assuming format: "Subject: Your Subject Here")
   const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
   if (subjectMatch && subjectMatch[1]) {
     return subjectMatch[1].trim();
   }
   
-  // Fallback: use first line or generate generic subject
   const firstLine = emailContent.split('\n')[0].trim();
   return firstLine.length > 0 ? firstLine : 'Email from LetiMail';
 }
