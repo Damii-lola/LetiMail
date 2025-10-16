@@ -4,7 +4,15 @@
   --primary: #2563eb;
   --secondary: #3b82f6;
   --border: #e5e7eb;
+  --card: #ffffff;
   --radius: 12px;
+}
+
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --text: #e2e8f0;
+  --border: #1e293b;
+  --card: #1e293b;
 }
 
 body {
@@ -12,6 +20,7 @@ body {
   font-family: 'Inter', sans-serif;
   background-color: var(--bg);
   color: var(--text);
+  transition: background 0.4s, color 0.4s;
 }
 
 .navbar {
@@ -20,22 +29,38 @@ body {
   align-items: center;
   padding: 1.2rem 2rem;
   border-bottom: 1px solid var(--border);
-  background: white;
+  background: var(--card);
+  transition: background 0.3s;
 }
 
-.navbar h1 {
-  color: var(--primary);
-  font-weight: 700;
+.nav-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#themeToggle,
+#loginBtn {
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+#themeToggle {
+  background: var(--border);
+  color: var(--text);
+}
+
+#themeToggle:hover {
+  background: var(--secondary);
+  color: #fff;
 }
 
 #loginBtn {
   background: var(--primary);
   color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: 0.3s;
 }
 
 #loginBtn:hover {
@@ -54,31 +79,24 @@ body {
 .app {
   max-width: 700px;
   margin: 2rem auto;
-  background: white;
+  background: var(--card);
   padding: 2rem;
   border-radius: var(--radius);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: background 0.3s;
 }
 
-.input-box {
-  margin-bottom: 1.5rem;
-}
-
-textarea {
+textarea,
+select {
   width: 100%;
-  min-height: 80px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.8rem;
   font-size: 1rem;
   resize: vertical;
-}
-
-select {
-  padding: 0.6rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.3s, color 0.3s;
 }
 
 button#generateBtn {
@@ -90,10 +108,11 @@ button#generateBtn {
   width: 100%;
   font-size: 1.1rem;
   cursor: pointer;
-  transition: 0.3s;
+  transition: transform 0.3s ease, background 0.3s ease;
 }
 
 button#generateBtn:hover {
+  transform: scale(1.02);
   background: var(--secondary);
 }
 
@@ -102,10 +121,36 @@ button#generateBtn:hover {
 }
 
 .output-text {
-  background: #f3f4f6;
+  background: var(--bg);
   padding: 1rem;
   border-radius: var(--radius);
   white-space: pre-wrap;
+  transition: background 0.3s;
+}
+
+/* Animations */
+.fade-in {
+  opacity: 0;
+  animation: fadeIn 0.9s ease forwards;
+}
+
+.slide-up {
+  opacity: 0;
+  transform: translateY(40px);
+  animation: slideUp 1s ease forwards;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 footer {
