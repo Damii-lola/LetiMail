@@ -8,6 +8,8 @@ const sendBtn = document.getElementById("sendBtn");
 // Store the original generated email
 let originalEmail = "";
 let isEditing = false;
+let isGenerating = false;
+let isRefining = false;
 
 document.addEventListener("DOMContentLoaded", () => {
   const savedTheme = localStorage.getItem("theme") || "light";
@@ -24,6 +26,11 @@ themeToggle.addEventListener("click", () => {
 });
 
 generateBtn.addEventListener("click", async () => {
+  // Prevent multiple simultaneous generations
+  if (isGenerating || isRefining) {
+    return;
+  }
+
   const business = document.getElementById("businessDesc").value.trim();
   const context = document.getElementById("context").value.trim();
   const tone = document.getElementById("tone").value;
@@ -33,6 +40,10 @@ generateBtn.addEventListener("click", async () => {
     hideActionButtons();
     return;
   }
+
+  isGenerating = true;
+  generateBtn.disabled = true;
+  generateBtn.textContent = "Generating...";
 
   outputDiv.innerHTML = "Generating your email <span class='dots'>...</span>";
   hideActionButtons();
@@ -45,7 +56,10 @@ generateBtn.addEventListener("click", async () => {
     });
 
     const data = await response.json();
-    const email = data.email || "Something went wrong.";
+    let email = data.email || "Something went wrong.";
+    
+    // Clean any AI comments from the email
+    email = cleanAIComments(email);
     
     outputDiv.innerText = email;
     originalEmail = email;
@@ -55,12 +69,16 @@ generateBtn.addEventListener("click", async () => {
     console.error(err);
     outputDiv.innerText = "❌ Server error. Please try again later.";
     hideActionButtons();
+  } finally {
+    isGenerating = false;
+    generateBtn.disabled = false;
+    generateBtn.textContent = "✨ Generate Email";
   }
 });
 
 // Edit button functionality
 editBtn.addEventListener("click", () => {
-  if (!isEditing) {
+  if (!isEditing && !isGenerating && !isRefining) {
     // Enter edit mode
     const currentEmail = outputDiv.innerText;
     outputDiv.innerHTML = `
@@ -78,6 +96,10 @@ editBtn.addEventListener("click", () => {
 
 // Send button functionality with SendGrid
 sendBtn.addEventListener("click", async () => {
+  if (isGenerating || isRefining) {
+    return;
+  }
+  
   const currentEmail = outputDiv.innerText;
   
   // Show recipient input modal
@@ -86,7 +108,7 @@ sendBtn.addEventListener("click", async () => {
 
 // Handle edit submission and cancellation
 document.addEventListener('click', async (e) => {
-  if (e.target.id === 'submitEditBtn') {
+  if (e.target.id === 'submitEditBtn' && !isRefining) {
     const editedEmail = document.getElementById('emailEditor').value;
     await submitEditedEmail(editedEmail);
   } else if (e.target.id === 'cancelEditBtn') {
@@ -99,9 +121,21 @@ document.addEventListener('click', async (e) => {
 });
 
 async function submitEditedEmail(editedEmail) {
+  if (isRefining) {
+    return;
+  }
+
   const business = document.getElementById("businessDesc").value.trim();
   const context = document.getElementById("context").value.trim();
   const tone = document.getElementById("tone").value;
+
+  isRefining = true;
+  const submitBtn = document.getElementById('submitEditBtn');
+  const cancelBtn = document.getElementById('cancelEditBtn');
+  
+  submitBtn.disabled = true;
+  cancelBtn.disabled = true;
+  submitBtn.textContent = "Refining...";
 
   outputDiv.innerHTML = "Refining your email <span class='dots'>...</span>";
 
@@ -119,7 +153,10 @@ async function submitEditedEmail(editedEmail) {
     });
 
     const data = await response.json();
-    const refinedEmail = data.email || "Something went wrong.";
+    let refinedEmail = data.email || "Something went wrong.";
+    
+    // Clean any AI comments from the refined email
+    refinedEmail = cleanAIComments(refinedEmail);
     
     outputDiv.innerText = refinedEmail;
     originalEmail = refinedEmail;
@@ -131,6 +168,11 @@ async function submitEditedEmail(editedEmail) {
     outputDiv.innerText = "❌ Server error. Please try again later.";
     isEditing = false;
     showActionButtons();
+  } finally {
+    isRefining = false;
+    submitBtn.disabled = false;
+    cancelBtn.disabled = false;
+    submitBtn.textContent = "✅ Submit Edit";
   }
 }
 
@@ -148,6 +190,61 @@ function showActionButtons() {
 
 function hideActionButtons() {
   actionButtons.style.display = 'none';
+}
+
+// Function to clean AI comments and notes from email content
+function cleanAIComments(emailContent) {
+  if (!emailContent) return emailContent;
+  
+  // Remove common AI comment patterns
+  let cleaned = emailContent
+    // Remove "Note:" sections and similar
+    .replace(/Note:\s*.+?(?=\n\n|\n[A-Z]|$)/gis, '')
+    .replace(/Please note:\s*.+?(?=\n\n|\n[A-Z]|$)/gis, '')
+    .replace(/Important:\s*.+?(?=\n\n|\n[A-Z]|$)/gis, '')
+    
+    // Remove "I have preserved" type comments
+    .replace(/I have preserved.+?(?=\n\n|\n[A-Z]|$)/gis, '')
+    .replace(/I've preserved.+?(?=\n\n|\n[A-Z]|$)/gis, '')
+    
+    // Remove "Here is" type introductions
+    .replace(/Here is your.+?(?=Subject:)/gis, '')
+    .replace(/Here's your.+?(?=Subject:)/gis, '')
+    
+    // Remove explanatory paragraphs about formatting
+    .replace(/I have applied.+?(?=\n\n|\n[A-Z]|$)/gis, '')
+    .replace(/The email has been.+?(?=\n\n|\n[A-Z]|$)/gis, '')
+    
+    // Remove any lines that are clearly AI explanations
+    .split('\n')
+    .filter(line => {
+      const lowerLine = line.toLowerCase();
+      return !(
+        lowerLine.includes('note:') ||
+        lowerLine.includes('important:') ||
+        lowerLine.includes('i have preserved') ||
+        lowerLine.includes("i've preserved") ||
+        lowerLine.includes('here is your') ||
+        lowerLine.includes("here's your") ||
+        lowerLine.includes('i applied') ||
+        lowerLine.includes('formatting adjustments') ||
+        lowerLine.includes('professional presentation') ||
+        lowerLine.includes('maintaining the') ||
+        (lowerLine.includes('preserved') && lowerLine.includes('content'))
+      );
+    })
+    .join('\n')
+    
+    // Clean up extra line breaks
+    .replace(/\n\s*\n\s*\n/g, '\n\n')
+    .trim();
+  
+  // If we removed everything accidentally, return original
+  if (!cleaned || cleaned.length < 10) {
+    return emailContent.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+  }
+  
+  return cleaned;
 }
 
 // Send Email Modal Functions
@@ -173,85 +270,6 @@ function showSendModal(emailContent) {
   `;
   
   document.body.appendChild(modal);
-  
-  // Add modal styles if not already added
-  if (!document.querySelector('#modal-styles')) {
-    const style = document.createElement('style');
-    style.id = 'modal-styles';
-    style.textContent = `
-      .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.6);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-      }
-      .modal-content {
-        background: var(--card);
-        padding: 2rem;
-        border-radius: var(--radius);
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-        max-width: 500px;
-        width: 90%;
-      }
-      .modal-content h3 {
-        margin-top: 0;
-        color: var(--text);
-      }
-      .input-group {
-        margin-bottom: 1rem;
-      }
-      .input-group label {
-        display: block;
-        margin-bottom: 0.5rem;
-        font-weight: 500;
-        color: var(--text);
-      }
-      .email-input, .name-input {
-        width: 100%;
-        padding: 0.8rem;
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        background: var(--bg);
-        color: var(--text);
-        font-size: 1rem;
-      }
-      .modal-actions {
-        display: flex;
-        gap: 1rem;
-        justify-content: flex-end;
-        margin-top: 1.5rem;
-      }
-      .confirm-send-btn, .cancel-send-btn {
-        padding: 0.8rem 1.5rem;
-        border: none;
-        border-radius: var(--radius);
-        cursor: pointer;
-        font-size: 1rem;
-        transition: all 0.3s ease;
-      }
-      .confirm-send-btn {
-        background: #10b981;
-        color: white;
-      }
-      .confirm-send-btn:hover {
-        background: #059669;
-      }
-      .cancel-send-btn {
-        background: #6b7280;
-        color: white;
-      }
-      .cancel-send-btn:hover {
-        background: #4b5563;
-      }
-    `;
-    document.head.appendChild(style);
-  }
 }
 
 function hideSendModal() {
@@ -276,11 +294,18 @@ async function sendEmail() {
     return;
   }
 
+  // Prevent multiple sends
+  if (isGenerating || isRefining) {
+    return;
+  }
+
   // Show sending state
   const confirmBtn = document.getElementById('confirmSendBtn');
+  const cancelBtn = document.getElementById('cancelSendBtn');
   const originalText = confirmBtn.textContent;
   confirmBtn.textContent = 'Sending...';
   confirmBtn.disabled = true;
+  cancelBtn.disabled = true;
 
   try {
     const response = await fetch('https://letimail-production.up.railway.app/send-email', {
@@ -310,6 +335,7 @@ async function sendEmail() {
   } finally {
     confirmBtn.textContent = originalText;
     confirmBtn.disabled = false;
+    cancelBtn.disabled = false;
   }
 }
 
