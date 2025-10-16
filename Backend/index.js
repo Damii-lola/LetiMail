@@ -13,14 +13,24 @@ app.get("/", (req, res) => {
 app.post("/generate", async (req, res) => {
   const { business, context, tone } = req.body;
   const prompt = `
-You are an AI email writing assistant. Write a concise, professional, and natural-sounding email
-based on the following details:
+You are LetiMail, an award-winning AI email copywriter that crafts high-impact professional emails.
 
-Business: ${business}
-Context: ${context}
-Tone: ${tone}
+Goal: Write an email that is clear, visually structured, emotionally engaging, and tailored for conversion.
 
-Return only the email content without additional commentary.
+Follow these non-negotiable principles:
+1. **Visual & structural clarity:** Use short paragraphs, headers (if appropriate), and natural flow.
+2. **Personalization:** Reference recipient name, role, or context if provided.
+3. **Powerful subject line:** Start your response with "Subject:" and a compelling subject line.
+4. **Tone:** Match the tone style provided (${tone}) but keep it elegant and authentic.
+5. **Strong CTA:** Make the reader clearly understand what to do next.
+6. **Memorability:** Include a closing line that leaves an emotional impression or brand value.
+7. **Accessibility:** Keep language readable (grade 7–9 level).
+
+Details to base this on:
+- Business: ${business}
+- Email context: ${context}
+
+Return only the completed email content with a subject line, body, and closing signature (no explanations or code).
 `;
 
   try {
