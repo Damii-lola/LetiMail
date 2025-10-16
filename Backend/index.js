@@ -223,11 +223,11 @@ app.post("/send-email", async (req, res) => {
         }],
         from: {
           email: process.env.FROM_EMAIL,
-          name: senderName || "Professional Contact"
+          name: senderName || "LetiMail User"
         },
         content: [
           {
-            type: "text/plain",
+            type: "text/html",
             value: formattedContent
           }
         ]
@@ -247,17 +247,182 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
+// Enhanced HTML email formatting
 function formatEmailContent(content, senderName) {
-  let formatted = content.replace(/^Subject:\s*.+\n?/i, '').trim();
-  formatted = formatted.replace(/\r\n/g, '\n').replace(/\n+/g, '\n');
+  // Remove Subject line from content
+  let emailBody = content.replace(/^Subject:\s*.+\n?/i, '').trim();
   
-  if (senderName && !formatted.includes(senderName)) {
-    formatted += `\n\nBest regards,\n${senderName}`;
-  }
+  // Convert plain text to HTML with proper formatting
+  let htmlContent = convertTextToHTML(emailBody);
   
-  formatted += `\n\n---\nCrafted with LetiMail`;
+  // Create beautiful HTML email template
+  const htmlEmail = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${extractSubject(content) || 'Professional Email'}</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f9f9f9;
+    }
+    .email-container {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+    .email-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    .email-header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    .email-body {
+      padding: 40px;
+    }
+    .email-content {
+      font-size: 16px;
+      line-height: 1.7;
+    }
+    .email-content p {
+      margin-bottom: 16px;
+    }
+    .email-signature {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 2px solid #f0f0f0;
+    }
+    .sender-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 5px;
+    }
+    .footer {
+      background: #f8f9fa;
+      padding: 20px;
+      text-align: center;
+      color: #6c757d;
+      font-size: 14px;
+    }
+    .footer a {
+      color: #667eea;
+      text-decoration: none;
+    }
+    .bullet-points {
+      margin: 20px 0;
+      padding-left: 20px;
+    }
+    .bullet-points li {
+      margin-bottom: 8px;
+      position: relative;
+    }
+    .highlight-box {
+      background: #f8f9ff;
+      border-left: 4px solid #667eea;
+      padding: 15px 20px;
+      margin: 20px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-body {
+        padding: 20px;
+      }
+      body {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <h1>${extractSubject(content) || 'Professional Communication'}</h1>
+    </div>
+    
+    <div class="email-body">
+      <div class="email-content">
+        ${htmlContent}
+      </div>
+      
+      <div class="email-signature">
+        <div class="sender-name">${senderName || 'Professional Contact'}</div>
+        <div style="color: #6c757d; font-size: 14px;">
+          Sent via LetiMail • Professional Email Assistant
+        </div>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p>
+        This email was professionally crafted using 
+        <a href="#" style="color: #667eea; text-decoration: none; font-weight: 500;">LetiMail</a>
+      </p>
+      <p style="font-size: 12px; margin-top: 10px; color: #adb5bd;">
+        &copy; 2024 LetiMail. All rights reserved.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
   
-  return formatted;
+  return htmlEmail;
+}
+
+// Convert plain text to formatted HTML
+function convertTextToHTML(text) {
+  if (!text) return '';
+  
+  let html = text
+    // Convert line breaks to paragraphs
+    .split('\n\n')
+    .map(paragraph => {
+      if (!paragraph.trim()) return '';
+      
+      // Check if it's a bullet point section
+      if (paragraph.includes('•') || paragraph.includes('-')) {
+        const lines = paragraph.split('\n');
+        const listItems = lines.map(line => {
+          const cleanLine = line.replace(/^[•\-]\s*/, '').trim();
+          return cleanLine ? `<li>${cleanLine}</li>` : '';
+        }).filter(item => item);
+        
+        if (listItems.length > 0) {
+          return `<div class="bullet-points"><ul>${listItems.join('')}</ul></div>`;
+        }
+      }
+      
+      // Check if it's an important point (starts with bold indicators)
+      if (paragraph.match(/^(Important|Note|Key Point)/i)) {
+        return `<div class="highlight-box"><strong>${paragraph.replace(/^(Important|Note|Key Point):?\s*/i, '$1: ')}</strong></div>`;
+      }
+      
+      // Regular paragraph
+      return `<p>${paragraph.replace(/\n/g, '<br>')}</p>`;
+    })
+    .join('');
+  
+  return html;
+}
+
+// Extract subject from content
+function extractSubject(content) {
+  const subjectMatch = content.match(/Subject:\s*(.*?)(?:\n|$)/i);
+  return subjectMatch ? subjectMatch[1].trim() : null;
 }
 
 const PORT = process.env.PORT || 3000;
