@@ -1,2 +1,2 @@
-# AIPC
+# LetiMail
 AI Personal Communicator
