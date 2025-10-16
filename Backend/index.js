@@ -13,51 +13,96 @@ app.get("/", (req, res) => {
 app.post("/generate", async (req, res) => {
   const { business, context, tone } = req.body;
   
-  const toneInstructions = {
-    friendly: "Warm, approachable, and conversational while maintaining professionalism. Use contractions naturally, show genuine interest, and keep it personable.",
-    formal: "Polished, respectful, and structured. Use complete sentences, proper salutations, and maintain a professional distance while being courteous.",
-    persuasive: "Confident, compelling, and benefit-focused. Use persuasive language, highlight value propositions, and create urgency while being respectful.",
-    casual: "Relaxed, conversational, and direct. Use casual language, shorter sentences, and friendly tone while keeping it appropriate for business contexts."
+  const emotionalProfiles = {
+    friendly: {
+      primary: "Warmth and genuine connection",
+      secondary: "Enthusiasm and approachability", 
+      expressions: "Show excitement, use friendly language, express genuine interest, be encouraging",
+      avoid: "Being overly formal or distant"
+    },
+    formal: {
+      primary: "Respect and professionalism",
+      secondary: "Confidence and consideration",
+      expressions: "Show appreciation, acknowledge importance, express gratitude, maintain dignity",
+      avoid: "Casual slang or overly familiar language"
+    },
+    persuasive: {
+      primary: "Conviction and excitement",
+      secondary: "Urgency and value",
+      expressions: "Create enthusiasm, highlight benefits, show confidence, build anticipation",
+      avoid: "Being pushy or aggressive"
+    },
+    casual: {
+      primary: "Relaxed connection",
+      secondary: "Authenticity and ease",
+      expressions: "Be genuine, use conversational language, show personality, keep it real",
+      avoid: "Corporate jargon or stiff language"
+    }
   };
 
+  const emotion = emotionalProfiles[tone];
+
   const prompt = `
-You are LetiMail, an expert email crafting AI that creates professionally formatted, visually appealing emails that balance casual professionalism with emotional intelligence.
+You are an expert email writer crafting emotionally intelligent business communication.
 
-CRITICAL FORMATTING REQUIREMENTS:
-- Start with "Subject: [Compelling Subject Line]"
-- Use proper email structure with visual spacing
-- Include clear sections with strategic line breaks
-- Use emojis sparingly and only when appropriate for the tone
-- Create visual hierarchy without markdown
+CRITICAL RULES:
+- ABSOLUTELY DO NOT mention "LetiMail" or any AI tool in the email content
+- This email should sound 100% human-written and personal
+- The email comes directly from the business/person, not from any tool
 
-VISUAL & STRUCTURAL GUIDELINES:
-1. **Subject Line**: Clear, benefit-focused, 5-8 words max
-2. **Salutation**: Professional but warm (e.g., "Hi [Name]," or "Hello [Name],")
-3. **Opening**: 1-2 lines establishing context and warmth
-4. **Body**: 2-3 short paragraphs with clear visual separation
-   - Each paragraph 2-4 lines max
-   - Strategic line breaks between ideas
-   - Bullet points for key points (using • character)
-5. **Closing**: Professional sign-off with emotional touch
-6. **Signature**: Name and optional title/company
+EMOTIONAL INTELLIGENCE FRAMEWORK:
+- Primary Emotion: ${emotion.primary}
+- Secondary Emotion: ${emotion.secondary}
+- Emotional Expressions: ${emotion.expressions}
+- Avoid: ${emotion.avoid}
 
-TONE & EMOTIONAL BALANCE:
-- **Target Tone**: ${tone} - ${toneInstructions[tone]}
-- **Overall Vibe**: Casual professionalism - professional but human, approachable but credible
-- **Emotional Mix**: Blend competence with warmth, authority with approachability
-- **Language Level**: Grade 8-10 readability - sophisticated but accessible
+EMOTIONAL DEPTH TECHNIQUES TO APPLY:
+1. **Empathy Statements**: Show understanding of recipient's situation
+2. **Value Alignment**: Connect to recipient's goals and values
+3. **Authentic Enthusiasm**: Genuine excitement about the opportunity
+4. **Personal Connection**: Relate to recipient's needs and interests
+5. **Confident Warmth**: Assurance without arrogance
+6. **Gratitude Expression**: Sincere appreciation for time/consideration
+7. **Positive Framing**: Focus on benefits and solutions
 
-CONTENT CONTEXT:
+EMAIL STRUCTURE:
+Subject: [Emotionally compelling subject line 5-8 words]
+
+Salutation: [Warm, personalized greeting]
+
+Opening: 
+- Emotional hook that connects with recipient
+- Context with genuine tone
+- Express appreciation or understanding
+
+Body:
+- Core message with emotional resonance
+- Benefits framed around recipient's emotions
+- Clear value proposition with feeling
+- Specific, emotionally engaging details
+
+Closing:
+- Reinforce positive emotional connection
+- Clear call-to-action with enthusiasm
+- Warm, professional sign-off
+
+Signature:
+[Name]
+[Optional: Title/Company - based on business context]
+
+CONTEXT:
 - Business: ${business}
 - Email Purpose: ${context}
+- Emotional Tone: ${tone} - focusing on ${emotion.primary} and ${emotion.secondary}
 
-IMPORTANT: 
-- DO NOT use markdown, HTML, or special formatting
-- DO use strategic spacing and line breaks for visual appeal
-- DO maintain consistent casual-professional voice throughout
-- DO make it feel human-written and emotionally intelligent
+CRITICAL: 
+- DO NOT use "LetiMail", "AI", "generated", or any tool references
+- DO incorporate emotional intelligence naturally
+- DO make it sound authentically human
+- DO use strategic spacing for visual appeal
+- DO maintain professional credibility with emotional warmth
 
-Return only the perfectly formatted email content.
+Return only the email content with emotional depth and professional formatting.
 `;
 
   try {
@@ -76,7 +121,11 @@ Return only the perfectly formatted email content.
     });
 
     const data = await groqResponse.json();
-    const email = data.choices?.[0]?.message?.content?.trim() || "Error generating email.";
+    let email = data.choices?.[0]?.message?.content?.trim() || "Error generating email.";
+    
+    // Double-check: Remove any accidental LetiMail mentions
+    email = email.replace(/LetiMail/gi, '').replace(/AI-generated/gi, '').replace(/generated by/gi, '');
+    
     res.json({ email });
   } catch (error) {
     console.error("Groq API Error:", error);
@@ -88,46 +137,61 @@ Return only the perfectly formatted email content.
 app.post("/refine-email", async (req, res) => {
   const { business, context, tone, originalEmail, editedEmail } = req.body;
   
-  const prompt = `
-You are LetiMail's formatting assistant. Your ONLY job is to apply professional formatting to the user's edited email while PRESERVING ALL USER CONTENT EXACTLY as written.
+  const emotionalProfiles = {
+    friendly: { primary: "Warmth and genuine connection", secondary: "Enthusiasm and approachability" },
+    formal: { primary: "Respect and professionalism", secondary: "Confidence and consideration" },
+    persuasive: { primary: "Conviction and excitement", secondary: "Urgency and value" },
+    casual: { primary: "Relaxed connection", secondary: "Authenticity and ease" }
+  };
 
-CRITICAL INSTRUCTIONS:
+  const emotion = emotionalProfiles[tone];
+
+  const prompt = `
+You are a formatting assistant. Your ONLY job is to apply professional formatting and emotional tone consistency to the user's edited email while PRESERVING ALL USER CONTENT EXACTLY as written.
+
+CRITICAL RULES:
 - PRESERVE EVERY WORD, PHRASE, AND SENTENCE exactly as the user wrote them
 - DO NOT change, remove, or "improve" any content for any reason
-- DO NOT filter, censor, or modify content you deem inappropriate
-- YOUR ONLY ROLE is to apply consistent formatting and structure
-- The user's content is always correct and should be preserved 100%
+- ABSOLUTELY DO NOT mention "LetiMail" or any AI tool
+- YOUR ROLE: Apply formatting and ensure emotional tone consistency only
 
-ORIGINAL CONTEXT (for reference only):
+EMOTIONAL TONE CONTEXT (for reference):
 - Business: ${business}
 - Purpose: ${context}
-- Tone: ${tone}
+- Target Tone: ${tone}
+- Emotional Focus: ${emotion.primary} with ${emotion.secondary}
 
 USER'S EDITED EMAIL (PRESERVE THIS EXACTLY):
 ${editedEmail}
 
-YOUR TASKS (FORMATTING ONLY):
+YOUR TASKS (FORMATTING AND TONE CONSISTENCY ONLY):
 
 1. **STRUCTURE FORMATTING**:
-   - Ensure proper email structure (Subject, Salutation, Body, Closing)
+   - Ensure proper email structure
    - Apply consistent spacing and line breaks
-   - Maintain visual hierarchy through paragraph separation
-   - Use bullet points (•) if the user included list-like content
+   - Maintain visual hierarchy
+   - Use bullet points (•) if user included lists
 
-2. **VISUAL CONSISTENCY**:
-   - Make sure spacing is clean and professional
-   - Ensure the email flows well visually
-   - Keep similar formatting to the original style
+2. **EMOTIONAL CONSISTENCY**:
+   - Ensure the formatting supports the ${tone} tone
+   - Maintain emotional flow through spacing
+   - Preserve any emotional language the user included
+   - Keep the emotional authenticity intact
 
-3. **PRESERVATION GUARANTEE**:
+3. **CONTENT PRESERVATION**:
    - ALL user content stays exactly as written
    - Word order, phrasing, and intent remain unchanged
    - If user content seems unusual, preserve it anyway
-   - Your opinion on content appropriateness is irrelevant
+   - Remove any accidental "LetiMail" mentions if present
 
-IMPORTANT: If the user's edited email already has good formatting, make minimal changes. Only adjust formatting to improve visual flow while keeping all content identical.
+4. **PROFESSIONAL POLISH**:
+   - Clean up formatting while keeping content identical
+   - Ensure visual appeal without changing meaning
+   - Maintain email structure integrity
 
-Return the formatted email with ALL user content preserved exactly.
+IMPORTANT: If the user's edited email already has good formatting and emotional flow, make minimal changes. Only adjust what's necessary for professional presentation.
+
+Return the formatted email with ALL user content preserved exactly and emotional tone maintained.
 `;
 
   try {
@@ -140,7 +204,7 @@ Return the formatted email with ALL user content preserved exactly.
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.3, // Lower temperature for more consistent formatting
+        temperature: 0.3,
         max_tokens: 800,
       }),
     });
@@ -153,6 +217,9 @@ Return the formatted email with ALL user content preserved exactly.
       email = editedEmail;
     }
     
+    // Double-check: Remove any LetiMail mentions
+    email = email.replace(/LetiMail/gi, '').replace(/AI-generated/gi, '').replace(/generated by/gi, '');
+    
     res.json({ email });
   } catch (error) {
     console.error("Groq API Error:", error);
@@ -161,7 +228,7 @@ Return the formatted email with ALL user content preserved exactly.
   }
 });
 
-// SendGrid email sending endpoint
+// SendGrid email sending endpoint - Add LetiMail mention only in sent emails
 app.post("/send-email", async (req, res) => {
   const { to, subject, content, senderName } = req.body;
 
@@ -171,7 +238,7 @@ app.post("/send-email", async (req, res) => {
   }
 
   try {
-    // Format the email content for SendGrid - preserve the visual formatting
+    // Format the email content for SendGrid - add LetiMail mention only here
     const formattedContent = formatEmailContent(content, senderName);
 
     const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -187,7 +254,7 @@ app.post("/send-email", async (req, res) => {
         }],
         from: {
           email: process.env.FROM_EMAIL,
-          name: senderName || "LetiMail"
+          name: senderName || "LetiMail User"
         },
         content: [
           {
@@ -211,38 +278,33 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
-// Enhanced email formatting that preserves visual structure
+// Enhanced email formatting - Add LetiMail mention only in sent emails
 function formatEmailContent(content, senderName) {
   // Remove "Subject:" line but preserve all other formatting
   let formatted = content.replace(/^Subject:\s*.+\n?/i, '').trim();
   
   // Preserve the existing visual spacing and structure
-  // Just ensure we have proper line breaks
   formatted = formatted.replace(/\r\n/g, '\n').replace(/\n+/g, '\n');
   
-  // Add sender name to closing if not present, but preserve the existing structure
+  // Add professional closing with sender name
   if (senderName) {
-    const closingLines = formatted.split('\n').slice(-3);
-    const hasNameInClosing = closingLines.some(line => 
-      line.includes(senderName) || 
-      (line.length > 2 && line.length < 50 && !line.match(/[.!?@]/))
-    );
+    const lines = formatted.split('\n');
+    const lastFewLines = lines.slice(-4).join('\n');
     
-    if (!hasNameInClosing) {
-      // Find the best place to add the name - usually before the last line
-      const lines = formatted.split('\n');
-      const lastLine = lines[lines.length - 1];
-      
-      if (lastLine && lastLine.trim() && !lastLine.match(/[.!?@]/)) {
-        // Last line might be a signature already
-        lines[lines.length - 1] = `${senderName}\n${lastLine}`;
-        formatted = lines.join('\n');
-      } else {
-        // Add professional closing with name
-        formatted += `\n\nBest regards,\n${senderName}`;
-      }
+    // Check if there's already a signature
+    const hasSignature = lastFewLines.includes('Best') || 
+                        lastFewLines.includes('Regards') || 
+                        lastFewLines.includes('Sincerely') ||
+                        lastFewLines.includes('Thanks') ||
+                        lastFewLines.includes('Thank you');
+    
+    if (!hasSignature) {
+      formatted += `\n\nBest regards,\n${senderName}`;
     }
   }
+  
+  // Add LetiMail mention ONLY in the sent email (not in the displayed version)
+  formatted += `\n\n---\nCrafted with care using LetiMail`;
   
   return formatted;
 }
