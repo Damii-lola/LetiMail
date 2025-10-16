@@ -14,7 +14,7 @@ const generatedEl = document.getElementById('generatedEmail');
 const subjectEl = document.getElementById('subject');
 const statusEl = document.getElementById('status');
 
-const API_BASE = 'https://letimail-production.up.railway.app/'; // REPLACE with your Railway backend URL
+const API_BASE = 'https://letimail-production.up.railway.app'; // REPLACE with your Railway backend URL
 
 function setStatus(msg, isError=false){
   statusEl.textContent = msg;
