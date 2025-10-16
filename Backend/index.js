@@ -37,7 +37,7 @@ if(!GROQ_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_KEY || !SENDGRID_API_KEY 
 }
 
 sgMail.setApiKey(SENDGRID_API_KEY);
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const app = express();
 app.use(cors());
