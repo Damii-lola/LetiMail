@@ -114,5 +114,80 @@ Return ONLY the refined email content (no analysis or explanations). Make sure t
   }
 });
 
+// SendGrid email sending endpoint
+app.post("/send-email", async (req, res) => {
+  const { to, subject, content, senderName } = req.body;
+
+  // Validate required fields
+  if (!to || !subject || !content) {
+    return res.status(400).json({ error: "Missing required fields: to, subject, content" });
+  }
+
+  try {
+    // Format the email content for SendGrid
+    const formattedContent = formatEmailContent(content, senderName);
+
+    const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.SENDGRID_API_KEY}`
+      },
+      body: JSON.stringify({
+        personalizations: [{
+          to: [{ email: to }],
+          subject: subject
+        }],
+        from: {
+          email: process.env.FROM_EMAIL,
+          name: senderName || "LetiMail"
+        },
+        content: [
+          {
+            type: "text/plain",
+            value: formattedContent
+          }
+        ]
+      })
+    });
+
+    if (sendGridResponse.ok) {
+      res.json({ success: true, message: "Email sent successfully" });
+    } else {
+      const errorData = await sendGridResponse.text();
+      console.error("SendGrid Error:", errorData);
+      res.status(500).json({ error: "Failed to send email via SendGrid" });
+    }
+  } catch (error) {
+    console.error("Send Email Error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Helper function to format email content
+function formatEmailContent(content, senderName) {
+  // Remove "Subject:" line from the content since we're using it separately
+  let formatted = content.replace(/^Subject:\s*.+\n?/i, '').trim();
+  
+  // Ensure proper formatting
+  formatted = formatted.replace(/\n\s*\n/g, '\n\n'); // Normalize line breaks
+  
+  // Add sender name to signature if not already present
+  if (senderName && !formatted.includes(senderName)) {
+    const lines = formatted.split('\n');
+    const lastLine = lines[lines.length - 1];
+    
+    // If last line looks like a signature (short line, might be a name)
+    if (lastLine && lastLine.length < 50 && !lastLine.includes('@')) {
+      lines[lines.length - 1] = `${senderName}\n${lastLine}`;
+      formatted = lines.join('\n');
+    } else {
+      formatted += `\n\nBest regards,\n${senderName}`;
+    }
+  }
+  
+  return formatted;
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 LetiMail backend running on port ${PORT}`));
