@@ -1,66 +1,54 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LetiMail</title>
-  <link rel="stylesheet" href="Frontend/style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LetiMail — Write Emails That Sound Like You</title>
+  <link rel="stylesheet" href="Frontend/style.css">
 </head>
 <body>
-  <main class="container">
-    <header class="hero">
-      <h1>Write emails that sound like <span class="accent">you</span></h1>
-      <p class="tag">Type two lines and pick a mood — generate, edit, recompile, send.</p>
-    </header>
+  <header class="navbar">
+    <h1>LetiMail</h1>
+    <button id="loginBtn">Login</button>
+  </header>
 
-    <section class="app">
-      <div class="field">
-        <label>1) Describe your business / brand (one short paragraph)</label>
-        <textarea id="businessContext" placeholder="I run a small marketing agency that helps indie apps with growth..."></textarea>
-      </div>
+  <section class="hero">
+    <h2>Write emails that sound like <span>you</span>.</h2>
+    <p>Describe your business, your goal — LetiMail crafts the perfect email instantly.</p>
+  </section>
 
-      <div class="field">
-        <label>2) Email purpose / brief context</label>
-        <textarea id="emailContext" placeholder="Following up on the proposal I sent last week..."></textarea>
-      </div>
+  <section class="app">
+    <div class="input-box">
+      <label>Describe your business:</label>
+      <textarea id="businessDesc" placeholder="e.g. I run a social media marketing agency..."></textarea>
+    </div>
 
-      <div class="controls">
-        <label for="tone">Tone</label>
-        <select id="tone">
-          <option value="friendly">Friendly</option>
-          <option value="formal">Formal</option>
-          <option value="confident">Confident</option>
-          <option value="persuasive">Persuasive</option>
-          <option value="neutral" selected>Neutral</option>
-        </select>
+    <div class="input-box">
+      <label>Context of this email:</label>
+      <textarea id="context" placeholder="e.g. I'm following up with a client after our last meeting..."></textarea>
+    </div>
 
-        <label for="recipient">Recipient email (optional)</label>
-        <input id="recipient" placeholder="client@example.com" type="email" />
-      </div>
+    <div class="tone-selector">
+      <label>Tone:</label>
+      <select id="tone">
+        <option value="friendly">Friendly</option>
+        <option value="formal">Formal</option>
+        <option value="persuasive">Persuasive</option>
+        <option value="casual">Casual</option>
+      </select>
+    </div>
 
-      <div class="actions">
-        <button id="generateBtn" class="btn primary">Generate Email</button>
-        <button id="saveDraftBtn" class="btn">Save Draft</button>
-      </div>
+    <button id="generateBtn">Generate Email</button>
 
-      <section id="outputSection" class="output hidden">
-        <h3>Generated email</h3>
-        <input id="subject" placeholder="Email subject" class="subject" />
-        <textarea id="generatedEmail" class="generated"></textarea>
+    <div class="output-box">
+      <h3>Generated Email:</h3>
+      <div id="output" class="output-text"></div>
+    </div>
+  </section>
 
-        <div class="output-actions">
-          <button id="recompileBtn" class="btn">Recompile (use edits)</button>
-          <button id="sendBtn" class="btn primary">Send</button>
-        </div>
-
-        <div id="status" class="status"></div>
-      </section>
-    </section>
-
-    <footer class="footer">
-      <small>Built with Llama + Groq • Backend sends via SendGrid • Stored on Supabase</small>
-    </footer>
-  </main>
+  <footer>
+    <p>© 2025 LetiMail. All rights reserved.</p>
+  </footer>
 
   <script src="Frontend/script.js"></script>
 </body>
