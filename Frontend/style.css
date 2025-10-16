@@ -1,25 +1,16 @@
 :root {
-  --bg: #ffffff;
-  --text: #1a202c;
-  --text-light: #718096;
-  --primary: #667eea;
-  --primary-dark: #5a67d8;
-  --secondary: #764ba2;
-  --border: #e2e8f0;
-  --card: #ffffff;
-  --accent: #f7fafc;
-  --radius: 12px;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-[data-theme="dark"] {
   --bg: #0f1419;
   --text: #f7fafc;
   --text-light: #cbd5e0;
+  --primary: #667eea;
+  --primary-dark: #5a67d8;
+  --secondary: #764ba2;
   --border: #2d3748;
   --card: #1a202c;
-  --accent: #2d3748;
+  --accent: #1e293b;
+  --radius: 12px;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
 }
 
 * {
@@ -33,7 +24,6 @@ body {
   background-color: var(--bg);
   color: var(--text);
   line-height: 1.6;
-  transition: all 0.3s ease;
 }
 
 .container {
@@ -83,23 +73,14 @@ body {
   align-items: center;
 }
 
-.theme-btn, .login-btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.theme-btn {
-  background: var(--accent);
-  color: var(--text);
-}
-
 .login-btn {
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: var(--radius);
+  font-weight: 500;
+  cursor: pointer;
 }
 
 .login-btn:hover {
@@ -210,7 +191,6 @@ body {
   border-radius: var(--radius);
   text-align: center;
   box-shadow: var(--shadow);
-  transition: all 0.3s ease;
 }
 
 .problem-card:hover {
@@ -341,7 +321,6 @@ textarea, select {
   font-family: inherit;
   font-size: 1rem;
   resize: vertical;
-  transition: all 0.3s ease;
 }
 
 textarea:focus, select:focus {
@@ -370,7 +349,6 @@ textarea:focus, select:focus {
   font-size: 1.125rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -444,7 +422,6 @@ textarea:focus, select:focus {
   border-radius: var(--radius);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -493,7 +470,6 @@ textarea:focus, select:focus {
   font-size: 1.125rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
   margin-bottom: 16px;
 }
 
@@ -547,7 +523,6 @@ textarea:focus, select:focus {
   color: var(--text-light);
   text-decoration: none;
   margin-bottom: 8px;
-  transition: color 0.3s ease;
 }
 
 .footer-column a:hover {
@@ -592,29 +567,6 @@ textarea:focus, select:focus {
   .feature {
     flex-direction: column;
     text-align: center;
-  }
-}
-
-/* Animations */
-.fade-in {
-  opacity: 0;
-  animation: fadeIn 0.8s ease forwards;
-}
-
-.slide-up {
-  opacity: 0;
-  transform: translateY(30px);
-  animation: slideUp 0.8s ease forwards;
-}
-
-@keyframes fadeIn {
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  to { 
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 
