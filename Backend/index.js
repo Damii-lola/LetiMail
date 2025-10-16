@@ -84,59 +84,50 @@ Return only the perfectly formatted email content.
   }
 });
 
-// New endpoint for refining emails based on user edits
+// Updated endpoint that RESPECTS all user edits without filtering
 app.post("/refine-email", async (req, res) => {
   const { business, context, tone, originalEmail, editedEmail } = req.body;
   
-  const toneInstructions = {
-    friendly: "Warm, approachable, and conversational while maintaining professionalism",
-    formal: "Polished, respectful, and structured",
-    persuasive: "Confident, compelling, and benefit-focused", 
-    casual: "Relaxed, conversational, and direct"
-  };
-
   const prompt = `
-You are LetiMail, an expert email refinement AI. Your task is to professionally incorporate user edits while maintaining visual appeal and the perfect casual-professional balance.
+You are LetiMail's formatting assistant. Your ONLY job is to apply professional formatting to the user's edited email while PRESERVING ALL USER CONTENT EXACTLY as written.
 
-ORIGINAL CONTEXT:
+CRITICAL INSTRUCTIONS:
+- PRESERVE EVERY WORD, PHRASE, AND SENTENCE exactly as the user wrote them
+- DO NOT change, remove, or "improve" any content for any reason
+- DO NOT filter, censor, or modify content you deem inappropriate
+- YOUR ONLY ROLE is to apply consistent formatting and structure
+- The user's content is always correct and should be preserved 100%
+
+ORIGINAL CONTEXT (for reference only):
 - Business: ${business}
 - Purpose: ${context}
-- Desired Tone: ${tone} - ${toneInstructions[tone]}
+- Tone: ${tone}
 
-ORIGINAL EMAIL:
-${originalEmail}
-
-USER EDITED VERSION:
+USER'S EDITED EMAIL (PRESERVE THIS EXACTLY):
 ${editedEmail}
 
-REFINEMENT PRIORITIES:
+YOUR TASKS (FORMATTING ONLY):
 
-1. **CONTENT ANALYSIS**:
-   - Identify added, removed, and modified content
-   - Understand the user's intent behind changes
-   - Preserve the core message and purpose
+1. **STRUCTURE FORMATTING**:
+   - Ensure proper email structure (Subject, Salutation, Body, Closing)
+   - Apply consistent spacing and line breaks
+   - Maintain visual hierarchy through paragraph separation
+   - Use bullet points (•) if the user included list-like content
 
-2. **VISUAL INTEGRATION**:
-   - Maintain clean, professional formatting
-   - Keep strategic spacing and paragraph structure
-   - Ensure visual hierarchy remains intact
-   - Use bullet points (•) where appropriate
+2. **VISUAL CONSISTENCY**:
+   - Make sure spacing is clean and professional
+   - Ensure the email flows well visually
+   - Keep similar formatting to the original style
 
-3. **TONE PERFECTION**:
-   - Blend user changes seamlessly into ${tone} voice
-   - Maintain casual-professional balance throughout
-   - Keep emotional intelligence in language
-   - Ensure consistency in warmth and professionalism
+3. **PRESERVATION GUARANTEE**:
+   - ALL user content stays exactly as written
+   - Word order, phrasing, and intent remain unchanged
+   - If user content seems unusual, preserve it anyway
+   - Your opinion on content appropriateness is irrelevant
 
-4. **PROFESSIONAL POLISH**:
-   - Make edits sound natural and intentional
-   - Improve flow and readability where needed
-   - Maintain proper email structure
-   - Keep subject line compelling and relevant
+IMPORTANT: If the user's edited email already has good formatting, make minimal changes. Only adjust formatting to improve visual flow while keeping all content identical.
 
-CRITICAL: Preserve the user's voice while enhancing professionalism. Make the email feel like it was professionally written from scratch with their input.
-
-Return only the refined, perfectly formatted email.
+Return the formatted email with ALL user content preserved exactly.
 `;
 
   try {
@@ -149,17 +140,24 @@ Return only the refined, perfectly formatted email.
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.5,
+        temperature: 0.3, // Lower temperature for more consistent formatting
         max_tokens: 800,
       }),
     });
 
     const data = await groqResponse.json();
-    const email = data.choices?.[0]?.message?.content?.trim() || "Error refining email.";
+    let email = data.choices?.[0]?.message?.content?.trim() || "Error refining email.";
+    
+    // Fallback: If anything goes wrong, return the user's original edited email
+    if (email === "Error refining email." || email.length < 10) {
+      email = editedEmail;
+    }
+    
     res.json({ email });
   } catch (error) {
     console.error("Groq API Error:", error);
-    res.status(500).json({ email: "Error connecting to Groq API." });
+    // Critical: Return user's edited email if API fails
+    res.json({ email: editedEmail });
   }
 });
 
