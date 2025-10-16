@@ -103,66 +103,76 @@ app.post("/generate", async (req, res) => {
     }
   }
 
+  const formalWritingStyles = {
+    friendly: {
+      approach: "Warm and comprehensive formal writing",
+      characteristics: "Thorough explanations with a personal touch, maintaining formal structure while being approachable"
+    },
+    formal: {
+      approach: "Traditional elaborate formal writing",
+      characteristics: "Comprehensive details, proper formalities, extensive explanations, traditional business language"
+    },
+    persuasive: {
+      approach: "Detailed and compelling formal argument",
+      characteristics: "Thorough reasoning, comprehensive benefits explanation, detailed value proposition"
+    },
+    casual: {
+      approach: "Relaxed but comprehensive formal writing",
+      characteristics: "Complete explanations with casual language, maintaining formal structure but relaxed tone"
+    }
+  };
+
+  const style = formalWritingStyles[tone];
+
   const prompt = `
-Create a formal business letter following proper formal letter structure. This should be structured exactly like a traditional formal letter, regardless of the specific tone requested.
+Write a comprehensive formal business letter that follows traditional elaborate formal writing style. This should be detailed, thorough, and properly structured with all formalities.
 
-FORMAL LETTER STRUCTURE (MUST FOLLOW THIS EXACT FORMAT):
+ELABORATE FORMAL WRITING PRINCIPLES (MUST FOLLOW):
+1. **Formal Greeting**: Use proper salutation with full formalities
+2. **Comprehensive Opening**: Begin with context and purpose in detail
+3. **Thorough Explanation**: Provide complete background and reasoning
+4. **Detailed Body**: Multiple paragraphs with extensive explanations
+5. **Proper Formal Language**: Use traditional business vocabulary and phrasing
+6. **Complete Closing**: Formal sign-off with all necessary details
+7. **Length**: Should be comprehensive, not brief - proper formal letters are detailed
 
-[Current Date]
+BUSINESS CONTEXT:
+- Business: ${business}
+- Purpose: ${context}
+- Writing Style: ${style.approach} - ${style.characteristics}
 
-[Recipient's Name]
-[Recipient's Title]
-[Recipient's Company/Organization]
-[Recipient's Address]
+TRADITIONAL FORMAL LETTER STRUCTURE:
+Subject: [Formal, descriptive subject line]
 
-SUBJECT: [Clear and concise subject line]
+[Formal Salutation],
 
-Dear [Appropriate Salutation],
+[Paragraph 1: Comprehensive opening with full context, background, and purpose]
+[Paragraph 2: Detailed explanation of the situation or proposal]
+[Paragraph 3: Additional supporting information or considerations]
+[Paragraph 4: Specific requests, actions, or next steps in detail]
+[Paragraph 5: Closing remarks and appreciation]
 
-[Body Paragraph 1: Introduction and purpose of the letter]
-- State who you are and your business
-- Clearly state the purpose of the letter
-- Provide necessary context
+[Formal Closing],
+[Full Name and Title if appropriate]
 
-[Body Paragraph 2: Main content and details]
-- Elaborate on the main points
-- Provide specific details and information
-- Support your purpose with relevant facts
+FORMAL PHRASES TO INCLUDE:
+- "I am writing to inform you regarding..."
+- "It is with great pleasure that I..."
+- "Please be advised that..."
+- "I would like to take this opportunity to..."
+- "In accordance with our previous correspondence..."
+- "We respectfully request your attention to..."
+- "Thank you for your time and consideration in this matter"
 
-[Body Paragraph 3: Conclusion and call to action]
-- Summarize key points
-- State what you expect or hope for
-- Provide clear next steps or call to action
+CRITICAL: 
+- Do NOT be brief or direct
+- Use complete sentences and proper grammar
+- Include all necessary formalities and courtesies
+- Provide thorough explanations and background
+- Make it comprehensive and detailed like a proper formal letter
+- Use traditional business language throughout
 
-[Closing Paragraph: Polite conclusion]
-- Express appreciation
-- Offer availability for further discussion
-- Restate your contact information
-
-Sincerely,
-
-[Your Name]
-[Your Title]
-[Your Company]
-[Your Contact Information]
-
-BUSINESS CONTEXT TO INCORPORATE:
-- Your Business: ${business}
-- Purpose of Letter: ${context}
-- Overall Approach: Professional and formal
-
-IMPORTANT RULES:
-1. MUST use the exact formal letter structure shown above
-2. Include placeholders in square brackets for personalization (e.g., [Recipient's Name])
-3. Use formal business language throughout
-4. Maintain professional tone and formatting
-5. Do not use casual language or slang
-6. Ensure proper spacing and paragraph structure
-7. Include all standard formal letter elements
-
-Fill in the structure with appropriate content based on the business context provided. Use professional, formal business language that would be appropriate for any business communication.
-
-Return ONLY the formal letter content following the exact structure above.
+Return ONLY the email content starting with "Subject:".
 `;
 
   try {
@@ -176,7 +186,7 @@ Return ONLY the formal letter content following the exact structure above.
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 1200, // Increased for comprehensive formal letters
       }),
     });
 
@@ -185,6 +195,9 @@ Return ONLY the formal letter content following the exact structure above.
     
     // Clean the response
     email = cleanAIResponse(email);
+    
+    // Enhance formal style
+    email = enhanceFormalStyle(email);
     
     // Validate email content against spam
     if (!validateEmailContent(email, business, context)) {
@@ -200,6 +213,35 @@ Return ONLY the formal letter content following the exact structure above.
   }
 });
 
+// Function to enhance formal style with traditional phrasing
+function enhanceFormalStyle(email) {
+  if (!email) return email;
+  
+  let formalEmail = email
+    // Ensure proper formal openings
+    .replace(/^Hi\s+/gi, 'Dear ')
+    .replace(/^Hello\s+/gi, 'Dear ')
+    .replace(/^Hey\s+/gi, 'Dear ')
+    
+    // Enhance formal language
+    .replace(/I'm writing about/gi, 'I am writing to inform you regarding')
+    .replace(/I want to/gi, 'I would like to')
+    .replace(/I need you to/gi, 'We respectfully request that you')
+    .replace(/Please\s*$/gi, 'We would appreciate your prompt attention to this matter.')
+    .replace(/Thanks/gi, 'Thank you for your time and consideration')
+    .replace(/Talk soon/gi, 'We look forward to your response');
+  
+  // Ensure comprehensive structure with multiple paragraphs
+  const lines = formalEmail.split('\n');
+  if (lines.length < 8) {
+    // Add more formal content if too brief
+    formalEmail = formalEmail.replace(/(Sincerely|Regards|Best regards),/gi, 
+      'Thank you for your attention to this important matter.\n\n$1,');
+  }
+  
+  return formalEmail;
+}
+
 app.post("/refine-email", async (req, res) => {
   const { business, context, tone, originalEmail, editedEmail } = req.body;
 
@@ -211,30 +253,26 @@ app.post("/refine-email", async (req, res) => {
   }
 
   const prompt = `
-The user has edited their formal business letter. Please ensure it maintains proper formal letter structure while preserving ALL their exact words.
+Apply comprehensive formal business letter formatting to this email while preserving ALL user content exactly. Make it elaborate and detailed in the traditional formal style.
 
 USER'S EXACT WORDS (DO NOT CHANGE CONTENT):
 ${editedEmail}
 
-FORMAL LETTER STRUCTURE REQUIREMENTS:
-- Must maintain formal business letter format
-- Proper date, recipient information, subject line
+FORMAL FORMATTING REQUIREMENTS:
+- Structure as a traditional elaborate formal letter
+- Use proper formal language and phrasing
+- Maintain comprehensive explanations
+- Include all formal courtesies and structure
+- Keep every word the user wrote
+
+FORMAL PRINCIPLES TO APPLY:
 - Formal salutation and closing
-- Structured paragraphs with clear purpose
-- Professional language throughout
+- Multiple paragraphs with detailed explanations
+- Traditional business vocabulary
+- Complete sentences and proper grammar
+- Thorough background and context
 
-YOUR TASK:
-1. Preserve every single word exactly as the user wrote them
-2. Ensure the content follows formal letter structure
-3. Maintain professional formatting and spacing
-4. Keep all placeholders and formal elements intact
-5. Do not change the user's content, only adjust structure if needed
-
-CONTEXT (for reference only):
-- Business: ${business}
-- Purpose: ${context}
-
-Return ONLY the formatted formal letter maintaining proper structure.
+Return ONLY the formatted formal letter starting with "Subject:" if present.
 `;
 
   try {
@@ -247,8 +285,8 @@ Return ONLY the formatted formal letter maintaining proper structure.
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        max_tokens: 1000,
+        temperature: 0.4,
+        max_tokens: 1200,
       }),
     });
 
@@ -257,6 +295,9 @@ Return ONLY the formatted formal letter maintaining proper structure.
     
     // Clean the response
     email = cleanAIResponse(email);
+    
+    // Enhance formal style on refined email
+    email = enhanceFormalStyle(email);
     
     // Validate the final content
     if (!validateEmailContent(email, business, context)) {
@@ -274,7 +315,7 @@ Return ONLY the formatted formal letter maintaining proper structure.
   }
 });
 
-// SendGrid email sending endpoint - Updated for formal letters
+// SendGrid email sending endpoint
 app.post("/send-email", async (req, res) => {
   const { to, subject, content, senderName } = req.body;
 
@@ -303,7 +344,7 @@ app.post("/send-email", async (req, res) => {
   }
 
   try {
-    const formattedContent = formatFormalLetterContent(content, senderName);
+    const formattedContent = formatEmailContent(content, senderName);
 
     const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
@@ -330,7 +371,7 @@ app.post("/send-email", async (req, res) => {
     });
 
     if (sendGridResponse.ok) {
-      res.json({ success: true, message: "Formal letter sent successfully" });
+      res.json({ success: true, message: "Email sent successfully" });
     } else {
       const errorData = await sendGridResponse.text();
       console.error("SendGrid Error:", errorData);
@@ -349,16 +390,25 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
-// Updated formatting function for formal letters
-function formatFormalLetterContent(content, senderName) {
-  let formatted = content;
+function formatEmailContent(content, senderName) {
+  let formatted = content.replace(/^Subject:\s*.+\n?/i, '').trim();
+  formatted = formatted.replace(/\r\n/g, '\n').replace(/\n+/g, '\n');
   
-  // Ensure the letter maintains its formal structure
-  // Just clean up any extra line breaks but preserve the format
-  formatted = formatted.replace(/\r\n/g, '\n').replace(/\n\s*\n\s*\n/g, '\n\n');
+  if (senderName) {
+    const lines = formatted.split('\n');
+    const lastFewLines = lines.slice(-4).join('\n');
+    
+    const hasSignature = lastFewLines.includes('Sincerely') || 
+                        lastFewLines.includes('Respectfully') || 
+                        lastFewLines.includes('Yours faithfully') ||
+                        lastFewLines.includes('Best regards');
+    
+    if (!hasSignature) {
+      formatted += `\n\nSincerely,\n${senderName}`;
+    }
+  }
   
-  // Add LetiMail attribution at the very end, after the formal closing
-  formatted += `\n\n---\nFormal letter crafted with LetiMail`;
+  formatted += `\n\n---\nProfessional formal letter crafted with LetiMail`;
   
   return formatted;
 }
