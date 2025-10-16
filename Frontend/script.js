@@ -1,68 +1,95 @@
-const API_BASE = 'https://aipersonalcommunicator.vercel.app//api';
-
+// Frontend/script.js
+// Simple JS to call backend endpoints
 const generateBtn = document.getElementById('generateBtn');
+const recompileBtn = document.getElementById('recompileBtn');
 const sendBtn = document.getElementById('sendBtn');
-const output = document.getElementById('output');
+const saveDraftBtn = document.getElementById('saveDraftBtn');
 
-generateBtn.addEventListener('click', async () => {
-  const business = document.getElementById('business').value.trim();
-  const context = document.getElementById('context').value.trim();
-  const tone = document.getElementById('tone').value;
+const businessContextEl = document.getElementById('businessContext');
+const emailContextEl = document.getElementById('emailContext');
+const toneEl = document.getElementById('tone');
+const recipientEl = document.getElementById('recipient');
+const outputSection = document.getElementById('outputSection');
+const generatedEl = document.getElementById('generatedEmail');
+const subjectEl = document.getElementById('subject');
+const statusEl = document.getElementById('status');
 
-  if (!business || !context) {
-    alert('Please fill in both text areas.');
-    return;
-  }
+const API_BASE = 'https://your-railway-backend.example.com'; // REPLACE with your Railway backend URL
 
-  generateBtn.innerText = 'Generating...';
-  generateBtn.disabled = true;
+function setStatus(msg, isError=false){
+  statusEl.textContent = msg;
+  statusEl.style.color = isError ? '#F87171' : '#6B7280';
+}
 
+async function generateEmail(useEdits=false){
+  setStatus('Generating…');
+  const payload = {
+    business_context: businessContextEl.value,
+    email_context: emailContextEl.value,
+    tone: toneEl.value,
+    recipient: recipientEl.value || null,
+    edits: useEdits ? generatedEl.value : null
+  };
   try {
-    const res = await fetch(`${API_BASE}/generate`, {
+    const res = await fetch(API_BASE + '/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_context: business, email_context: context, tone })
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
-
-    document.getElementById('subject').value = data.subject || '';
-    document.getElementById('body').value = data.body || '';
-    output.classList.remove('hidden');
-  } catch (err) {
+    if (!res.ok) throw new Error(data.error || 'Generation failed');
+    subjectEl.value = data.subject || '';
+    generatedEl.value = data.body || '';
+    outputSection.classList.remove('hidden');
+    setStatus('Generated — edit or send.');
+  } catch(err){
     console.error(err);
-    alert('Error generating email.');
-  } finally {
-    generateBtn.innerText = 'Generate Email';
-    generateBtn.disabled = false;
+    setStatus('Error: ' + err.message, true);
+  }
+}
+
+generateBtn.addEventListener('click', ()=> generateEmail(false));
+recompileBtn.addEventListener('click', ()=> generateEmail(true));
+
+sendBtn.addEventListener('click', async ()=>{
+  setStatus('Sending...');
+  const payload = {
+    recipient: recipientEl.value,
+    subject: subjectEl.value,
+    body: generatedEl.value
+  };
+  try {
+    const res = await fetch(API_BASE + '/send', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Send failed');
+    setStatus('Email sent ✅');
+  } catch(err){
+    console.error(err);
+    setStatus('Send error: ' + err.message, true);
   }
 });
 
-sendBtn.addEventListener('click', async () => {
-  const recipient = document.getElementById('recipient').value.trim();
-  const subject = document.getElementById('subject').value.trim();
-  const body = document.getElementById('body').value.trim();
-
-  if (!recipient || !subject || !body) {
-    alert('Please fill all fields before sending.');
-    return;
-  }
-
-  sendBtn.innerText = 'Sending...';
-  sendBtn.disabled = true;
-
+saveDraftBtn.addEventListener('click', async () => {
+  setStatus('Saving draft...');
+  const payload = {
+    subject: subjectEl.value,
+    body: generatedEl.value
+  };
   try {
-    const res = await fetch(`${API_BASE}/send`, {
+    const res = await fetch(API_BASE + '/save-draft', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipient, subject, body, user_id: 'anon' })
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
     });
-    if (res.ok) alert('Email sent successfully!');
-    else alert('Error sending email.');
-  } catch (err) {
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Save failed');
+    setStatus('Draft saved');
+  } catch(err){
     console.error(err);
-    alert('Error sending email.');
-  } finally {
-    sendBtn.innerText = 'Send Email';
-    sendBtn.disabled = false;
+    setStatus('Save error: ' + err.message, true);
   }
 });
