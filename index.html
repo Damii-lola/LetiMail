@@ -3,59 +3,242 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LetiMail — Write Emails That Sound Like You</title>
+  <title>LetiMail — AI Email Assistant That Sounds Like You</title>
   <link rel="stylesheet" href="Frontend/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+  <!-- Navigation -->
   <header class="navbar">
-    <h1>LetiMail</h1>
-    <div class="nav-actions">
-      <button id="themeToggle">🌙</button>
-      <button id="loginBtn">Login</button>
+    <div class="nav-container">
+      <div class="logo">
+        <h1>LetiMail</h1>
+        <span class="logo-tagline">Your Voice, AI Powered</span>
+      </div>
+      <div class="nav-actions">
+        <button id="themeToggle" class="theme-btn">🌙</button>
+        <button id="loginBtn" class="login-btn">Get Started</button>
+      </div>
     </div>
   </header>
 
-  <section class="hero fade-in">
-    <h2>Write emails that sound like <span>you</span>.</h2>
-    <p>Describe your business and context — LetiMail crafts the perfect email instantly.</p>
-  </section>
-
-  <section class="app slide-up">
-    <div class="input-box">
-      <label>Describe your business:</label>
-      <textarea id="businessDesc" placeholder="e.g. I run a digital marketing agency..."></textarea>
-    </div>
-
-    <div class="input-box">
-      <label>Context of this email:</label>
-      <textarea id="context" placeholder="e.g. I'm following up after our last meeting..."></textarea>
-    </div>
-
-    <div class="tone-selector">
-      <label>Tone:</label>
-      <select id="tone">
-        <option value="friendly">Friendly</option>
-        <option value="formal">Formal</option>
-        <option value="persuasive">Persuasive</option>
-        <option value="casual">Casual</option>
-      </select>
-    </div>
-
-    <button id="generateBtn">✨ Generate Email</button>
-
-    <div class="output-box fade-in">
-      <h3>Generated Email:</h3>
-      <div id="output" class="output-text"></div>
-      <!-- Add this button container -->
-      <div id="actionButtons" class="action-buttons" style="display: none;">
-        <button id="editBtn" class="edit-btn">✏️ Edit Email</button>
-        <button id="sendBtn" class="send-btn">📤 Send</button>
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="hero-badge">AI-Powered Email Assistant</div>
+        <h1 class="hero-title">
+          Write emails that sound 
+          <span class="gradient-text">exactly like you</span>
+        </h1>
+        <p class="hero-description">
+          LetiMail lifts the weight of writing off your shoulders — so you can focus on growing your business, not typing.
+        </p>
+        <div class="hero-stats">
+          <div class="stat">
+            <div class="stat-number">10x</div>
+            <div class="stat-label">Faster Email Writing</div>
+          </div>
+          <div class="stat">
+            <div class="stat-number">100%</div>
+            <div class="stat-label">Your Voice</div>
+          </div>
+          <div class="stat">
+            <div class="stat-number">0</div>
+            <div class="stat-label">Generic AI Tone</div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-demo">
+        <!-- App demo will go here -->
       </div>
     </div>
   </section>
 
-  <footer>
-    <p>© 2025 LetiMail. All rights reserved.</p>
+  <!-- Problem Section -->
+  <section class="problem-section">
+    <div class="container">
+      <div class="section-header">
+        <h2>The Problem: Generic AI vs. Your Authentic Voice</h2>
+        <p>Current solutions force you to choose between speed and authenticity</p>
+      </div>
+      <div class="problem-grid">
+        <div class="problem-card">
+          <div class="problem-icon">⏰</div>
+          <h3>Time-Consuming</h3>
+          <p>Professionals spend countless hours crafting emails that balance professionalism with authenticity.</p>
+        </div>
+        <div class="problem-card">
+          <div class="problem-icon">🤖</div>
+          <h3>Generic Content</h3>
+          <p>Current AI tools produce robotic, "one-size-fits-all" content that lacks your personal nuance.</p>
+        </div>
+        <div class="problem-card">
+          <div class="problem-icon">✍️</div>
+          <h3>Editing Overload</h3>
+          <p>You end up spending more time editing AI content than writing from scratch.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Solution Section -->
+  <section class="solution-section">
+    <div class="container">
+      <div class="solution-header">
+        <h2>The LetiMail Solution</h2>
+        <p>AI that learns and adapts to your unique communication style</p>
+      </div>
+      <div class="solution-features">
+        <div class="feature">
+          <div class="feature-icon">🎯</div>
+          <div class="feature-content">
+            <h3>Adaptive Tone Learning</h3>
+            <p>Analyzes your writing style to replicate your unique voice and business tone over time.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-content">
+            <h3>Context-Aware Generation</h3>
+            <p>Creates complete email drafts from minimal input like "Follow-up to prospect A about pricing".</p>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">✏️</div>
+          <div class="feature-content">
+            <h3>Instant Editing & Refining</h3>
+            <p>Quickly edit and regenerate entire emails while maintaining your authentic voice.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📤</div>
+          <div class="feature-content">
+            <h3>Integrated Sending</h3>
+            <p>Send emails directly through LetiMail without external SMTP setup.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- App Interface -->
+  <section class="app-section">
+    <div class="container">
+      <div class="app-header">
+        <h2>Experience The Magic</h2>
+        <p>Watch as LetiMail transforms your brief context into complete, natural emails</p>
+      </div>
+      <div class="app-interface">
+        <div class="input-section">
+          <div class="input-group">
+            <label for="businessDesc">Describe Your Business</label>
+            <textarea 
+              id="businessDesc" 
+              placeholder="e.g., I run a digital marketing agency specializing in SaaS companies..."
+              rows="3"
+            ></textarea>
+          </div>
+
+          <div class="input-group">
+            <label for="context">Email Context & Purpose</label>
+            <textarea 
+              id="context" 
+              placeholder="e.g., Following up with a prospect who showed interest in our premium package..."
+              rows="3"
+            ></textarea>
+          </div>
+
+          <div class="tone-selector">
+            <label for="tone">Select Tone</label>
+            <div class="tone-options">
+              <select id="tone">
+                <option value="friendly">🤝 Friendly & Approachable</option>
+                <option value="formal">💼 Professional & Formal</option>
+                <option value="persuasive">🎯 Persuasive & Compelling</option>
+                <option value="casual">😊 Casual & Conversational</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="generateBtn" class="generate-btn">
+            <span class="btn-icon">✨</span>
+            Generate My Email
+          </button>
+        </div>
+
+        <div class="output-section">
+          <div class="output-header">
+            <h3>Your Generated Email</h3>
+            <div class="output-subtitle">100% your voice, AI-powered</div>
+          </div>
+          <div id="output" class="output-text">
+            <div class="output-placeholder">
+              <div class="placeholder-icon">✉️</div>
+              <p>Your personalized email will appear here</p>
+              <small>Powered by adaptive AI that learns your style</small>
+            </div>
+          </div>
+          <div id="actionButtons" class="action-buttons" style="display: none;">
+            <button id="editBtn" class="edit-btn">
+              <span class="btn-icon">✏️</span>
+              Edit Email
+            </button>
+            <button id="sendBtn" class="send-btn">
+              <span class="btn-icon">📤</span>
+              Send Email
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-content">
+        <h2>Ready to Write Like You, But Faster?</h2>
+        <p>Join professionals who save hours each week with LetiMail</p>
+        <button class="cta-button">Start Writing Free</button>
+        <div class="cta-note">No credit card required • 14-day free trial</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <h3>LetiMail</h3>
+          <p>Your Voice, AI Powered</p>
+        </div>
+        <div class="footer-links">
+          <div class="footer-column">
+            <h4>Product</h4>
+            <a href="#">Features</a>
+            <a href="#">Pricing</a>
+            <a href="#">Use Cases</a>
+          </div>
+          <div class="footer-column">
+            <h4>Company</h4>
+            <a href="#">About</a>
+            <a href="#">Blog</a>
+            <a href="#">Contact</a>
+          </div>
+          <div class="footer-column">
+            <h4>Legal</h4>
+            <a href="#">Privacy</a>
+            <a href="#">Terms</a>
+            <a href="#">Security</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2025 LetiMail. All rights reserved. Crafted with ❤️ for professionals who value their voice.</p>
+      </div>
+    </div>
   </footer>
 
   <script src="Frontend/script.js"></script>
