@@ -52,6 +52,26 @@ function validateEmailContent(content, business, context) {
   return true;
 }
 
+// Function to add human-like imperfections
+function addHumanTouches(email) {
+  if (!email) return email;
+  
+  let humanEmail = email
+    // Replace perfect AI phrases with more human ones
+    .replace(/I am writing to/g, 'I\'m reaching out')
+    .replace(/I would like to/g, 'I wanted to')
+    .replace(/Please be advised/g, 'Just wanted to let you know')
+    .replace(/It is important to note/g, 'Worth mentioning')
+    .replace(/Furthermore/g, 'Also')
+    .replace(/Additionally/g, 'Plus')
+    .replace(/In conclusion/g, 'Anyway')
+    .replace(/Utilize/g, 'Use')
+    .replace(/Approximately/g, 'About')
+    .replace(/Approach/g, 'Way');
+  
+  return humanEmail;
+}
+
 app.get("/", (req, res) => {
   res.send("✅ LetiMail backend running with Groq AI");
 });
@@ -78,34 +98,85 @@ app.post("/generate", async (req, res) => {
     }
   }
 
-  const prompt = `
-Write a professional business email that is formal but concise. Get straight to the point while maintaining professional tone.
+  const humanWritingStyles = {
+    friendly: {
+      instructions: `Write this email like a real human would - with slight imperfections, conversational language, and personal touches. Use contractions (I'm, you're, don't), occasional informal phrases, and make it sound like someone typed it quickly while thinking.`,
+      examples: [
+        "Hope you're having a good week!",
+        "Quick question for you",
+        "Just wanted to follow up on this",
+        "No rush at all on this"
+      ]
+    },
+    formal: {
+      instructions: `Write this in a professional but human tone - not too perfect. Use some contractions, vary sentence length, and make it sound like a busy professional wrote it. Avoid overly formal corporate language.`,
+      examples: [
+        "I'm writing to follow up on",
+        "Wanted to circle back to",
+        "When you have a moment",
+        "Look forward to hearing your thoughts"
+      ]
+    },
+    persuasive: {
+      instructions: `Write this persuasively but naturally - like a real salesperson or marketer would. Use conversational persuasion, not corporate jargon. Sound confident but human.`,
+      examples: [
+        "I think this could really help with",
+        "What if we tried",
+        "Have you considered",
+        "This might be a game-changer for"
+      ]
+    },
+    casual: {
+      instructions: `Write this very casually like you're messaging a colleague. Use plenty of contractions, short sentences, and natural speech patterns. Make it sound completely unscripted.`,
+      examples: [
+        "Hey, quick question",
+        "Just checking in on",
+        "Let me know what you think",
+        "No pressure either way"
+      ]
+    }
+  };
 
-FORMAL BUT CONCISE PRINCIPLES:
-- Professional tone and language
-- Clear purpose stated early
-- Necessary details only
-- Respectful but direct
-- 3-4 paragraphs maximum
+  const style = humanWritingStyles[tone];
+
+  const prompt = `
+IMPORTANT: Write this email to sound 100% human-written. Avoid all AI patterns and make it pass AI detection as human-written.
+
+HUMAN WRITING TECHNIQUES TO USE:
+- Use contractions: I'm, you're, don't, can't, won't
+- Vary sentence length dramatically
+- Include occasional minor grammatical imperfections
+- Use conversational phrases like "${style.examples[0]}"
+- Add personal observations or thoughts
+- Mix formal and informal language naturally
+- Use industry-specific terms from the business context
+- Include brief asides or personal touches
+- Sound like a busy professional wrote it quickly
+
+AVOID THESE AI PATTERNS:
+- Perfect grammar and punctuation
+- Overly structured paragraphs
+- Repetitive sentence patterns
+- Corporate jargon and buzzwords
+- Generic "I hope this email finds you well"
+- Overly formal language
+- Perfect logical flow (humans jump around a bit)
 
 BUSINESS CONTEXT:
 - Business: ${business}
 - Purpose: ${context}
 - Tone: ${tone}
 
-STRUCTURE:
-Subject: [Clear professional subject]
+WRITING STYLE: ${style.instructions}
 
-[Professional greeting],
+EMAIL STRUCTURE (but make it flow naturally):
+Subject: [Human-sounding subject line - not too perfect]
 
-[Paragraph 1: State purpose and context clearly]
-[Paragraph 2: Key details or explanation]
-[Paragraph 3: Action items or next steps]
+[Natural opening that sounds conversational]
+[Body with personal touches and slight imperfections]  
+[Genuine closing that matches the tone]
 
-[Professional closing],
-[Name]
-
-Keep it professional but not overly long. Be clear and direct.
+CRITICAL: This should sound like a real human wrote it in 5 minutes, not like a perfectly crafted AI email. Include at least 3-4 human-like elements from the techniques above.
 
 Return ONLY the email content starting with "Subject:".
 `;
@@ -120,8 +191,11 @@ Return ONLY the email content starting with "Subject:".
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
+        temperature: 0.9,
         max_tokens: 800,
+        top_p: 0.9,
+        frequency_penalty: 0.5,
+        presence_penalty: 0.3,
       }),
     });
 
@@ -129,6 +203,7 @@ Return ONLY the email content starting with "Subject:".
     let email = data.choices?.[0]?.message?.content?.trim() || "Error generating email.";
     
     email = cleanAIResponse(email);
+    email = addHumanTouches(email);
     
     if (!validateEmailContent(email, business, context)) {
       return res.status(400).json({ 
@@ -153,14 +228,25 @@ app.post("/refine-email", async (req, res) => {
   }
 
   const prompt = `
-Apply professional formatting to this email while preserving ALL user content exactly.
+Apply professional formatting to this email while preserving ALL user content exactly. Make it maintain a human-written feel.
 
 USER'S EXACT WORDS (DO NOT CHANGE CONTENT):
 ${editedEmail}
 
-Make it professionally formatted but keep it concise.
+CONTEXT (for reference only):
+- Business: ${business}
+- Purpose: ${context} 
+- Tone: ${tone}
 
-Return ONLY the formatted email starting with "Subject:" if present.
+INSTRUCTIONS:
+- Preserve every word exactly as written
+- Apply clean email formatting only
+- Maintain the human-like flow and imperfections
+- Don't "improve" or "correct" the writing style
+- Keep any casual language or contractions
+- Return ONLY the formatted email
+
+Formatted email:
 `;
 
   try {
@@ -173,7 +259,7 @@ Return ONLY the formatted email starting with "Subject:" if present.
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
+        temperature: 0.4,
         max_tokens: 800,
       }),
     });
@@ -247,10 +333,10 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
-// Premium HTML email formatting with sophisticated typography
+// Updated HTML email formatting - NO BOLD TEXT
 function formatEmailContent(content, senderName) {
   let emailBody = content.replace(/^Subject:\s*.+\n?/i, '').trim();
-  let htmlContent = convertTextToPremiumHTML(emailBody);
+  let htmlContent = convertTextToCleanHTML(emailBody);
   const emailSubject = extractSubject(content) || 'Professional Communication';
 
   const htmlEmail = `
@@ -341,23 +427,6 @@ function formatEmailContent(content, senderName) {
       font-weight: 400;
     }
     
-    .email-content strong {
-      font-weight: 600;
-      color: #2D3748;
-      background: linear-gradient(120deg, #fed7aa 0%, #fed7aa 100%);
-      background-repeat: no-repeat;
-      background-size: 100% 0.3em;
-      background-position: 0 88%;
-      padding: 0.1em 0.2em;
-      border-radius: 2px;
-    }
-    
-    .email-content em {
-      font-style: italic;
-      color: #718096;
-      font-weight: 500;
-    }
-    
     .greeting {
       font-size: 18px;
       font-weight: 500;
@@ -432,13 +501,6 @@ function formatEmailContent(content, senderName) {
       box-shadow: 0 4px 12px rgba(66, 153, 225, 0.1);
     }
     
-    .highlight-box strong {
-      font-size: 16px;
-      color: #2B6CB0;
-      display: block;
-      margin-bottom: 8px;
-    }
-    
     .quote {
       font-style: italic;
       font-size: 18px;
@@ -447,25 +509,6 @@ function formatEmailContent(content, senderName) {
       padding-left: 24px;
       margin: 30px 0;
       font-weight: 400;
-    }
-    
-    .action-button {
-      display: inline-block;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 16px 32px;
-      text-decoration: none;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 16px;
-      margin: 20px 0;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-      transition: all 0.3s ease;
-    }
-    
-    .action-button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
     }
     
     .footer {
@@ -555,8 +598,8 @@ function formatEmailContent(content, senderName) {
   return htmlEmail;
 }
 
-// Enhanced text to HTML conversion with sophisticated formatting
-function convertTextToPremiumHTML(text) {
+// Updated HTML conversion - NO BOLD TEXT
+function convertTextToCleanHTML(text) {
   if (!text) return '<p>No content available.</p>';
   
   let html = '';
@@ -587,11 +630,7 @@ function convertTextToPremiumHTML(text) {
       lines.forEach(line => {
         const cleanLine = line.replace(/^[•\-\d+\.]\s*/, '').trim();
         if (cleanLine) {
-          // Add emphasis to key points in lists
-          const emphasizedLine = cleanLine
-            .replace(/\b(important|key|critical|essential|major)\b/gi, '<strong>$1</strong>')
-            .replace(/\b(please note|remember|consider)\b/gi, '<em>$1</em>');
-          listItems.push(`<li>${emphasizedLine}</li>`);
+          listItems.push(`<li>${cleanLine}</li>`);
         }
       });
       
@@ -606,7 +645,7 @@ function convertTextToPremiumHTML(text) {
       const cleanPara = trimmedPara.replace(/^(important|note|attention|key point):?\s*/i, '');
       html += `
         <div class="highlight-box">
-          <strong>${trimmedPara.match(/^(important|note|attention|key point)/i)[0].toUpperCase()}:</strong>
+          ${trimmedPara.match(/^(important|note|attention|key point)/i)[0].toUpperCase()}: 
           ${cleanPara.replace(/\n/g, '<br>')}
         </div>
       `;
@@ -619,27 +658,8 @@ function convertTextToPremiumHTML(text) {
       return;
     }
     
-    // Handle action items or calls to action
-    if (trimmedPara.match(/\b(please|request|suggest|recommend|action required)\b/gi)) {
-      const actionPara = trimmedPara
-        .replace(/\b(please|kindly)\b/gi, '<strong>$1</strong>')
-        .replace(/\b(request|suggest|recommend|action required)\b/gi, '<em>$1</em>');
-      html += `<p>${actionPara.replace(/\n/g, '<br>')}</p>`;
-      return;
-    }
-    
-    // Regular paragraph with smart formatting
-    let formattedPara = trimmedPara
-      // Bold important business terms
-      .replace(/\b(meeting|deadline|project|proposal|agreement|contract)\b/gi, '<strong>$1</strong>')
-      // Italicize descriptive terms
-      .replace(/\b(very|quite|rather|extremely|highly)\b/gi, '<em>$1</em>')
-      // Bold numbers and dates
-      .replace(/(\$\d+|\d+%|\b\d{1,2}\/\d{1,2}\/\d{4}\b)/g, '<strong>$1</strong>')
-      // Add emphasis to key actions
-      .replace(/\b(submit|complete|review|approve|confirm)\b/gi, '<strong>$1</strong>');
-    
-    html += `<p>${formattedPara.replace(/\n/g, '<br>')}</p>`;
+    // Regular paragraph - NO BOLD TEXT
+    html += `<p>${trimmedPara.replace(/\n/g, '<br>')}</p>`;
   });
   
   return html;
