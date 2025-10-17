@@ -333,10 +333,10 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
-// Updated HTML email formatting - NO BOLD TEXT
+// Updated HTML email formatting - Preserve original bullets only
 function formatEmailContent(content, senderName) {
   let emailBody = content.replace(/^Subject:\s*.+\n?/i, '').trim();
-  let htmlContent = convertTextToCleanHTML(emailBody);
+  let htmlContent = convertTextToSimpleHTML(emailBody);
   const emailSubject = extractSubject(content) || 'Professional Communication';
 
   const htmlEmail = `
@@ -470,47 +470,6 @@ function formatEmailContent(content, senderName) {
       color: #4A5568;
     }
     
-    .bullet-points {
-      margin: 30px 0;
-      padding-left: 0;
-    }
-    
-    .bullet-points li {
-      margin-bottom: 16px;
-      padding-left: 30px;
-      position: relative;
-      font-weight: 400;
-    }
-    
-    .bullet-points li::before {
-      content: '▸';
-      position: absolute;
-      left: 0;
-      color: #667eea;
-      font-weight: bold;
-      font-size: 18px;
-    }
-    
-    .highlight-box {
-      background: linear-gradient(135deg, #EBF4FF 0%, #E6FFFA 100%);
-      border: 1px solid #BEE3F8;
-      border-left: 4px solid #4299E1;
-      padding: 25px 30px;
-      margin: 30px 0;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(66, 153, 225, 0.1);
-    }
-    
-    .quote {
-      font-style: italic;
-      font-size: 18px;
-      color: #4A5568;
-      border-left: 4px solid #CBD5E0;
-      padding-left: 24px;
-      margin: 30px 0;
-      font-weight: 400;
-    }
-    
     .footer {
       background: #1A202C;
       color: #A0AEC0;
@@ -598,69 +557,52 @@ function formatEmailContent(content, senderName) {
   return htmlEmail;
 }
 
-// Updated HTML conversion - NO BOLD TEXT
-function convertTextToCleanHTML(text) {
+// Simple HTML conversion - Preserve original bullets only, no automatic conversion
+function convertTextToSimpleHTML(text) {
   if (!text) return '<p>No content available.</p>';
   
   let html = '';
-  const paragraphs = text.split('\n\n');
+  const lines = text.split('\n');
+  let currentParagraph = '';
   
-  paragraphs.forEach((paragraph, index) => {
-    if (!paragraph.trim()) return;
+  lines.forEach((line, index) => {
+    const trimmedLine = line.trim();
     
-    const trimmedPara = paragraph.trim();
-    
-    // Handle greetings (first paragraph)
-    if (index === 0 && (trimmedPara.includes('Dear') || trimmedPara.includes('Hello') || trimmedPara.includes('Hi'))) {
-      html += `<div class="greeting">${trimmedPara.replace(/\n/g, '<br>')}</div>`;
-      return;
-    }
-    
-    // Handle closings (last paragraph)
-    if (index === paragraphs.length - 2 && (trimmedPara.includes('Best') || trimmedPara.includes('Sincerely') || trimmedPara.includes('Regards'))) {
-      html += `<div class="closing">${trimmedPara.replace(/\n/g, '<br>')}</div>`;
-      return;
-    }
-    
-    // Handle bullet points
-    if (trimmedPara.includes('•') || trimmedPara.match(/^\d+\./) || trimmedPara.includes('- ')) {
-      const lines = trimmedPara.split('\n');
-      let listItems = [];
-      
-      lines.forEach(line => {
-        const cleanLine = line.replace(/^[•\-\d+\.]\s*/, '').trim();
-        if (cleanLine) {
-          listItems.push(`<li>${cleanLine}</li>`);
-        }
-      });
-      
-      if (listItems.length > 0) {
-        html += `<ul class="bullet-points">${listItems.join('')}</ul>`;
+    if (!trimmedLine) {
+      // Empty line - finish current paragraph
+      if (currentParagraph) {
+        html += `<p>${currentParagraph}</p>`;
+        currentParagraph = '';
       }
       return;
     }
     
-    // Handle important announcements
-    if (trimmedPara.match(/^(important|note|attention|key point)/i)) {
-      const cleanPara = trimmedPara.replace(/^(important|note|attention|key point):?\s*/i, '');
-      html += `
-        <div class="highlight-box">
-          ${trimmedPara.match(/^(important|note|attention|key point)/i)[0].toUpperCase()}: 
-          ${cleanPara.replace(/\n/g, '<br>')}
-        </div>
-      `;
-      return;
-    }
+    // Check if this line is a bullet point in the original content
+    const isBulletPoint = trimmedLine.startsWith('•') || trimmedLine.startsWith('-') || /^\d+\./.test(trimmedLine);
     
-    // Handle quotes or special statements
-    if (trimmedPara.includes('"') || trimmedPara.match(/^'.*'$/)) {
-      html += `<div class="quote">${trimmedPara.replace(/\n/g, '<br>')}</div>`;
-      return;
+    if (isBulletPoint) {
+      // Finish current paragraph if exists
+      if (currentParagraph) {
+        html += `<p>${currentParagraph}</p>`;
+        currentParagraph = '';
+      }
+      // Add bullet point as a simple paragraph with the bullet character
+      const cleanLine = trimmedLine.replace(/^[•\-\d+\.]\s*/, '');
+      html += `<p>• ${cleanLine}</p>`;
+    } else {
+      // Regular text line - add to current paragraph
+      if (currentParagraph) {
+        currentParagraph += '<br>' + trimmedLine;
+      } else {
+        currentParagraph = trimmedLine;
+      }
     }
-    
-    // Regular paragraph - NO BOLD TEXT
-    html += `<p>${trimmedPara.replace(/\n/g, '<br>')}</p>`;
   });
+  
+  // Add any remaining paragraph
+  if (currentParagraph) {
+    html += `<p>${currentParagraph}</p>`;
+  }
   
   return html;
 }
