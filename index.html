@@ -18,13 +18,9 @@
           <span class="logo-tagline">Your Voice, AI Powered</span>
         </div>
       </div>
-      <nav class="nav-menu">
-        <a href="#features">Features</a>
-        <a href="#solution">Solution</a>
-        <a href="#demo">Demo</a>
-      </nav>
       <div class="nav-actions">
-        <button id="loginBtn" class="login-btn">Get Started</button>
+        <button id="loginBtn" class="login-btn">Login</button>
+        <button id="signupBtn" class="signup-btn">Sign Up</button>
       </div>
     </div>
   </header>
@@ -46,7 +42,7 @@
           LetiMail lifts the weight of writing off your shoulders — so you can focus on growing your business, not typing.
         </p>
         <div class="hero-cta">
-          <button class="primary-cta">Start Writing Free</button>
+          <a href="app.html" class="primary-cta">Start Writing Free</a>
           <button class="secondary-cta">Watch Demo</button>
         </div>
         <div class="hero-stats">
@@ -89,7 +85,7 @@
   </section>
 
   <!-- Problem Section -->
-  <section class="problem-section" id="features">
+  <section class="problem-section">
     <div class="container">
       <div class="section-header">
         <span class="section-label">The Challenge</span>
@@ -123,7 +119,7 @@
   </section>
 
   <!-- Solution Section -->
-  <section class="solution-section" id="solution">
+  <section class="solution-section">
     <div class="container">
       <div class="solution-header">
         <span class="section-label">The LetiMail Difference</span>
@@ -159,93 +155,73 @@
     </div>
   </section>
 
-  <!-- App Interface -->
-  <section class="app-section" id="demo">
+  <!-- Pricing Section -->
+  <section class="pricing-section">
     <div class="container">
-      <div class="app-header">
-        <span class="section-label">Experience The Magic</span>
-        <h2>Watch LetiMail Transform Your Words</h2>
-        <p>Turn brief context into complete, natural emails instantly</p>
+      <div class="pricing-header">
+        <span class="section-label">Pricing Plans</span>
+        <h2>Choose Your Perfect Plan</h2>
+        <p>Start free, scale as you grow. No hidden fees.</p>
       </div>
-      <div class="app-showcase">
-        <div class="app-interface">
-          <div class="input-panel">
-            <div class="panel-header">
-              <h3>Your Input</h3>
-              <span class="step-indicator">Step 1 of 2</span>
-            </div>
-            
-            <div class="input-group">
-              <label for="businessDesc">
-                <span class="label-icon">🏢</span>
-                Describe Your Business
-              </label>
-              <textarea 
-                id="businessDesc" 
-                placeholder="e.g., I run a digital marketing agency specializing in SaaS companies..."
-                rows="3"
-              ></textarea>
-            </div>
-
-            <div class="input-group">
-              <label for="context">
-                <span class="label-icon">💬</span>
-                Email Context & Purpose
-              </label>
-              <textarea 
-                id="context" 
-                placeholder="e.g., Following up with a prospect who showed interest in our premium package..."
-                rows="3"
-              ></textarea>
-            </div>
-
-            <div class="input-group">
-              <label for="tone">
-                <span class="label-icon">🎨</span>
-                Select Tone
-              </label>
-              <select id="tone">
-                <option value="friendly">🤝 Friendly & Approachable</option>
-                <option value="formal">💼 Professional & Formal</option>
-                <option value="persuasive">🎯 Persuasive & Compelling</option>
-                <option value="casual">😊 Casual & Conversational</option>
-              </select>
-            </div>
-
-            <button id="generateBtn" class="generate-btn">
-              <span class="btn-icon">✨</span>
-              Generate My Email
-            </button>
+      <div class="pricing-grid">
+        <!-- Free Plan -->
+        <div class="pricing-card">
+          <div class="plan-badge">Free Forever</div>
+          <h3 class="plan-name">Starter</h3>
+          <div class="plan-price">
+            <span class="price">$0</span>
+            <span class="period">/month</span>
           </div>
+          <p class="plan-description">Perfect for trying out LetiMail</p>
+          <ul class="plan-features">
+            <li><span class="check">✓</span> 50 emails per month</li>
+            <li><span class="check">✓</span> Basic tone options</li>
+            <li><span class="check">✓</span> Email editing</li>
+            <li><span class="check">✓</span> Direct sending</li>
+            <li><span class="cross">✗</span> Priority support</li>
+            <li><span class="cross">✗</span> Advanced AI learning</li>
+          </ul>
+          <a href="app.html" class="plan-button plan-button-outline">Get Started</a>
+        </div>
 
-          <div class="output-panel">
-            <div class="panel-header">
-              <h3>Your Generated Email</h3>
-              <span class="quality-badge">100% Your Voice</span>
-            </div>
-            
-            <div id="output" class="output-text">
-              <div class="output-placeholder">
-                <div class="placeholder-animation">
-                  <div class="animation-ring"></div>
-                  <div class="placeholder-icon">✉️</div>
-                </div>
-                <p>Your personalized email will appear here</p>
-                <small>Powered by adaptive AI that learns your style</small>
-              </div>
-            </div>
-            
-            <div id="actionButtons" class="action-buttons" style="display: none;">
-              <button id="editBtn" class="action-btn edit-btn">
-                <span class="btn-icon">✏️</span>
-                Edit Email
-              </button>
-              <button id="sendBtn" class="action-btn send-btn">
-                <span class="btn-icon">📤</span>
-                Send Email
-              </button>
-            </div>
+        <!-- Pro Plan -->
+        <div class="pricing-card featured">
+          <div class="plan-badge featured-badge">Most Popular</div>
+          <h3 class="plan-name">Professional</h3>
+          <div class="plan-price">
+            <span class="price">$29</span>
+            <span class="period">/month</span>
           </div>
+          <p class="plan-description">For professionals who write daily</p>
+          <ul class="plan-features">
+            <li><span class="check">✓</span> Unlimited emails</li>
+            <li><span class="check">✓</span> All tone options</li>
+            <li><span class="check">✓</span> Advanced AI learning</li>
+            <li><span class="check">✓</span> Email templates</li>
+            <li><span class="check">✓</span> Priority support</li>
+            <li><span class="check">✓</span> Analytics dashboard</li>
+          </ul>
+          <a href="app.html" class="plan-button plan-button-primary">Start Free Trial</a>
+        </div>
+
+        <!-- Business Plan -->
+        <div class="pricing-card">
+          <div class="plan-badge">For Teams</div>
+          <h3 class="plan-name">Business</h3>
+          <div class="plan-price">
+            <span class="price">$99</span>
+            <span class="period">/month</span>
+          </div>
+          <p class="plan-description">For teams that need collaboration</p>
+          <ul class="plan-features">
+            <li><span class="check">✓</span> Everything in Pro</li>
+            <li><span class="check">✓</span> Up to 10 team members</li>
+            <li><span class="check">✓</span> Shared templates</li>
+            <li><span class="check">✓</span> Team analytics</li>
+            <li><span class="check">✓</span> Custom integrations</li>
+            <li><span class="check">✓</span> Dedicated support</li>
+          </ul>
+          <a href="app.html" class="plan-button plan-button-outline">Contact Sales</a>
         </div>
       </div>
     </div>
@@ -258,10 +234,10 @@
       <div class="cta-content">
         <h2>Ready to Write Like You, But Faster?</h2>
         <p>Join professionals who save hours each week with LetiMail</p>
-        <button class="cta-button">
+        <a href="app.html" class="cta-button">
           Start Writing Free
           <span class="cta-arrow">→</span>
-        </button>
+        </a>
         <div class="cta-features">
           <div class="cta-feature">
             <span class="feature-check">✓</span>
@@ -331,7 +307,5 @@
       </div>
     </div>
   </footer>
-
-  <script src="Frontend/script.js"></script>
 </body>
 </html>
