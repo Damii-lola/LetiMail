@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LetiMail App - Generate Your Emails</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Navigation -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="logo">
+        <div class="logo-mark">L</div>
+        <div class="logo-text">
+          <h1>LetiMail</h1>
+          <span class="logo-tagline">Your Voice, AI Powered</span>
+        </div>
+      </a>
+      <div class="nav-actions">
+        <div class="user-info">
+          <span class="user-badge">Free Plan</span>
+          <span class="email-count">50 emails left</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main App Section -->
+  <section class="app-main">
+    <div class="app-container">
+      <div class="app-header">
+        <h1>Create Your Perfect Email</h1>
+        <p>Transform your brief context into a complete, professional email in seconds</p>
+      </div>
+
+      <div class="app-workspace">
+        <!-- Input Panel -->
+        <div class="input-panel">
+          <div class="panel-header">
+            <h2>Your Input</h2>
+            <span class="step-indicator">Step 1 of 2</span>
+          </div>
+          
+          <div class="input-group">
+            <label for="businessDesc">
+              <span class="label-icon">🏢</span>
+              Describe Your Business
+            </label>
+            <textarea 
+              id="businessDesc" 
+              placeholder="e.g., I run a digital marketing agency specializing in SaaS companies..."
+              rows="4"
+            ></textarea>
+            <span class="input-hint">Help AI understand your business context</span>
+          </div>
+
+          <div class="input-group">
+            <label for="context">
+              <span class="label-icon">💬</span>
+              Email Context & Purpose
+            </label>
+            <textarea 
+              id="context" 
+              placeholder="e.g., Following up with a prospect who showed interest in our premium package..."
+              rows="4"
+            ></textarea>
+            <span class="input-hint">What's the purpose of this email?</span>
+          </div>
+
+          <div class="input-group">
+            <label for="tone">
+              <span class="label-icon">🎨</span>
+              Select Tone
+            </label>
+            <select id="tone">
+              <option value="friendly">🤝 Friendly & Approachable</option>
+              <option value="formal">💼 Professional & Formal</option>
+              <option value="persuasive">🎯 Persuasive & Compelling</option>
+              <option value="casual">😊 Casual & Conversational</option>
+            </select>
+          </div>
+
+          <button id="generateBtn" class="generate-btn">
+            <span class="btn-icon">✨</span>
+            Generate My Email
+          </button>
+        </div>
+
+        <!-- Output Panel -->
+        <div class="output-panel">
+          <div class="panel-header">
+            <h2>Generated Email</h2>
+            <span class="quality-badge">100% Your Voice</span>
+          </div>
+          
+          <div id="output" class="output-text">
+            <div class="output-placeholder">
+              <div class="placeholder-animation">
+                <div class="animation-ring"></div>
+                <div class="placeholder-icon">✉️</div>
+              </div>
+              <p>Your personalized email will appear here</p>
+              <small>Powered by adaptive AI that learns your style</small>
+            </div>
+          </div>
+          
+          <div id="actionButtons" class="action-buttons" style="display: none;">
+            <button id="copyBtn" class="action-btn copy-btn">
+              <span class="btn-icon">📋</span>
+              Copy Email
+            </button>
+            <button id="editBtn" class="action-btn edit-btn">
+              <span class="btn-icon">✏️</span>
+              Edit Email
+            </button>
+            <button id="sendBtn" class="action-btn send-btn">
+              <span class="btn-icon">📤</span>
+              Send Email
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Tips -->
+      <div class="tips-section">
+        <h3>💡 Pro Tips for Better Results</h3>
+        <div class="tips-grid">
+          <div class="tip-card">
+            <span class="tip-icon">🎯</span>
+            <h4>Be Specific</h4>
+            <p>The more context you provide, the better your email will be</p>
+          </div>
+          <div class="tip-card">
+            <span class="tip-icon">🗣️</span>
+            <h4>Your Voice</h4>
+            <p>Describe how you naturally communicate in business</p>
+          </div>
+          <div class="tip-card">
+            <span class="tip-icon">✏️</span>
+            <h4>Refine & Edit</h4>
+            <p>Edit generated emails to train the AI on your style</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="container">
+      <p>&copy; 2024 LetiMail. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="#">Help Center</a>
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+      </div>
+    </div>
+  </footer>
+  <script src="Frontend/script.js"></script>
+</body>
+</html>
