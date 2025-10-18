@@ -20,8 +20,9 @@
       </a>
       <div class="nav-actions">
         <div class="user-info">
-          <span class="user-badge">Free Plan</span>
-          <span class="email-count">50 emails left</span>
+          <span class="user-badge" id="planType">Free Plan</span>
+          <span class="email-count" id="emailCount">25 emails left</span>
+          <button id="logoutBtn" class="logout-btn">Logout</button>
         </div>
       </div>
     </div>
@@ -158,6 +159,28 @@
       </div>
     </div>
   </footer>
+
+  <script>
+    // Check authentication
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = 'index.html';
+    }
+
+    // Load user data
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    document.getElementById('planType').textContent = user.plan || 'Free Plan';
+    document.getElementById('emailCount').textContent = `${user.emailsLeft || 25} emails left`;
+
+    // Logout functionality
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = 'index.html';
+    });
+
+    // Rest of your existing app.js functionality...
+  </script>
   <script src="Frontend/script.js"></script>
 </body>
 </html>
