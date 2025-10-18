@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings - LetiMail</title>
+  <link rel="stylesheet" href="Frontend/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Notification System -->
+  <div id="notification" class="notification hidden">
+    <div class="notification-content">
+      <span class="notification-icon"></span>
+      <span class="notification-message"></span>
+      <button class="notification-close">&times;</button>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="logo">
+        <div class="logo-mark">L</div>
+        <div class="logo-text">
+          <h1>LetiMail</h1>
+          <span class="logo-tagline">Your Voice, AI Powered</span>
+        </div>
+      </a>
+      <div class="nav-actions">
+        <div class="user-info">
+          <span class="user-badge" id="planType">Free Plan</span>
+          <span class="email-count" id="emailCount">25 emails left</span>
+        </div>
+        <div id="userMenu" class="user-menu">
+          <button class="user-avatar" id="userAvatar">
+            <span id="avatarText">U</span>
+          </button>
+          <div class="dropdown-menu">
+            <a href="app.html" class="dropdown-item">
+              <i class="fas fa-envelope"></i>Email Generator
+            </a>
+            <a href="settings.html" class="dropdown-item active">
+              <i class="fas fa-cog"></i>Settings
+            </a>
+            <div class="dropdown-divider"></div>
+            <button id="logoutBtn" class="dropdown-item logout">
+              <i class="fas fa-sign-out-alt"></i>Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Settings Main Section -->
+  <section class="settings-main">
+    <div class="settings-container">
+      <div class="settings-header">
+        <h1>Account Settings</h1>
+        <p>Manage your LetiMail account and preferences</p>
+      </div>
+
+      <div class="settings-content">
+        <!-- Sidebar Navigation -->
+        <div class="settings-sidebar">
+          <nav class="settings-nav">
+            <button class="nav-item active" data-tab="profile">
+              <i class="fas fa-user"></i>
+              Profile
+            </button>
+            <button class="nav-item" data-tab="subscription">
+              <i class="fas fa-crown"></i>
+              Subscription
+            </button>
+            <button class="nav-item" data-tab="preferences">
+              <i class="fas fa-sliders-h"></i>
+              Preferences
+            </button>
+            <button class="nav-item" data-tab="security">
+              <i class="fas fa-shield-alt"></i>
+              Security
+            </button>
+            <button class="nav-item" data-tab="notifications">
+              <i class="fas fa-bell"></i>
+              Notifications
+            </button>
+          </nav>
+        </div>
+
+        <!-- Settings Panels -->
+        <div class="settings-panels">
+          <!-- Profile Tab -->
+          <div class="settings-panel active" id="profile-panel">
+            <h2>Profile Information</h2>
+            <form id="profileForm" class="settings-form">
+              <div class="form-group">
+                <label for="profileName">Full Name</label>
+                <input type="text" id="profileName" class="settings-input" placeholder="Enter your full name">
+              </div>
+              <div class="form-group">
+                <label for="profileEmail">Email Address</label>
+                <input type="email" id="profileEmail" class="settings-input" placeholder="Enter your email" readonly>
+              </div>
+              <div class="form-group">
+                <label for="profileCompany">Company</label>
+                <input type="text" id="profileCompany" class="settings-input" placeholder="Enter your company name">
+              </div>
+              <div class="form-group">
+                <label for="profileRole">Role</label>
+                <input type="text" id="profileRole" class="settings-input" placeholder="Enter your role">
+              </div>
+              <button type="submit" class="settings-btn primary">
+                <span class="btn-text">Save Changes</span>
+                <div class="btn-spinner" style="display: none;"></div>
+              </button>
+            </form>
+          </div>
+
+          <!-- Subscription Tab -->
+          <div class="settings-panel" id="subscription-panel">
+            <h2>Subscription Plan</h2>
+            <div class="subscription-info">
+              <div class="plan-card current-plan">
+                <div class="plan-header">
+                  <h3 id="currentPlanName">Free Plan</h3>
+                  <span class="plan-badge">Current</span>
+                </div>
+                <div class="plan-features">
+                  <div class="feature">
+                    <i class="fas fa-check"></i>
+                    <span>25 emails per month</span>
+                  </div>
+                  <div class="feature">
+                    <i class="fas fa-check"></i>
+                    <span>5 emails per day limit</span>
+                  </div>
+                  <div class="feature">
+                    <i class="fas fa-check"></i>
+                    <span>Basic email features</span>
+                  </div>
+                </div>
+                <div class="plan-usage">
+                  <div class="usage-item">
+                    <span class="usage-label">Emails used this month:</span>
+                    <span class="usage-value" id="emailsUsed">0/25</span>
+                  </div>
+                  <div class="usage-item">
+                    <span class="usage-label">Daily emails used:</span>
+                    <span class="usage-value" id="dailyEmailsUsed">0/5</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="upgrade-options">
+                <h4>Upgrade Your Plan</h4>
+                <div class="plan-option">
+                  <div class="option-header">
+                    <h5>Premium</h5>
+                    <span class="option-price">$9.99/month</span>
+                  </div>
+                  <ul class="option-features">
+                    <li>500 emails per month</li>
+                    <li>Unlimited daily emails</li>
+                    <li>Advanced tone learning</li>
+                    <li>Smart reply generation</li>
+                    <li>Priority support</li>
+                  </ul>
+                  <button class="settings-btn secondary">Upgrade to Premium</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Preferences Tab -->
+          <div class="settings-panel" id="preferences-panel">
+            <h2>Email Preferences</h2>
+            <form id="preferencesForm" class="settings-form">
+              <div class="form-group">
+                <label>Default Email Tone</label>
+                <select id="defaultTone" class="settings-select">
+                  <option value="friendly">Friendly & Approachable</option>
+                  <option value="formal">Professional & Formal</option>
+                  <option value="persuasive">Persuasive & Compelling</option>
+                  <option value="casual">Casual & Conversational</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Email Length Preference</label>
+                <select id="emailLength" class="settings-select">
+                  <option value="short">Short & Concise</option>
+                  <option value="medium">Medium Length</option>
+                  <option value="detailed">Detailed & Comprehensive</option>
+                </select>
+              </div>
+              <div class="form-group checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="autoSave" checked>
+                  <span class="checkmark"></span>
+                  Auto-save draft emails
+                </label>
+              </div>
+              <div class="form-group checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="spellCheck" checked>
+                  <span class="checkmark"></span>
+                  Enable spell check
+                </label>
+              </div>
+              <button type="submit" class="settings-btn primary">Save Preferences</button>
+            </form>
+          </div>
+
+          <!-- Security Tab -->
+          <div class="settings-panel" id="security-panel">
+            <h2>Security Settings</h2>
+            <div class="security-sections">
+              <div class="security-section">
+                <h4>Change Password</h4>
+                <form id="passwordForm" class="settings-form">
+                  <div class="form-group">
+                    <label for="currentPassword">Current Password</label>
+                    <input type="password" id="currentPassword" class="settings-input" placeholder="Enter current password">
+                  </div>
+                  <div class="form-group">
+                    <label for="newPassword">New Password</label>
+                    <input type="password" id="newPassword" class="settings-input" placeholder="Enter new password">
+                  </div>
+                  <div class="form-group">
+                    <label for="confirmPassword">Confirm New Password</label>
+                    <input type="password" id="confirmPassword" class="settings-input" placeholder="Confirm new password">
+                  </div>
+                  <button type="submit" class="settings-btn primary">Update Password</button>
+                </form>
+              </div>
+
+              <div class="security-section">
+                <h4>Two-Factor Authentication</h4>
+                <div class="security-info">
+                  <p>Add an extra layer of security to your account</p>
+                  <button class="settings-btn secondary" id="enable2fa">
+                    <i class="fas fa-shield-alt"></i>
+                    Enable 2FA
+                  </button>
+                </div>
+              </div>
+
+              <div class="security-section">
+                <h4>Login Activity</h4>
+                <div class="login-sessions">
+                  <div class="session-item">
+                    <div class="session-info">
+                      <strong>Current Session</strong>
+                      <span>Chrome • Windows • Just now</span>
+                    </div>
+                    <span class="session-status current">Active</span>
+                  </div>
+                </div>
+                <button class="settings-btn outline" id="logoutAll">
+                  <i class="fas fa-sign-out-alt"></i>
+                  Logout from all devices
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notifications Tab -->
+          <div class="settings-panel" id="notifications-panel">
+            <h2>Notification Preferences</h2>
+            <form id="notificationsForm" class="settings-form">
+              <div class="notification-category">
+                <h4>Email Notifications</h4>
+                <div class="form-group checkbox-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="emailUpdates" checked>
+                    <span class="checkmark"></span>
+                    Product updates and new features
+                  </label>
+                </div>
+                <div class="form-group checkbox-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="emailTips" checked>
+                    <span class="checkmark"></span>
+                    Tips and best practices
+                  </label>
+                </div>
+                <div class="form-group checkbox-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="emailPromo">
+                    <span class="checkmark"></span>
+                    Promotional offers
+                  </label>
+                </div>
+              </div>
+
+              <div class="notification-category">
+                <h4>In-App Notifications</h4>
+                <div class="form-group checkbox-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="inAppUsage" checked>
+                    <span class="checkmark"></span>
+                    Usage limits and reminders
+                  </label>
+                </div>
+                <div class="form-group checkbox-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="inAppSuccess" checked>
+                    <span class="checkmark"></span>
+                    Success notifications
+                  </label>
+                </div>
+                <div class="form-group checkbox-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="inAppErrors" checked>
+                    <span class="checkmark"></span>
+                    Error and warning messages
+                  </label>
+                </div>
+              </div>
+
+              <button type="submit" class="settings-btn primary">Save Notification Settings</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="Frontend/auth.js"></script>
+  <script src="Frontend/settings.js"></script>
+</body>
+</html>
