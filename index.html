@@ -6,8 +6,18 @@
   <title>LetiMail — AI Email Assistant That Sounds Like You</title>
   <link rel="stylesheet" href="Frontend/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
+  <!-- Notification System -->
+  <div id="notification" class="notification hidden">
+    <div class="notification-content">
+      <span class="notification-icon"></span>
+      <span class="notification-message"></span>
+      <button class="notification-close">&times;</button>
+    </div>
+  </div>
+
   <!-- Navigation -->
   <header class="navbar">
     <div class="nav-container">
@@ -19,8 +29,27 @@
         </div>
       </div>
       <div class="nav-actions">
-        <button id="loginBtn" class="login-btn">Login</button>
-        <button id="signupBtn" class="signup-btn">Sign Up</button>
+        <div id="userMenu" class="user-menu" style="display: none;">
+          <button class="user-avatar" id="userAvatar">
+            <span id="avatarText">U</span>
+          </button>
+          <div class="dropdown-menu">
+            <a href="app.html" class="dropdown-item">
+              <i class="fas fa-envelope"></i>Email Generator
+            </a>
+            <a href="settings.html" class="dropdown-item">
+              <i class="fas fa-cog"></i>Settings
+            </a>
+            <div class="dropdown-divider"></div>
+            <button id="logoutBtn" class="dropdown-item logout">
+              <i class="fas fa-sign-out-alt"></i>Logout
+            </button>
+          </div>
+        </div>
+        <div id="authButtons" class="auth-buttons">
+          <button id="loginBtn" class="login-btn">Login</button>
+          <button id="signupBtn" class="signup-btn">Sign Up</button>
+        </div>
       </div>
     </div>
   </header>
@@ -34,15 +63,49 @@
         <form id="loginForm" class="auth-form">
           <div class="input-group">
             <label for="loginEmail">Email</label>
-            <input type="email" id="loginEmail" required class="auth-input">
+            <input type="email" id="loginEmail" required class="auth-input" placeholder="Enter your email">
           </div>
           <div class="input-group">
             <label for="loginPassword">Password</label>
-            <input type="password" id="loginPassword" required class="auth-input">
+            <input type="password" id="loginPassword" required class="auth-input" placeholder="Enter your password">
           </div>
-          <button type="submit" class="auth-btn primary">Sign In</button>
+          <button type="submit" class="auth-btn primary">
+            <span class="btn-text">Sign In</span>
+            <div class="btn-spinner" style="display: none;"></div>
+          </button>
         </form>
+        <div class="auth-divider">
+          <span>or</span>
+        </div>
+        <button class="auth-btn secondary" id="loginWithOtp">
+          <i class="fas fa-mobile-alt"></i>
+          Sign in with OTP
+        </button>
         <p class="auth-switch">Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+        <button class="modal-close" onclick="hideAuthModal()">×</button>
+      </div>
+    </div>
+
+    <!-- OTP Login Modal -->
+    <div id="otpLoginModal" class="modal-overlay">
+      <div class="modal-content auth-modal">
+        <h3>Sign in with OTP</h3>
+        <form id="otpLoginForm" class="auth-form">
+          <div class="input-group">
+            <label for="otpEmail">Email</label>
+            <input type="email" id="otpEmail" required class="auth-input" placeholder="Enter your email">
+          </div>
+          <div class="input-group">
+            <label for="otpCode">OTP Code</label>
+            <input type="text" id="otpCode" class="auth-input" placeholder="Enter 6-digit OTP" maxlength="6">
+            <button type="button" id="sendOtpBtn" class="otp-send-btn">Send OTP</button>
+          </div>
+          <button type="submit" class="auth-btn primary">
+            <span class="btn-text">Verify OTP</span>
+            <div class="btn-spinner" style="display: none;"></div>
+          </button>
+        </form>
+        <p class="auth-switch">Prefer password? <a href="#" id="showPasswordLogin">Sign in with password</a></p>
         <button class="modal-close" onclick="hideAuthModal()">×</button>
       </div>
     </div>
@@ -54,17 +117,20 @@
         <form id="signupForm" class="auth-form">
           <div class="input-group">
             <label for="signupName">Full Name</label>
-            <input type="text" id="signupName" required class="auth-input">
+            <input type="text" id="signupName" required class="auth-input" placeholder="Enter your full name">
           </div>
           <div class="input-group">
             <label for="signupEmail">Email</label>
-            <input type="email" id="signupEmail" required class="auth-input">
+            <input type="email" id="signupEmail" required class="auth-input" placeholder="Enter your email">
           </div>
           <div class="input-group">
             <label for="signupPassword">Password</label>
-            <input type="password" id="signupPassword" required class="auth-input" minlength="6">
+            <input type="password" id="signupPassword" required class="auth-input" placeholder="Create a password" minlength="6">
           </div>
-          <button type="submit" class="auth-btn primary">Create Account</button>
+          <button type="submit" class="auth-btn primary">
+            <span class="btn-text">Create Account</span>
+            <div class="btn-spinner" style="display: none;"></div>
+          </button>
         </form>
         <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Sign in</a></p>
         <button class="modal-close" onclick="hideAuthModal()">×</button>
@@ -72,6 +138,7 @@
     </div>
   </div>
 
+  <!-- Rest of your existing landing page content remains the same -->
   <!-- Hero Section -->
   <section class="hero">
     <div class="hero-background"></div>
@@ -347,99 +414,14 @@
       <div class="footer-bottom">
         <p>&copy; 2024 LetiMail. All rights reserved.</p>
         <div class="footer-social">
-          <a href="#">Twitter</a>
-          <a href="#">LinkedIn</a>
-          <a href="#">GitHub</a>
+          <a href="#"><i class="fab fa-twitter"></i></a>
+          <a href="#"><i class="fab fa-linkedin"></i></a>
+          <a href="#"><i class="fab fa-github"></i></a>
         </div>
       </div>
     </div>
   </footer>
 
-  <script>
-    // Auth modal functionality
-    function showLoginModal() {
-      document.getElementById('authModals').style.display = 'block';
-      document.getElementById('loginModal').style.display = 'flex';
-      document.getElementById('signupModal').style.display = 'none';
-    }
-
-    function showSignupModal() {
-      document.getElementById('authModals').style.display = 'block';
-      document.getElementById('signupModal').style.display = 'flex';
-      document.getElementById('loginModal').style.display = 'none';
-    }
-
-    function hideAuthModal() {
-      document.getElementById('authModals').style.display = 'none';
-    }
-
-    // Event listeners
-    document.getElementById('loginBtn').addEventListener('click', showLoginModal);
-    document.getElementById('signupBtn').addEventListener('click', showSignupModal);
-    document.getElementById('showSignup').addEventListener('click', showSignupModal);
-    document.getElementById('showLogin').addEventListener('click', showLoginModal);
-
-    // Close modal when clicking outside
-    document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('modal-overlay')) {
-        hideAuthModal();
-      }
-    });
-
-    // Auth form submissions
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = document.getElementById('loginEmail').value;
-      const password = document.getElementById('loginPassword').value;
-      
-      try {
-        const response = await fetch('https://letimail-production.up.railway.app/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          alert('Login successful!');
-          hideAuthModal();
-          window.location.href = 'app.html';
-        } else {
-          alert(data.error || 'Login failed');
-        }
-      } catch (error) {
-        alert('Login failed. Please try again.');
-      }
-    });
-
-    document.getElementById('signupForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const name = document.getElementById('signupName').value;
-      const email = document.getElementById('signupEmail').value;
-      const password = document.getElementById('signupPassword').value;
-      
-      try {
-        const response = await fetch('https://letimail-production.up.railway.app/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-          alert('Account created! Please check your email for verification.');
-          hideAuthModal();
-        } else {
-          alert(data.error || 'Signup failed');
-        }
-      } catch (error) {
-        alert('Signup failed. Please try again.');
-      }
-    });
-  </script>
+  <script src="Frontend/auth.js"></script>
 </body>
 </html>
