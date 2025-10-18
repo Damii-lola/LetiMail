@@ -1005,5 +1005,211 @@ app.get('/auth/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// OTP Login endpoints
+app.post('/auth/send-otp', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    // Check if user exists
+    const userResult = await pool.query(
+      'SELECT id, name, is_verified FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No account found with this email' });
+    }
+
+    const user = userResult.rows[0];
+
+    if (!user.is_verified) {
+      return res.status(400).json({ error: 'Please verify your email first' });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Store OTP in database
+    await pool.query(
+      'UPDATE users SET otp_code = $1, otp_expiry = $2 WHERE email = $3',
+      [otp, otpExpiry, email]
+    );
+
+    // Send OTP email
+    const msg = {
+      to: email,
+      from: {
+        email: process.env.FROM_EMAIL,
+        name: 'LetiMail'
+      },
+      subject: 'Your LetiMail Login OTP',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #6366f1;">Your Login OTP</h2>
+          <p>Hi ${user.name},</p>
+          <p>Use the following OTP to sign in to your LetiMail account:</p>
+          <div style="background: #f8fafc; border: 2px dashed #cbd5e0; padding: 20px; text-align: center; margin: 20px 0;">
+            <h1 style="color: #6366f1; font-size: 48px; margin: 0; letter-spacing: 8px;">${otp}</h1>
+          </div>
+          <p style="color: #666; font-size: 14px;">This OTP will expire in 10 minutes.</p>
+          <p>If you didn't request this OTP, please ignore this email.</p>
+        </div>
+      `
+    };
+
+    await sgMail.send(msg);
+
+    res.json({ message: 'OTP sent successfully' });
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+app.post('/auth/verify-otp', async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ error: 'Email and OTP are required' });
+  }
+
+  try {
+    // Verify OTP
+    const result = await pool.query(
+      'SELECT id, name, email, plan, emails_used, emails_left, otp_code, otp_expiry FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Invalid OTP' });
+    }
+
+    const user = result.rows[0];
+
+    if (!user.otp_code || user.otp_code !== otp) {
+      return res.status(400).json({ error: 'Invalid OTP' });
+    }
+
+    if (new Date() > user.otp_expiry) {
+      return res.status(400).json({ error: 'OTP has expired' });
+    }
+
+    // Clear OTP after successful verification
+    await pool.query(
+      'UPDATE users SET otp_code = NULL, otp_expiry = NULL WHERE email = $1',
+      [email]
+    );
+
+    // Create token
+    const token = jwt.sign(
+      { id: user.id, email: user.email }, 
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        plan: user.plan,
+        emailsUsed: user.emails_used,
+        emailsLeft: user.emails_left
+      }
+    });
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({ error: 'Failed to verify OTP' });
+  }
+});
+
+// Update user profile endpoint
+app.post('/auth/update-profile', authenticateToken, async (req, res) => {
+  const { name, company, role } = req.body;
+
+  try {
+    await pool.query(
+      'UPDATE users SET name = $1, company = $2, role = $3 WHERE id = $4',
+      [name, company, role, req.user.id]
+    );
+
+    res.json({ message: 'Profile updated successfully' });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// Change password endpoint
+app.post('/auth/change-password', authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  try {
+    // Verify current password
+    const userResult = await pool.query(
+      'SELECT password FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    const validPassword = await bcrypt.compare(currentPassword, userResult.rows[0].password);
+    if (!validPassword) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await pool.query(
+      'UPDATE users SET password = $1 WHERE id = $2',
+      [hashedPassword, req.user.id]
+    );
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+// Update preferences endpoint
+app.post('/auth/update-preferences', authenticateToken, async (req, res) => {
+  const { preferences } = req.body;
+
+  try {
+    await pool.query(
+      'UPDATE users SET preferences = $1 WHERE id = $2',
+      [JSON.stringify(preferences), req.user.id]
+    );
+
+    res.json({ message: 'Preferences updated successfully' });
+  } catch (error) {
+    console.error('Update preferences error:', error);
+    res.status(500).json({ error: 'Failed to update preferences' });
+  }
+});
+
+// Update notifications endpoint
+app.post('/auth/update-notifications', authenticateToken, async (req, res) => {
+  const { notifications } = req.body;
+
+  try {
+    await pool.query(
+      'UPDATE users SET notification_settings = $1 WHERE id = $2',
+      [JSON.stringify(notifications), req.user.id]
+    );
+
+    res.json({ message: 'Notification settings updated successfully' });
+  } catch (error) {
+    console.error('Update notifications error:', error);
+    res.status(500).json({ error: 'Failed to update notification settings' });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 LetiMail backend running on port ${PORT}`));
