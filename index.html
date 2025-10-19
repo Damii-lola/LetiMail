@@ -10,12 +10,18 @@
 </head>
 <body>
   <!-- Notification System -->
-  <div id="notification" class="notification hidden">
+  <div id="notification" class="notification">
     <div class="notification-content">
-      <span class="notification-icon"></span>
-      <span class="notification-message"></span>
-      <button class="notification-close">&times;</button>
+      <div class="notification-icon"></div>
+      <div class="notification-text">
+        <div class="notification-title"></div>
+        <div class="notification-message"></div>
+      </div>
+      <button class="notification-close">
+        <i class="fas fa-times"></i>
+      </button>
     </div>
+    <div class="notification-progress"></div>
   </div>
 
   <!-- Navigation -->
@@ -56,64 +62,16 @@
 
   <!-- Auth Modals -->
   <div id="authModals" style="display: none;">
-    <!-- Login Modal -->
-    <div id="loginModal" class="modal-overlay">
-      <div class="modal-content auth-modal">
-        <h3>Welcome Back</h3>
-        <form id="loginForm" class="auth-form">
-          <div class="input-group">
-            <label for="loginEmail">Email</label>
-            <input type="email" id="loginEmail" required class="auth-input" placeholder="Enter your email">
-          </div>
-          <div class="input-group">
-            <label for="loginPassword">Password</label>
-            <input type="password" id="loginPassword" required class="auth-input" placeholder="Enter your password">
-          </div>
-          <button type="submit" class="auth-btn primary">
-            <span class="btn-text">Sign In</span>
-            <div class="btn-spinner" style="display: none;"></div>
-          </button>
-        </form>
-        <div class="auth-divider">
-          <span>or</span>
-        </div>
-        <button class="auth-btn secondary" id="loginWithOtp">
-          <i class="fas fa-mobile-alt"></i>
-          Sign in with OTP
-        </button>
-        <p class="auth-switch">Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
-        <button class="modal-close" onclick="hideAuthModal()">×</button>
-      </div>
-    </div>
-
-    <!-- OTP Login Modal -->
-    <div id="otpLoginModal" class="modal-overlay">
-      <div class="modal-content auth-modal">
-        <h3>Sign in with OTP</h3>
-        <form id="otpLoginForm" class="auth-form">
-          <div class="input-group">
-            <label for="otpEmail">Email</label>
-            <input type="email" id="otpEmail" required class="auth-input" placeholder="Enter your email">
-          </div>
-          <div class="input-group">
-            <label for="otpCode">OTP Code</label>
-            <input type="text" id="otpCode" class="auth-input" placeholder="Enter 6-digit OTP" maxlength="6">
-            <button type="button" id="sendOtpBtn" class="otp-send-btn">Send OTP</button>
-          </div>
-          <button type="submit" class="auth-btn primary">
-            <span class="btn-text">Verify OTP</span>
-            <div class="btn-spinner" style="display: none;"></div>
-          </button>
-        </form>
-        <p class="auth-switch">Prefer password? <a href="#" id="showPasswordLogin">Sign in with password</a></p>
-        <button class="modal-close" onclick="hideAuthModal()">×</button>
-      </div>
-    </div>
-
     <!-- Signup Modal -->
     <div id="signupModal" class="modal-overlay">
       <div class="modal-content auth-modal">
-        <h3>Create Your Account</h3>
+        <button class="modal-close" onclick="hideAuthModal()">
+          <i class="fas fa-times"></i>
+        </button>
+        <div class="auth-header">
+          <h3>Create Your Account</h3>
+          <p>Join thousands of professionals using LetiMail</p>
+        </div>
         <form id="signupForm" class="auth-form">
           <div class="input-group">
             <label for="signupName">Full Name</label>
@@ -125,20 +83,82 @@
           </div>
           <div class="input-group">
             <label for="signupPassword">Password</label>
-            <input type="password" id="signupPassword" required class="auth-input" placeholder="Create a password" minlength="6">
+            <input type="password" id="signupPassword" required class="auth-input" placeholder="Create a password (min. 6 characters)" minlength="6">
           </div>
           <button type="submit" class="auth-btn primary">
             <span class="btn-text">Create Account</span>
-            <div class="btn-spinner" style="display: none;"></div>
+            <div class="btn-spinner"></div>
           </button>
         </form>
-        <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Sign in</a></p>
-        <button class="modal-close" onclick="hideAuthModal()">×</button>
+        <div class="auth-footer">
+          <p>Already have an account? <a href="#" id="showLogin">Sign in</a></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- OTP Verification Modal -->
+    <div id="otpModal" class="modal-overlay">
+      <div class="modal-content auth-modal">
+        <button class="modal-close" onclick="hideAuthModal()">
+          <i class="fas fa-times"></i>
+        </button>
+        <div class="auth-header">
+          <h3>Verify Your Email</h3>
+          <p>We've sent a 6-digit code to your email</p>
+        </div>
+        <form id="otpForm" class="auth-form">
+          <div class="input-group">
+            <label for="otpCode">Enter OTP Code</label>
+            <div class="otp-input-container">
+              <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="000000" maxlength="6" pattern="[0-9]{6}">
+              <button type="button" id="resendOtp" class="otp-resend" disabled>
+                Resend (60s)
+              </button>
+            </div>
+            <div class="otp-hint">Enter the 6-digit code sent to your email</div>
+          </div>
+          <button type="submit" class="auth-btn primary">
+            <span class="btn-text">Verify & Continue</span>
+            <div class="btn-spinner"></div>
+          </button>
+        </form>
+        <div class="auth-footer">
+          <p>Wrong email? <a href="#" id="changeEmail">Change email</a></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal-overlay">
+      <div class="modal-content auth-modal">
+        <button class="modal-close" onclick="hideAuthModal()">
+          <i class="fas fa-times"></i>
+        </button>
+        <div class="auth-header">
+          <h3>Welcome Back</h3>
+          <p>Sign in to your LetiMail account</p>
+        </div>
+        <form id="loginForm" class="auth-form">
+          <div class="input-group">
+            <label for="loginEmail">Email</label>
+            <input type="email" id="loginEmail" required class="auth-input" placeholder="Enter your email">
+          </div>
+          <div class="input-group">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" required class="auth-input" placeholder="Enter your password">
+          </div>
+          <button type="submit" class="auth-btn primary">
+            <span class="btn-text">Sign In</span>
+            <div class="btn-spinner"></div>
+          </button>
+        </form>
+        <div class="auth-footer">
+          <p>Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Rest of your existing landing page content remains the same -->
   <!-- Hero Section -->
   <section class="hero">
     <div class="hero-background"></div>
@@ -156,7 +176,7 @@
           LetiMail lifts the weight of writing off your shoulders — so you can focus on growing your business, not typing.
         </p>
         <div class="hero-cta">
-          <a href="app.html" class="primary-cta">Start Writing Free</a>
+          <button class="primary-cta" onclick="handleGetStarted()">Start Writing</button>
           <button class="secondary-cta">Watch Demo</button>
         </div>
         <div class="hero-stats">
@@ -197,7 +217,7 @@
       </div>
     </div>
   </section>
-
+  
   <!-- Problem Section -->
   <section class="problem-section">
     <div class="container">
@@ -348,8 +368,8 @@
       <div class="cta-content">
         <h2>Ready to Write Like You, But Faster?</h2>
         <p>Join professionals who save hours each week with LetiMail</p>
-        <button class="cta-button" onclick="showSignupModal()">
-          Start Writing Free
+        <button class="cta-button" onclick="handleGetStarted()">
+          Start Writing
           <span class="cta-arrow">→</span>
         </button>
         <div class="cta-features">
@@ -369,7 +389,7 @@
       </div>
     </div>
   </section>
-
+  
   <!-- Footer -->
   <footer class="footer">
     <div class="container">
