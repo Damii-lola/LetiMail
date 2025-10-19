@@ -1,27 +1,42 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
-import { createClient } from '@supabase/supabase-js';
+import pkg from 'pg';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
+const { Pool } = pkg;
 const app = express();
-app.use(cors());
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
-// Initialize Supabase with Railway environment variables
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE
-);
-
-// Serve Supabase config to frontend
-app.get("/api/config", (req, res) => {
-  res.json({
-    supabaseUrl: process.env.SUPABASE_URL,
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY
-  });
+// PostgreSQL connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Auth middleware using Supabase
+// Test database connection
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('Error connecting to the database', err.stack);
+  } else {
+    console.log('✅ Database connected successfully');
+    release();
+  }
+});
+
+// JWT Secret
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+
+// Auth middleware
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -31,20 +46,145 @@ const authenticateToken = async (req, res, next) => {
   }
 
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
     
-    if (error || !user) {
-      return res.status(403).json({ error: 'Invalid token' });
+    if (result.rows.length === 0) {
+      return res.status(403).json({ error: 'User not found' });
     }
     
-    req.user = user;
+    req.user = result.rows[0];
     next();
   } catch (error) {
     return res.status(403).json({ error: 'Invalid token' });
   }
 };
 
-// Email Generation Functions
+// ============================================
+// AUTH ENDPOINTS
+// ============================================
+
+// Register new user
+app.post("/api/auth/register", async (req, res) => {
+  const { name, email, password } = req.body;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  try {
+    // Check if user exists
+    const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Insert user
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
+       VALUES ($1, $2, $3, 'free', 0, 25, 0, CURRENT_DATE)
+       RETURNING id, name, email, plan, emails_used, emails_left, daily_emails_used, created_at`,
+      [name, email, hashedPassword]
+    );
+
+    const user = result.rows[0];
+
+    // Generate JWT
+    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        plan: user.plan,
+        emails_used: user.emails_used,
+        emails_left: user.emails_left,
+        daily_emails_used: user.daily_emails_used
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Login user
+app.post("/api/auth/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
+  }
+
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const user = result.rows[0];
+    const validPassword = await bcrypt.compare(password, user.password);
+
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Generate JWT
+    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        plan: user.plan,
+        emails_used: user.emails_used,
+        emails_left: user.emails_left,
+        daily_emails_used: user.daily_emails_used
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Get current user
+app.get("/api/auth/me", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, email, plan, emails_used, emails_left, daily_emails_used, last_reset_date FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user: result.rows[0] });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ error: 'Failed to get user data' });
+  }
+});
+
+// ============================================
+// EMAIL GENERATION
+// ============================================
+
 function cleanAIResponse(content) {
   if (!content) return content;
   
@@ -108,7 +248,7 @@ function addHumanTouches(email) {
 }
 
 // Generate email endpoint
-app.post("/generate", authenticateToken, async (req, res) => {
+app.post("/api/generate", authenticateToken, async (req, res) => {
   const { business, context, tone } = req.body;
   
   if (!business || !context) {
@@ -116,16 +256,7 @@ app.post("/generate", authenticateToken, async (req, res) => {
   }
 
   try {
-    // Check user's email limits
-    const { data: user, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', req.user.id)
-      .single();
-
-    if (error || !user) {
-      return res.status(404).json({ email: "User not found" });
-    }
+    const user = req.user;
     
     // Check monthly limit
     if (user.emails_left <= 0) {
@@ -275,20 +406,16 @@ Return ONLY the email content starting with "Subject:".
       });
     }
 
-    // Update email usage in Supabase
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        emails_used: user.emails_used + 1,
-        emails_left: user.emails_left - 1,
-        daily_emails_used: dailyEmailsUsed + 1,
-        last_reset_date: today
-      })
-      .eq('id', req.user.id);
-
-    if (updateError) {
-      console.error('Error updating email usage:', updateError);
-    }
+    // Update email usage
+    await pool.query(
+      `UPDATE users 
+       SET emails_used = emails_used + 1, 
+           emails_left = emails_left - 1,
+           daily_emails_used = $1,
+           last_reset_date = $2
+       WHERE id = $3`,
+      [dailyEmailsUsed + 1, today, user.id]
+    );
     
     res.json({ email });
   } catch (error) {
@@ -297,7 +424,7 @@ Return ONLY the email content starting with "Subject:".
   }
 });
 
-app.post("/refine-email", authenticateToken, async (req, res) => {
+app.post("/api/refine-email", authenticateToken, async (req, res) => {
   const { business, context, tone, originalEmail, editedEmail } = req.body;
 
   if (!validateEmailContent(editedEmail, business, context)) {
@@ -360,7 +487,7 @@ Formatted email:
 });
 
 // Send email endpoint
-app.post("/send-email", authenticateToken, async (req, res) => {
+app.post("/api/send-email", authenticateToken, async (req, res) => {
   const { to, subject, content, senderName } = req.body;
 
   if (!to || !subject || !content) {
@@ -412,7 +539,6 @@ app.post("/send-email", authenticateToken, async (req, res) => {
   }
 });
 
-// Email formatting functions
 function formatEmailContent(content, senderName) {
   let emailBody = content.replace(/^Subject:\s*.+\n?/i, '').trim();
   let htmlContent = convertTextToSimpleHTML(emailBody);
@@ -534,7 +660,11 @@ function extractSubject(content) {
 
 // Health check endpoint
 app.get("/", (req, res) => {
-  res.send("✅ LetiMail backend running with Supabase Authentication");
+  res.send("✅ LetiMail backend running with PostgreSQL");
+});
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", database: "postgresql" });
 });
 
 const PORT = process.env.PORT || 3000;
