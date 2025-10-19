@@ -12,14 +12,34 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// PostgreSQL connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+// PostgreSQL connection with better error handling
+let pool;
+try {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  });
+  
+  // Test connection
+  pool.query('SELECT NOW()', (err) => {
+    if (err) {
+      console.error('❌ Database connection failed:', err.message);
+    } else {
+      console.log('✅ Database connected successfully');
+    }
+  });
+} catch (error) {
+  console.error('❌ Database initialization failed:', error.message);
+  process.exit(1);
+}
 
-// Initialize SendGrid
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// Initialize SendGrid with fallback
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  console.log('✅ SendGrid configured');
+} else {
+  console.log('⚠️ SendGrid API key not found - email functionality disabled');
+}
 
 // Initialize database tables
 async function initializeDatabase() {
@@ -46,9 +66,9 @@ async function initializeDatabase() {
       )
     `);
     
-    console.log('✅ Database initialized successfully');
+    console.log('✅ Database tables initialized successfully');
   } catch (error) {
-    console.error('❌ Database initialization error:', error);
+    console.error('❌ Database initialization error:', error.message);
   }
 }
 
@@ -61,7 +81,7 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key-for-development', (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid token' });
     }
@@ -73,20 +93,38 @@ const authenticateToken = (req, res, next) => {
 // Initialize database on startup
 initializeDatabase();
 
+// Helper function for database queries
+async function queryDatabase(text, params) {
+  try {
+    const result = await pool.query(text, params);
+    return result;
+  } catch (error) {
+    console.error('Database query error:', error.message);
+    throw new Error('Database operation failed');
+  }
+}
+
 // Auth Routes
 
 // Signup with OTP
 app.post('/auth/signup', async (req, res) => {
+  console.log('📝 Signup attempt:', req.body.email);
+  
   const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
   try {
     // Check if user already exists
-    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existingUser = await queryDatabase('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
+      console.log('❌ User already exists:', email);
       return res.status(400).json({ error: 'User already exists with this email' });
     }
 
@@ -98,52 +136,62 @@ app.post('/auth/signup', async (req, res) => {
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Create user with OTP
-    const result = await pool.query(
+    const result = await queryDatabase(
       `INSERT INTO users (name, email, password, otp_code, otp_expiry, emails_left) 
        VALUES ($1, $2, $3, $4, $5, 25) RETURNING id, name, email`,
       [name, email, hashedPassword, otp, otpExpiry]
     );
 
-    // Send OTP email
-    const msg = {
-      to: email,
-      from: {
-        email: process.env.FROM_EMAIL || 'noreply@letimail.com',
-        name: 'LetiMail'
-      },
-      subject: 'Verify Your LetiMail Account - OTP Required',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6366f1;">Verify Your Email</h2>
-          <p>Hi ${name}, use this OTP to complete your registration:</p>
-          <div style="background: #f8fafc; border: 2px dashed #cbd5e0; padding: 20px; text-align: center; margin: 20px 0;">
-            <h1 style="color: #6366f1; font-size: 48px; margin: 0; letter-spacing: 8px;">${otp}</h1>
-          </div>
-          <p style="color: #666; font-size: 14px;">This code will expire in 10 minutes.</p>
-        </div>
-      `
-    };
+    console.log('✅ User created:', email);
 
-    try {
-      await sgMail.send(msg);
-      console.log('✅ OTP email sent successfully');
-    } catch (emailError) {
-      console.error('❌ Failed to send OTP email:', emailError);
-      // Continue even if email fails for development
+    // Send OTP email (optional - for development we can skip if no SendGrid)
+    if (process.env.SENDGRID_API_KEY) {
+      try {
+        const msg = {
+          to: email,
+          from: {
+            email: process.env.FROM_EMAIL || 'noreply@letimail.com',
+            name: 'LetiMail'
+          },
+          subject: 'Verify Your LetiMail Account - OTP Required',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #6366f1;">Verify Your Email</h2>
+              <p>Hi ${name}, use this OTP to complete your registration:</p>
+              <div style="background: #f8fafc; border: 2px dashed #cbd5e0; padding: 20px; text-align: center; margin: 20px 0;">
+                <h1 style="color: #6366f1; font-size: 48px; margin: 0; letter-spacing: 8px;">${otp}</h1>
+              </div>
+              <p style="color: #666; font-size: 14px;">This code will expire in 10 minutes.</p>
+              <p><strong>For testing, use this OTP: ${otp}</strong></p>
+            </div>
+          `
+        };
+
+        await sgMail.send(msg);
+        console.log('✅ OTP email sent successfully');
+      } catch (emailError) {
+        console.error('❌ Failed to send OTP email:', emailError.message);
+        // Continue even if email fails
+      }
+    } else {
+      console.log('📧 OTP (email disabled):', otp);
     }
 
     res.json({ 
       message: 'OTP sent to your email',
-      user: { id: result.rows[0].id, name: result.rows[0].name, email: result.rows[0].email }
+      user: { id: result.rows[0].id, name: result.rows[0].name, email: result.rows[0].email },
+      otp: process.env.NODE_ENV === 'development' ? otp : undefined // Return OTP for development
     });
   } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({ error: 'Failed to create account' });
+    console.error('❌ Signup error:', error.message);
+    res.status(500).json({ error: 'Failed to create account. Please try again.' });
   }
 });
 
 // Verify OTP for signup
 app.post('/auth/verify-otp-signup', async (req, res) => {
+  console.log('🔐 OTP verification attempt:', req.body.email);
+  
   const { email, otp } = req.body;
 
   if (!email || !otp) {
@@ -152,7 +200,7 @@ app.post('/auth/verify-otp-signup', async (req, res) => {
 
   try {
     // Verify OTP
-    const result = await pool.query(
+    const result = await queryDatabase(
       'SELECT id, name, email, otp_code, otp_expiry FROM users WHERE email = $1',
       [email]
     );
@@ -172,11 +220,11 @@ app.post('/auth/verify-otp-signup', async (req, res) => {
     }
 
     if (new Date() > user.otp_expiry) {
-      return res.status(400).json({ error: 'OTP has expired' });
+      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
     }
 
     // Mark user as verified and clear OTP
-    await pool.query(
+    await queryDatabase(
       'UPDATE users SET is_verified = TRUE, otp_code = NULL, otp_expiry = NULL WHERE email = $1',
       [email]
     );
@@ -184,17 +232,19 @@ app.post('/auth/verify-otp-signup', async (req, res) => {
     // Create token
     const token = jwt.sign(
       { id: user.id, email: user.email }, 
-      process.env.JWT_SECRET || 'fallback-secret-key',
+      process.env.JWT_SECRET || 'fallback-secret-key-for-development',
       { expiresIn: '7d' }
     );
 
     // Get updated user data
-    const userResult = await pool.query(
+    const userResult = await queryDatabase(
       'SELECT id, name, email, plan, emails_used, emails_left, daily_emails_used FROM users WHERE id = $1',
       [user.id]
     );
 
     const userData = userResult.rows[0];
+
+    console.log('✅ User verified:', email);
 
     res.json({
       token,
@@ -209,8 +259,8 @@ app.post('/auth/verify-otp-signup', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Verify OTP error:', error);
-    res.status(500).json({ error: 'Failed to verify OTP' });
+    console.error('❌ Verify OTP error:', error.message);
+    res.status(500).json({ error: 'Failed to verify OTP. Please try again.' });
   }
 });
 
@@ -224,7 +274,7 @@ app.post('/auth/resend-otp', async (req, res) => {
 
   try {
     // Check if user exists
-    const userResult = await pool.query('SELECT id, name FROM users WHERE email = $1', [email]);
+    const userResult = await queryDatabase('SELECT id, name FROM users WHERE email = $1', [email]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ error: 'No account found with this email' });
     }
@@ -236,49 +286,55 @@ app.post('/auth/resend-otp', async (req, res) => {
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Update OTP in database
-    await pool.query(
+    await queryDatabase(
       'UPDATE users SET otp_code = $1, otp_expiry = $2 WHERE email = $3',
       [otp, otpExpiry, email]
     );
 
-    // Send new OTP email
-    const msg = {
-      to: email,
-      from: {
-        email: process.env.FROM_EMAIL || 'noreply@letimail.com',
-        name: 'LetiMail'
-      },
-      subject: 'New Verification Code - LetiMail',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6366f1;">New Verification Code</h2>
-          <p>Hi ${user.name},</p>
-          <p>Here's your new verification code:</p>
-          <div style="background: #f8fafc; border: 2px dashed #cbd5e0; padding: 20px; text-align: center; margin: 20px 0;">
-            <h1 style="color: #6366f1; font-size: 48px; margin: 0; letter-spacing: 8px;">${otp}</h1>
-          </div>
-          <p style="color: #666; font-size: 14px;">This code will expire in 10 minutes.</p>
-        </div>
-      `
-    };
+    // Send new OTP email (optional)
+    if (process.env.SENDGRID_API_KEY) {
+      try {
+        const msg = {
+          to: email,
+          from: {
+            email: process.env.FROM_EMAIL || 'noreply@letimail.com',
+            name: 'LetiMail'
+          },
+          subject: 'New Verification Code - LetiMail',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #6366f1;">New Verification Code</h2>
+              <p>Hi ${user.name},</p>
+              <p>Here's your new verification code:</p>
+              <div style="background: #f8fafc; border: 2px dashed #cbd5e0; padding: 20px; text-align: center; margin: 20px 0;">
+                <h1 style="color: #6366f1; font-size: 48px; margin: 0; letter-spacing: 8px;">${otp}</h1>
+              </div>
+              <p style="color: #666; font-size: 14px;">This code will expire in 10 minutes.</p>
+            </div>
+          `
+        };
 
-    try {
-      await sgMail.send(msg);
-      console.log('✅ Resent OTP email successfully');
-    } catch (emailError) {
-      console.error('❌ Failed to resend OTP email:', emailError);
-      // Continue even if email fails for development
+        await sgMail.send(msg);
+        console.log('✅ Resent OTP email successfully');
+      } catch (emailError) {
+        console.error('❌ Failed to resend OTP email:', emailError.message);
+      }
     }
 
-    res.json({ message: 'New OTP sent successfully' });
+    res.json({ 
+      message: 'New OTP sent successfully',
+      otp: process.env.NODE_ENV === 'development' ? otp : undefined
+    });
   } catch (error) {
-    console.error('Resend OTP error:', error);
-    res.status(500).json({ error: 'Failed to resend OTP' });
+    console.error('❌ Resend OTP error:', error.message);
+    res.status(500).json({ error: 'Failed to resend OTP. Please try again.' });
   }
 });
 
 // Login
 app.post('/auth/login', async (req, res) => {
+  console.log('🔑 Login attempt:', req.body.email);
+  
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -287,12 +343,13 @@ app.post('/auth/login', async (req, res) => {
 
   try {
     // Get user
-    const result = await pool.query(
+    const result = await queryDatabase(
       'SELECT id, name, email, password, plan, emails_used, emails_left, daily_emails_used, is_verified, last_reset_date FROM users WHERE email = $1',
       [email]
     );
 
     if (result.rows.length === 0) {
+      console.log('❌ User not found:', email);
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
@@ -300,12 +357,14 @@ app.post('/auth/login', async (req, res) => {
 
     // Check if verified
     if (!user.is_verified) {
+      console.log('❌ User not verified:', email);
       return res.status(400).json({ error: 'Please verify your email first. Check your inbox for the OTP.' });
     }
 
     // Check password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
+      console.log('❌ Invalid password for:', email);
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
@@ -314,7 +373,7 @@ app.post('/auth/login', async (req, res) => {
     const lastReset = user.last_reset_date;
     
     if (lastReset && new Date(lastReset).toISOString().split('T')[0] !== today) {
-      await pool.query(
+      await queryDatabase(
         'UPDATE users SET daily_emails_used = 0, last_reset_date = $1 WHERE id = $2',
         [today, user.id]
       );
@@ -324,9 +383,11 @@ app.post('/auth/login', async (req, res) => {
     // Create token
     const token = jwt.sign(
       { id: user.id, email: user.email }, 
-      process.env.JWT_SECRET || 'fallback-secret-key',
+      process.env.JWT_SECRET || 'fallback-secret-key-for-development',
       { expiresIn: '7d' }
     );
+
+    console.log('✅ Login successful:', email);
 
     res.json({
       token,
@@ -341,8 +402,8 @@ app.post('/auth/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Login error:', error.message);
+    res.status(500).json({ error: 'Internal server error. Please try again.' });
   }
 });
 
@@ -351,14 +412,14 @@ app.post('/auth/update-profile', authenticateToken, async (req, res) => {
   const { name, company, role } = req.body;
 
   try {
-    await pool.query(
+    await queryDatabase(
       'UPDATE users SET name = $1, company = $2, role = $3 WHERE id = $4',
       [name, company, role, req.user.id]
     );
 
     res.json({ message: 'Profile updated successfully' });
   } catch (error) {
-    console.error('Update profile error:', error);
+    console.error('Update profile error:', error.message);
     res.status(500).json({ error: 'Failed to update profile' });
   }
 });
@@ -369,7 +430,7 @@ app.post('/auth/change-password', authenticateToken, async (req, res) => {
 
   try {
     // Verify current password
-    const userResult = await pool.query(
+    const userResult = await queryDatabase(
       'SELECT password FROM users WHERE id = $1',
       [req.user.id]
     );
@@ -386,14 +447,14 @@ app.post('/auth/change-password', authenticateToken, async (req, res) => {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await pool.query(
+    await queryDatabase(
       'UPDATE users SET password = $1 WHERE id = $2',
       [hashedPassword, req.user.id]
     );
 
     res.json({ message: 'Password updated successfully' });
   } catch (error) {
-    console.error('Change password error:', error);
+    console.error('Change password error:', error.message);
     res.status(500).json({ error: 'Failed to change password' });
   }
 });
@@ -403,14 +464,14 @@ app.post('/auth/update-preferences', authenticateToken, async (req, res) => {
   const { preferences } = req.body;
 
   try {
-    await pool.query(
+    await queryDatabase(
       'UPDATE users SET preferences = $1 WHERE id = $2',
       [JSON.stringify(preferences), req.user.id]
     );
 
     res.json({ message: 'Preferences updated successfully' });
   } catch (error) {
-    console.error('Update preferences error:', error);
+    console.error('Update preferences error:', error.message);
     res.status(500).json({ error: 'Failed to update preferences' });
   }
 });
@@ -420,14 +481,14 @@ app.post('/auth/update-notifications', authenticateToken, async (req, res) => {
   const { notifications } = req.body;
 
   try {
-    await pool.query(
+    await queryDatabase(
       'UPDATE users SET notification_settings = $1 WHERE id = $2',
       [JSON.stringify(notifications), req.user.id]
     );
 
     res.json({ message: 'Notification settings updated successfully' });
   } catch (error) {
-    console.error('Update notifications error:', error);
+    console.error('Update notifications error:', error.message);
     res.status(500).json({ error: 'Failed to update notification settings' });
   }
 });
@@ -435,7 +496,7 @@ app.post('/auth/update-notifications', authenticateToken, async (req, res) => {
 // Get user profile
 app.get('/auth/profile', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await queryDatabase(
       'SELECT id, name, email, plan, emails_used, emails_left, daily_emails_used, preferences, notification_settings, company, role, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
@@ -463,7 +524,7 @@ app.get('/auth/profile', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Profile error:', error);
+    console.error('Profile error:', error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -472,16 +533,17 @@ app.get('/auth/profile', authenticateToken, async (req, res) => {
 app.get("/", (req, res) => {
   res.json({ 
     status: "✅ LetiMail backend running",
-    database: "Connected to PostgreSQL",
+    database: "PostgreSQL connected",
     authentication: "JWT-based auth system",
-    email: "SendGrid configured"
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
   });
 });
 
-// Test endpoint for debugging
+// Debug endpoint for checking users
 app.get('/auth/debug', async (req, res) => {
   try {
-    const users = await pool.query('SELECT id, name, email, is_verified FROM users');
+    const users = await queryDatabase('SELECT id, name, email, is_verified, created_at FROM users ORDER BY created_at DESC');
     res.json({ 
       totalUsers: users.rows.length,
       users: users.rows 
@@ -491,7 +553,23 @@ app.get('/auth/debug', async (req, res) => {
   }
 });
 
-// Email Generation Functions (Keep your existing functions)
+// Reset user for testing (DANGEROUS - remove in production)
+app.post('/auth/reset-test-user', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Not allowed in production' });
+  }
+
+  const { email } = req.body;
+  
+  try {
+    await queryDatabase('DELETE FROM users WHERE email = $1', [email]);
+    res.json({ message: 'User reset successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Email Generation Functions (your existing functions)
 function cleanAIResponse(content) {
   if (!content) return content;
   
@@ -564,7 +642,7 @@ app.post("/generate", authenticateToken, async (req, res) => {
 
   try {
     // Check user's email limits
-    const userResult = await pool.query(
+    const userResult = await queryDatabase(
       'SELECT emails_used, emails_left, daily_emails_used, plan FROM users WHERE id = $1',
       [req.user.id]
     );
@@ -717,14 +795,14 @@ Return ONLY the email content starting with "Subject:".
     }
 
     // Update email usage
-    await pool.query(
+    await queryDatabase(
       'UPDATE users SET emails_used = emails_used + 1, emails_left = emails_left - 1, daily_emails_used = daily_emails_used + 1 WHERE id = $1',
       [req.user.id]
     );
     
     res.json({ email });
   } catch (error) {
-    console.error("Generation error:", error);
+    console.error("Generation error:", error.message);
     res.status(500).json({ email: "Error generating email." });
   }
 });
@@ -787,7 +865,7 @@ Formatted email:
     
     res.json({ email });
   } catch (error) {
-    console.error("Groq API Error:", error);
+    console.error("Groq API Error:", error.message);
     res.json({ email: editedEmail });
   }
 });
@@ -840,7 +918,7 @@ app.post("/send-email", authenticateToken, async (req, res) => {
       res.status(500).json({ error: "Failed to send email" });
     }
   } catch (error) {
-    console.error("Send Email Error:", error);
+    console.error("Send Email Error:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -966,4 +1044,8 @@ function extractSubject(content) {
 }
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 LetiMail backend running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 LetiMail backend running on port ${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Base URL: http://localhost:${PORT}`);
+});
