@@ -1,11 +1,9 @@
-// Supabase Configuration - Will be set from backend
-let supabase = null;
-
 // Global Auth State
 let currentUser = null;
+let authToken = null;
 
 // IMPORTANT: Replace this with your actual Railway backend URL
-const BACKEND_URL = 'letimail-production.up.railway.app'; // Change this!
+const BACKEND_URL = 'https://your-railway-app.up.railway.app'; // Change this!
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -13,86 +11,43 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function initializeApp() {
-    // Get Supabase config from backend
-    await getSupabaseConfig();
-    await checkAuthState();
+    checkAuthState();
     setupEventListeners();
     setupNotification();
     createAuthModals();
 }
 
-// Get Supabase configuration from backend
-async function getSupabaseConfig() {
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/config`);
-        
-        if (!response.ok) {
-            throw new Error(`Failed to fetch config: ${response.status}`);
-        }
-        
-        const config = await response.json();
-        
-        // Initialize Supabase client with config from backend
-        supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
-        
-        // Set up auth state listener
-        supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session) {
-                const userData = await getUserProfile(session.user.id);
-                if (userData) {
-                    currentUser = { ...session.user, ...userData };
-                    showUserMenu(currentUser);
-                }
-            } else if (event === 'SIGNED_OUT') {
-                currentUser = null;
-                showAuthButtons();
-            }
-        });
-    } catch (error) {
-        console.error('Failed to get Supabase config:', error);
-        showNotification('Error', 'Failed to initialize authentication. Please check your backend URL.', 'error');
-    }
-}
-
 // Auth State Management
 async function checkAuthState() {
-    if (!supabase) {
-        console.error('Supabase not initialized');
+    // Get token from localStorage
+    authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
         showAuthButtons();
         return;
     }
 
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    if (session && session.user) {
-        const userData = await getUserProfile(session.user.id);
-        if (userData) {
-            currentUser = { ...session.user, ...userData };
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            currentUser = data.user;
             showUserMenu(currentUser);
         } else {
-            await supabase.auth.signOut();
+            // Invalid token, clear it
+            localStorage.removeItem('authToken');
+            authToken = null;
             showAuthButtons();
         }
-    } else {
+    } catch (error) {
+        console.error('Auth check error:', error);
         showAuthButtons();
     }
-}
-
-async function getUserProfile(userId) {
-    if (!supabase) return null;
-
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-    
-    if (error) {
-        console.error('Error fetching user profile:', error);
-        return null;
-    }
-    
-    return data;
 }
 
 // UI Management
@@ -365,11 +320,6 @@ function hideNotification() {
 
 // Auth Handlers
 async function handleSignup(e) {
-    if (!supabase) {
-        showNotification('Error', 'Authentication service not available', 'error');
-        return;
-    }
-
     const button = e.target.querySelector('button[type="submit"]');
     showButtonLoading(button);
     
@@ -378,22 +328,27 @@ async function handleSignup(e) {
     const password = document.getElementById('signupPassword').value;
     
     try {
-        const { data, error } = await supabase.auth.signUp({
-            email: email,
-            password: password,
-            options: {
-                data: {
-                    name: name
-                },
-                emailRedirectTo: `${window.location.origin}/auth/callback`
-            }
+        const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, email, password })
         });
 
-        if (error) throw error;
+        const data = await response.json();
 
-        if (data.user) {
-            showNotification('Success', 'Check your email for verification link', 'success');
+        if (response.ok) {
+            // Save token
+            authToken = data.token;
+            localStorage.setItem('authToken', authToken);
+            currentUser = data.user;
+            
+            showNotification('Success', 'Account created successfully!', 'success');
             hideAuthModal();
+            showUserMenu(currentUser);
+        } else {
+            throw new Error(data.error || 'Registration failed');
         }
         
     } catch (error) {
@@ -404,11 +359,6 @@ async function handleSignup(e) {
 }
 
 async function handleLogin(e) {
-    if (!supabase) {
-        showNotification('Error', 'Authentication service not available', 'error');
-        return;
-    }
-
     const button = e.target.querySelector('button[type="submit"]');
     showButtonLoading(button);
     
@@ -416,23 +366,27 @@ async function handleLogin(e) {
     const password = document.getElementById('loginPassword').value;
     
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password
+        const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
         });
 
-        if (error) throw error;
+        const data = await response.json();
 
-        if (data.user) {
-            const userData = await getUserProfile(data.user.id);
-            if (userData) {
-                currentUser = { ...data.user, ...userData };
-                showNotification('Welcome Back!', 'Successfully signed in', 'success');
-                hideAuthModal();
-                showUserMenu(currentUser);
-            } else {
-                throw new Error('User profile not found');
-            }
+        if (response.ok) {
+            // Save token
+            authToken = data.token;
+            localStorage.setItem('authToken', authToken);
+            currentUser = data.user;
+            
+            showNotification('Welcome Back!', 'Successfully signed in', 'success');
+            hideAuthModal();
+            showUserMenu(currentUser);
+        } else {
+            throw new Error(data.error || 'Login failed');
         }
         
     } catch (error) {
@@ -442,25 +396,19 @@ async function handleLogin(e) {
     }
 }
 
-async function handleLogout() {
-    if (!supabase) return;
-
-    try {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
-        
-        currentUser = null;
-        showAuthButtons();
-        showNotification('Signed Out', 'You have been successfully signed out', 'info');
-        
-        if (window.location.pathname.includes('app.html') || window.location.pathname.includes('settings.html')) {
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 1500);
-        }
-        
-    } catch (error) {
-        showNotification('Logout Failed', error.message, 'error');
+function handleLogout() {
+    // Clear token and user data
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('authToken');
+    
+    showAuthButtons();
+    showNotification('Signed Out', 'You have been successfully signed out', 'info');
+    
+    if (window.location.pathname.includes('app.html') || window.location.pathname.includes('settings.html')) {
+        setTimeout(() => {
+            window.location.href = 'index.html';
+        }, 1500);
     }
 }
 
@@ -475,7 +423,7 @@ function handleGetStarted() {
 
 // Email Generation Functions (for app.html)
 async function generateEmail() {
-    if (!currentUser) {
+    if (!currentUser || !authToken) {
         showNotification('Authentication Required', 'Please sign in to generate emails', 'error');
         showLoginModal();
         return;
@@ -504,13 +452,11 @@ async function generateEmail() {
     if (actionButtons) actionButtons.style.display = 'none';
 
     try {
-        const token = (await supabase.auth.getSession()).data.session?.access_token;
-        
-        const response = await fetch(`${BACKEND_URL}/generate`, {
+        const response = await fetch(`${BACKEND_URL}/api/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify({ business, context, tone })
         });
@@ -521,6 +467,9 @@ async function generateEmail() {
             outputDiv.innerText = data.email;
             if (actionButtons) actionButtons.style.display = 'flex';
             showNotification('Success', 'Email generated successfully!', 'success');
+            
+            // Refresh user data to update email count
+            await checkAuthState();
         } else {
             throw new Error(data.email || 'Failed to generate email');
         }
@@ -534,6 +483,125 @@ async function generateEmail() {
     }
 }
 
+// Copy, Edit, Send functions for app.html
+function setupAppFunctions() {
+    const copyBtn = document.getElementById('copyBtn');
+    const editBtn = document.getElementById('editBtn');
+    const sendBtn = document.getElementById('sendBtn');
+
+    if (copyBtn) {
+        copyBtn.addEventListener('click', function() {
+            const outputDiv = document.getElementById('output');
+            const text = outputDiv.innerText;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification('Copied!', 'Email copied to clipboard', 'success');
+            }).catch(err => {
+                showNotification('Error', 'Failed to copy email', 'error');
+            });
+        });
+    }
+
+    if (editBtn) {
+        editBtn.addEventListener('click', function() {
+            const outputDiv = document.getElementById('output');
+            const currentText = outputDiv.innerText;
+            
+            outputDiv.innerHTML = `
+                <textarea class="email-editor" id="emailEditor">${currentText}</textarea>
+                <div class="edit-actions">
+                    <button class="submit-edit-btn" id="submitEdit">Save Changes</button>
+                    <button class="cancel-edit-btn" id="cancelEdit">Cancel</button>
+                </div>
+            `;
+
+            document.getElementById('submitEdit').addEventListener('click', async function() {
+                const editedText = document.getElementById('emailEditor').value;
+                outputDiv.innerText = editedText;
+                showNotification('Saved', 'Changes saved successfully', 'success');
+            });
+
+            document.getElementById('cancelEdit').addEventListener('click', function() {
+                outputDiv.innerText = currentText;
+            });
+        });
+    }
+
+    if (sendBtn) {
+        sendBtn.addEventListener('click', function() {
+            showSendEmailModal();
+        });
+    }
+}
+
+function showSendEmailModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>Send Email</h3>
+            <div class="input-group">
+                <label for="recipientEmail">Recipient Email</label>
+                <input type="email" id="recipientEmail" class="email-input" placeholder="recipient@example.com" required>
+            </div>
+            <div class="input-group">
+                <label for="senderName">Your Name</label>
+                <input type="text" id="senderName" class="name-input" placeholder="Your Name" value="${currentUser?.name || ''}" required>
+            </div>
+            <div class="modal-actions">
+                <button class="confirm-send-btn" id="confirmSend">Send Email</button>
+                <button class="cancel-send-btn" id="cancelSend">Cancel</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+
+    document.getElementById('confirmSend').addEventListener('click', async function() {
+        const to = document.getElementById('recipientEmail').value;
+        const senderName = document.getElementById('senderName').value;
+        const outputDiv = document.getElementById('output');
+        const emailContent = outputDiv.innerText;
+        
+        // Extract subject
+        const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
+        const subject = subjectMatch ? subjectMatch[1].trim() : 'Email from LetiMail';
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/api/send-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ to, subject, content: emailContent, senderName })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showNotification('Sent!', 'Email sent successfully', 'success');
+                document.body.removeChild(modal);
+            } else {
+                throw new Error(data.error || 'Failed to send email');
+            }
+        } catch (error) {
+            showNotification('Error', error.message, 'error');
+        }
+    });
+
+    document.getElementById('cancelSend').addEventListener('click', function() {
+        document.body.removeChild(modal);
+    });
+
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    });
+}
+
 // Global functions for modal access
 window.showLoginModal = showLoginModal;
 window.showSignupModal = showSignupModal;
@@ -541,7 +609,8 @@ window.hideAuthModal = hideAuthModal;
 window.handleGetStarted = handleGetStarted;
 window.generateEmail = generateEmail;
 
-// Auto-initialize for app.html email generation
+// Auto-initialize for app.html
 if (document.getElementById('generateBtn')) {
     document.getElementById('generateBtn').addEventListener('click', generateEmail);
+    setupAppFunctions();
 }
