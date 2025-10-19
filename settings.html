@@ -10,12 +10,18 @@
 </head>
 <body>
   <!-- Notification System -->
-  <div id="notification" class="notification hidden">
+  <div id="notification" class="notification">
     <div class="notification-content">
-      <span class="notification-icon"></span>
-      <span class="notification-message"></span>
-      <button class="notification-close">&times;</button>
+      <div class="notification-icon"></div>
+      <div class="notification-text">
+        <div class="notification-title"></div>
+        <div class="notification-message"></div>
+      </div>
+      <button class="notification-close">
+        <i class="fas fa-times"></i>
+      </button>
     </div>
+    <div class="notification-progress"></div>
   </div>
 
   <!-- Navigation -->
@@ -53,7 +59,7 @@
       </div>
     </div>
   </header>
-
+  
   <!-- Settings Main Section -->
   <section class="settings-main">
     <div class="settings-container">
