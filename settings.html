@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="Frontend/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <!-- Notification System -->
@@ -23,6 +24,9 @@
     </div>
     <div class="notification-progress"></div>
   </div>
+
+  <!-- Auth Modals -->
+  <div id="authModals"></div>
 
   <!-- Navigation -->
   <header class="navbar">
@@ -56,10 +60,14 @@
             </button>
           </div>
         </div>
+        <div id="authButtons" class="auth-buttons">
+          <button id="loginBtn" class="login-btn">Login</button>
+          <button id="signupBtn" class="signup-btn">Sign Up</button>
+        </div>
       </div>
     </div>
   </header>
-  
+
   <!-- Settings Main Section -->
   <section class="settings-main">
     <div class="settings-container">
@@ -87,10 +95,6 @@
             <button class="nav-item" data-tab="security">
               <i class="fas fa-shield-alt"></i>
               Security
-            </button>
-            <button class="nav-item" data-tab="notifications">
-              <i class="fas fa-bell"></i>
-              Notifications
             </button>
           </nav>
         </div>
@@ -242,98 +246,24 @@
               </div>
 
               <div class="security-section">
-                <h4>Two-Factor Authentication</h4>
-                <div class="security-info">
-                  <p>Add an extra layer of security to your account</p>
-                  <button class="settings-btn secondary" id="enable2fa">
-                    <i class="fas fa-shield-alt"></i>
-                    Enable 2FA
-                  </button>
-                </div>
-              </div>
-
-              <div class="security-section">
                 <h4>Login Activity</h4>
                 <div class="login-sessions">
                   <div class="session-item">
                     <div class="session-info">
                       <strong>Current Session</strong>
-                      <span>Chrome • Windows • Just now</span>
+                      <span>Just now</span>
                     </div>
                     <span class="session-status current">Active</span>
                   </div>
                 </div>
-                <button class="settings-btn outline" id="logoutAll">
-                  <i class="fas fa-sign-out-alt"></i>
-                  Logout from all devices
-                </button>
               </div>
             </div>
-          </div>
-
-          <!-- Notifications Tab -->
-          <div class="settings-panel" id="notifications-panel">
-            <h2>Notification Preferences</h2>
-            <form id="notificationsForm" class="settings-form">
-              <div class="notification-category">
-                <h4>Email Notifications</h4>
-                <div class="form-group checkbox-group">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="emailUpdates" checked>
-                    <span class="checkmark"></span>
-                    Product updates and new features
-                  </label>
-                </div>
-                <div class="form-group checkbox-group">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="emailTips" checked>
-                    <span class="checkmark"></span>
-                    Tips and best practices
-                  </label>
-                </div>
-                <div class="form-group checkbox-group">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="emailPromo">
-                    <span class="checkmark"></span>
-                    Promotional offers
-                  </label>
-                </div>
-              </div>
-
-              <div class="notification-category">
-                <h4>In-App Notifications</h4>
-                <div class="form-group checkbox-group">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="inAppUsage" checked>
-                    <span class="checkmark"></span>
-                    Usage limits and reminders
-                  </label>
-                </div>
-                <div class="form-group checkbox-group">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="inAppSuccess" checked>
-                    <span class="checkmark"></span>
-                    Success notifications
-                  </label>
-                </div>
-                <div class="form-group checkbox-group">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="inAppErrors" checked>
-                    <span class="checkmark"></span>
-                    Error and warning messages
-                  </label>
-                </div>
-              </div>
-
-              <button type="submit" class="settings-btn primary">Save Notification Settings</button>
-            </form>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <script src="Frontend/auth.js"></script>
-  <script src="Frontend/settings.js"></script>
+  <script src="Frontend/script.js"></script>
 </body>
 </html>
