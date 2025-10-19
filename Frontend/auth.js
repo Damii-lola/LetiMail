@@ -52,7 +52,7 @@ class AuthSystem {
     updateUserAvatar(userName) {
         const avatarElements = document.querySelectorAll('#avatarText');
         avatarElements.forEach(element => {
-            if (userName) {
+            if (userName && element) {
                 element.textContent = userName.charAt(0).toUpperCase();
             }
         });
@@ -119,14 +119,16 @@ class AuthSystem {
             userAvatar.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const dropdown = userAvatar.nextElementSibling;
-                dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+                if (dropdown) {
+                    dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+                }
             });
 
             // Close dropdown when clicking outside
             document.addEventListener('click', () => {
                 const dropdowns = document.querySelectorAll('.dropdown-menu');
                 dropdowns.forEach(dropdown => {
-                    dropdown.style.display = 'none';
+                    if (dropdown) dropdown.style.display = 'none';
                 });
             });
         }
@@ -177,10 +179,12 @@ class AuthSystem {
     resetForms() {
         const forms = document.querySelectorAll('.auth-form');
         forms.forEach(form => {
-            form.reset();
-            const button = form.querySelector('.auth-btn');
-            if (button) {
-                this.hideButtonLoading(button);
+            if (form) {
+                form.reset();
+                const button = form.querySelector('.auth-btn');
+                if (button) {
+                    this.hideButtonLoading(button);
+                }
             }
         });
     }
@@ -236,11 +240,14 @@ class AuthSystem {
     // Enhanced Notification system
     setupNotification() {
         const notification = document.getElementById('notification');
+        if (!notification) return;
+
         const closeBtn = notification.querySelector('.notification-close');
-        
-        closeBtn.addEventListener('click', () => {
-            this.hideNotification();
-        });
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.hideNotification();
+            });
+        }
 
         // Auto-hide after 5 seconds
         notification.addEventListener('animationend', (e) => {
@@ -254,12 +261,17 @@ class AuthSystem {
 
     showNotification(title, message, type = 'info') {
         const notification = document.getElementById('notification');
+        if (!notification) {
+            console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
+            return;
+        }
+
         const titleEl = notification.querySelector('.notification-title');
         const messageEl = notification.querySelector('.notification-message');
         const iconEl = notification.querySelector('.notification-icon');
         
-        titleEl.textContent = title;
-        messageEl.textContent = message;
+        if (titleEl) titleEl.textContent = title;
+        if (messageEl) messageEl.textContent = message;
         notification.className = `notification show ${type}`;
         
         // Set icon based on type
@@ -270,7 +282,9 @@ class AuthSystem {
             info: 'fas fa-info-circle'
         };
         
-        iconEl.className = `notification-icon ${icons[type] || icons.info}`;
+        if (iconEl) {
+            iconEl.className = `notification-icon ${icons[type] || icons.info}`;
+        }
         
         // Auto hide after 5 seconds
         setTimeout(() => {
@@ -280,7 +294,9 @@ class AuthSystem {
 
     hideNotification() {
         const notification = document.getElementById('notification');
-        notification.classList.remove('show');
+        if (notification) {
+            notification.classList.remove('show');
+        }
     }
 
     // API call helper
@@ -486,4 +502,11 @@ function hideAuthModal() {
     if (window.authSystem) {
         window.authSystem.hideAuthModal();
     }
+}
+
+// Debug function to check auth state
+function debugAuth() {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    console.log('Auth Debug:', { token, user: JSON.parse(user || '{}') });
 }
