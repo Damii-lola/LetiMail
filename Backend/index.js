@@ -1,79 +1,29 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import pkg from 'pg';
-import sgMail from '@sendgrid/mail';
+import { createClient } from '@supabase/supabase-js';
 
-const { Pool } = pkg;
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// PostgreSQL connection with better error handling
-let pool;
-try {
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+// Initialize Supabase with Railway environment variables
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE
+);
+
+// Serve Supabase config to frontend
+app.get("/api/config", (req, res) => {
+  res.json({
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY
   });
-  
-  // Test connection
-  pool.query('SELECT NOW()', (err) => {
-    if (err) {
-      console.error('❌ Database connection failed:', err.message);
-    } else {
-      console.log('✅ Database connected successfully');
-    }
-  });
-} catch (error) {
-  console.error('❌ Database initialization failed:', error.message);
-  process.exit(1);
-}
+});
 
-// Initialize SendGrid with fallback
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  console.log('✅ SendGrid configured');
-} else {
-  console.log('⚠️ SendGrid API key not found - email functionality disabled');
-}
-
-// Initialize database tables
-async function initializeDatabase() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        plan VARCHAR(50) DEFAULT 'free',
-        emails_used INTEGER DEFAULT 0,
-        emails_left INTEGER DEFAULT 25,
-        daily_emails_used INTEGER DEFAULT 0,
-        last_reset_date DATE DEFAULT CURRENT_DATE,
-        is_verified BOOLEAN DEFAULT FALSE,
-        otp_code VARCHAR(6),
-        otp_expiry TIMESTAMP,
-        preferences JSONB DEFAULT '{}',
-        notification_settings JSONB DEFAULT '{}',
-        company VARCHAR(255),
-        role VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    
-    console.log('✅ Database tables initialized successfully');
-  } catch (error) {
-    console.error('❌ Database initialization error:', error.message);
-  }
-}
-
-// Auth middleware
-const authenticateToken = (req, res, next) => {
+// Auth middleware using Supabase
+const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -81,495 +31,21 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key-for-development', (err, user) => {
-    if (err) {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
       return res.status(403).json({ error: 'Invalid token' });
     }
+    
     req.user = user;
     next();
-  });
+  } catch (error) {
+    return res.status(403).json({ error: 'Invalid token' });
+  }
 };
 
-// Initialize database on startup
-initializeDatabase();
-
-// Helper function for database queries
-async function queryDatabase(text, params) {
-  try {
-    const result = await pool.query(text, params);
-    return result;
-  } catch (error) {
-    console.error('Database query error:', error.message);
-    throw new Error('Database operation failed');
-  }
-}
-
-// Auth Routes
-
-// Signup with OTP
-app.post('/auth/signup', async (req, res) => {
-  console.log('📝 Signup attempt:', req.body.email);
-  
-  const { name, email, password } = req.body;
-
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'All fields are required' });
-  }
-
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  }
-
-  try {
-    // Check if user already exists
-    const existingUser = await queryDatabase('SELECT id FROM users WHERE email = $1', [email]);
-    if (existingUser.rows.length > 0) {
-      console.log('❌ User already exists:', email);
-      return res.status(400).json({ error: 'User already exists with this email' });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    // Create user with OTP
-    const result = await queryDatabase(
-      `INSERT INTO users (name, email, password, otp_code, otp_expiry, emails_left) 
-       VALUES ($1, $2, $3, $4, $5, 25) RETURNING id, name, email`,
-      [name, email, hashedPassword, otp, otpExpiry]
-    );
-
-    console.log('✅ User created:', email);
-
-    // Send OTP email (optional - for development we can skip if no SendGrid)
-    if (process.env.SENDGRID_API_KEY) {
-      try {
-        const msg = {
-          to: email,
-          from: {
-            email: process.env.FROM_EMAIL || 'noreply@letimail.com',
-            name: 'LetiMail'
-          },
-          subject: 'Verify Your LetiMail Account - OTP Required',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #6366f1;">Verify Your Email</h2>
-              <p>Hi ${name}, use this OTP to complete your registration:</p>
-              <div style="background: #f8fafc; border: 2px dashed #cbd5e0; padding: 20px; text-align: center; margin: 20px 0;">
-                <h1 style="color: #6366f1; font-size: 48px; margin: 0; letter-spacing: 8px;">${otp}</h1>
-              </div>
-              <p style="color: #666; font-size: 14px;">This code will expire in 10 minutes.</p>
-              <p><strong>For testing, use this OTP: ${otp}</strong></p>
-            </div>
-          `
-        };
-
-        await sgMail.send(msg);
-        console.log('✅ OTP email sent successfully');
-      } catch (emailError) {
-        console.error('❌ Failed to send OTP email:', emailError.message);
-        // Continue even if email fails
-      }
-    } else {
-      console.log('📧 OTP (email disabled):', otp);
-    }
-
-    res.json({ 
-      message: 'OTP sent to your email',
-      user: { id: result.rows[0].id, name: result.rows[0].name, email: result.rows[0].email },
-      otp: process.env.NODE_ENV === 'development' ? otp : undefined // Return OTP for development
-    });
-  } catch (error) {
-    console.error('❌ Signup error:', error.message);
-    res.status(500).json({ error: 'Failed to create account. Please try again.' });
-  }
-});
-
-// Verify OTP for signup
-app.post('/auth/verify-otp-signup', async (req, res) => {
-  console.log('🔐 OTP verification attempt:', req.body.email);
-  
-  const { email, otp } = req.body;
-
-  if (!email || !otp) {
-    return res.status(400).json({ error: 'Email and OTP are required' });
-  }
-
-  try {
-    // Verify OTP
-    const result = await queryDatabase(
-      'SELECT id, name, email, otp_code, otp_expiry FROM users WHERE email = $1',
-      [email]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'No account found with this email' });
-    }
-
-    const user = result.rows[0];
-
-    if (!user.otp_code) {
-      return res.status(400).json({ error: 'No OTP found for this account' });
-    }
-
-    if (user.otp_code !== otp) {
-      return res.status(400).json({ error: 'Invalid OTP code' });
-    }
-
-    if (new Date() > user.otp_expiry) {
-      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
-    }
-
-    // Mark user as verified and clear OTP
-    await queryDatabase(
-      'UPDATE users SET is_verified = TRUE, otp_code = NULL, otp_expiry = NULL WHERE email = $1',
-      [email]
-    );
-
-    // Create token
-    const token = jwt.sign(
-      { id: user.id, email: user.email }, 
-      process.env.JWT_SECRET || 'fallback-secret-key-for-development',
-      { expiresIn: '7d' }
-    );
-
-    // Get updated user data
-    const userResult = await queryDatabase(
-      'SELECT id, name, email, plan, emails_used, emails_left, daily_emails_used FROM users WHERE id = $1',
-      [user.id]
-    );
-
-    const userData = userResult.rows[0];
-
-    console.log('✅ User verified:', email);
-
-    res.json({
-      token,
-      user: {
-        id: userData.id,
-        name: userData.name,
-        email: userData.email,
-        plan: userData.plan,
-        emailsUsed: userData.emails_used,
-        emailsLeft: userData.emails_left,
-        dailyEmailsUsed: userData.daily_emails_used
-      }
-    });
-  } catch (error) {
-    console.error('❌ Verify OTP error:', error.message);
-    res.status(500).json({ error: 'Failed to verify OTP. Please try again.' });
-  }
-});
-
-// Resend OTP
-app.post('/auth/resend-otp', async (req, res) => {
-  const { email } = req.body;
-
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
-  }
-
-  try {
-    // Check if user exists
-    const userResult = await queryDatabase('SELECT id, name FROM users WHERE email = $1', [email]);
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'No account found with this email' });
-    }
-
-    const user = userResult.rows[0];
-
-    // Generate new OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    // Update OTP in database
-    await queryDatabase(
-      'UPDATE users SET otp_code = $1, otp_expiry = $2 WHERE email = $3',
-      [otp, otpExpiry, email]
-    );
-
-    // Send new OTP email (optional)
-    if (process.env.SENDGRID_API_KEY) {
-      try {
-        const msg = {
-          to: email,
-          from: {
-            email: process.env.FROM_EMAIL || 'noreply@letimail.com',
-            name: 'LetiMail'
-          },
-          subject: 'New Verification Code - LetiMail',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #6366f1;">New Verification Code</h2>
-              <p>Hi ${user.name},</p>
-              <p>Here's your new verification code:</p>
-              <div style="background: #f8fafc; border: 2px dashed #cbd5e0; padding: 20px; text-align: center; margin: 20px 0;">
-                <h1 style="color: #6366f1; font-size: 48px; margin: 0; letter-spacing: 8px;">${otp}</h1>
-              </div>
-              <p style="color: #666; font-size: 14px;">This code will expire in 10 minutes.</p>
-            </div>
-          `
-        };
-
-        await sgMail.send(msg);
-        console.log('✅ Resent OTP email successfully');
-      } catch (emailError) {
-        console.error('❌ Failed to resend OTP email:', emailError.message);
-      }
-    }
-
-    res.json({ 
-      message: 'New OTP sent successfully',
-      otp: process.env.NODE_ENV === 'development' ? otp : undefined
-    });
-  } catch (error) {
-    console.error('❌ Resend OTP error:', error.message);
-    res.status(500).json({ error: 'Failed to resend OTP. Please try again.' });
-  }
-});
-
-// Login
-app.post('/auth/login', async (req, res) => {
-  console.log('🔑 Login attempt:', req.body.email);
-  
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
-  }
-
-  try {
-    // Get user
-    const result = await queryDatabase(
-      'SELECT id, name, email, password, plan, emails_used, emails_left, daily_emails_used, is_verified, last_reset_date FROM users WHERE email = $1',
-      [email]
-    );
-
-    if (result.rows.length === 0) {
-      console.log('❌ User not found:', email);
-      return res.status(400).json({ error: 'Invalid email or password' });
-    }
-
-    const user = result.rows[0];
-
-    // Check if verified
-    if (!user.is_verified) {
-      console.log('❌ User not verified:', email);
-      return res.status(400).json({ error: 'Please verify your email first. Check your inbox for the OTP.' });
-    }
-
-    // Check password
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      console.log('❌ Invalid password for:', email);
-      return res.status(400).json({ error: 'Invalid email or password' });
-    }
-
-    // Reset daily email count if it's a new day (for free users)
-    const today = new Date().toISOString().split('T')[0];
-    const lastReset = user.last_reset_date;
-    
-    if (lastReset && new Date(lastReset).toISOString().split('T')[0] !== today) {
-      await queryDatabase(
-        'UPDATE users SET daily_emails_used = 0, last_reset_date = $1 WHERE id = $2',
-        [today, user.id]
-      );
-      user.daily_emails_used = 0;
-    }
-
-    // Create token
-    const token = jwt.sign(
-      { id: user.id, email: user.email }, 
-      process.env.JWT_SECRET || 'fallback-secret-key-for-development',
-      { expiresIn: '7d' }
-    );
-
-    console.log('✅ Login successful:', email);
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        plan: user.plan,
-        emailsUsed: user.emails_used,
-        emailsLeft: user.emails_left,
-        dailyEmailsUsed: user.daily_emails_used
-      }
-    });
-  } catch (error) {
-    console.error('❌ Login error:', error.message);
-    res.status(500).json({ error: 'Internal server error. Please try again.' });
-  }
-});
-
-// Update user profile
-app.post('/auth/update-profile', authenticateToken, async (req, res) => {
-  const { name, company, role } = req.body;
-
-  try {
-    await queryDatabase(
-      'UPDATE users SET name = $1, company = $2, role = $3 WHERE id = $4',
-      [name, company, role, req.user.id]
-    );
-
-    res.json({ message: 'Profile updated successfully' });
-  } catch (error) {
-    console.error('Update profile error:', error.message);
-    res.status(500).json({ error: 'Failed to update profile' });
-  }
-});
-
-// Change password
-app.post('/auth/change-password', authenticateToken, async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-
-  try {
-    // Verify current password
-    const userResult = await queryDatabase(
-      'SELECT password FROM users WHERE id = $1',
-      [req.user.id]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const validPassword = await bcrypt.compare(currentPassword, userResult.rows[0].password);
-    if (!validPassword) {
-      return res.status(400).json({ error: 'Current password is incorrect' });
-    }
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    await queryDatabase(
-      'UPDATE users SET password = $1 WHERE id = $2',
-      [hashedPassword, req.user.id]
-    );
-
-    res.json({ message: 'Password updated successfully' });
-  } catch (error) {
-    console.error('Change password error:', error.message);
-    res.status(500).json({ error: 'Failed to change password' });
-  }
-});
-
-// Update preferences
-app.post('/auth/update-preferences', authenticateToken, async (req, res) => {
-  const { preferences } = req.body;
-
-  try {
-    await queryDatabase(
-      'UPDATE users SET preferences = $1 WHERE id = $2',
-      [JSON.stringify(preferences), req.user.id]
-    );
-
-    res.json({ message: 'Preferences updated successfully' });
-  } catch (error) {
-    console.error('Update preferences error:', error.message);
-    res.status(500).json({ error: 'Failed to update preferences' });
-  }
-});
-
-// Update notifications
-app.post('/auth/update-notifications', authenticateToken, async (req, res) => {
-  const { notifications } = req.body;
-
-  try {
-    await queryDatabase(
-      'UPDATE users SET notification_settings = $1 WHERE id = $2',
-      [JSON.stringify(notifications), req.user.id]
-    );
-
-    res.json({ message: 'Notification settings updated successfully' });
-  } catch (error) {
-    console.error('Update notifications error:', error.message);
-    res.status(500).json({ error: 'Failed to update notification settings' });
-  }
-});
-
-// Get user profile
-app.get('/auth/profile', authenticateToken, async (req, res) => {
-  try {
-    const result = await queryDatabase(
-      'SELECT id, name, email, plan, emails_used, emails_left, daily_emails_used, preferences, notification_settings, company, role, created_at FROM users WHERE id = $1',
-      [req.user.id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const user = result.rows[0];
-    
-    res.json({ 
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        plan: user.plan,
-        emailsUsed: user.emails_used,
-        emailsLeft: user.emails_left,
-        dailyEmailsUsed: user.daily_emails_used,
-        preferences: user.preferences || {},
-        notificationSettings: user.notification_settings || {},
-        company: user.company,
-        role: user.role,
-        createdAt: user.created_at
-      }
-    });
-  } catch (error) {
-    console.error('Profile error:', error.message);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Health check endpoint
-app.get("/", (req, res) => {
-  res.json({ 
-    status: "✅ LetiMail backend running",
-    database: "PostgreSQL connected",
-    authentication: "JWT-based auth system",
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Debug endpoint for checking users
-app.get('/auth/debug', async (req, res) => {
-  try {
-    const users = await queryDatabase('SELECT id, name, email, is_verified, created_at FROM users ORDER BY created_at DESC');
-    res.json({ 
-      totalUsers: users.rows.length,
-      users: users.rows 
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Reset user for testing (DANGEROUS - remove in production)
-app.post('/auth/reset-test-user', async (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(403).json({ error: 'Not allowed in production' });
-  }
-
-  const { email } = req.body;
-  
-  try {
-    await queryDatabase('DELETE FROM users WHERE email = $1', [email]);
-    res.json({ message: 'User reset successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Email Generation Functions (your existing functions)
+// Email Generation Functions
 function cleanAIResponse(content) {
   if (!content) return content;
   
@@ -642,16 +118,15 @@ app.post("/generate", authenticateToken, async (req, res) => {
 
   try {
     // Check user's email limits
-    const userResult = await queryDatabase(
-      'SELECT emails_used, emails_left, daily_emails_used, plan FROM users WHERE id = $1',
-      [req.user.id]
-    );
+    const { data: user, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', req.user.id)
+      .single();
 
-    if (userResult.rows.length === 0) {
+    if (error || !user) {
       return res.status(404).json({ email: "User not found" });
     }
-
-    const user = userResult.rows[0];
     
     // Check monthly limit
     if (user.emails_left <= 0) {
@@ -661,10 +136,17 @@ app.post("/generate", authenticateToken, async (req, res) => {
     }
 
     // Check daily limit for free users
-    if (user.plan === 'free' && user.daily_emails_used >= 5) {
+    const today = new Date().toISOString().split('T')[0];
+    if (user.plan === 'free' && user.daily_emails_used >= 5 && user.last_reset_date === today) {
       return res.status(400).json({ 
         email: "❌ Daily email limit reached (5 emails/day). Upgrade to Premium for unlimited daily emails." 
       });
+    }
+
+    // Reset daily count if new day
+    let dailyEmailsUsed = user.daily_emails_used;
+    if (user.last_reset_date !== today) {
+      dailyEmailsUsed = 0;
     }
 
     const spamInputPatterns = [
@@ -794,20 +276,28 @@ Return ONLY the email content starting with "Subject:".
       });
     }
 
-    // Update email usage
-    await queryDatabase(
-      'UPDATE users SET emails_used = emails_used + 1, emails_left = emails_left - 1, daily_emails_used = daily_emails_used + 1 WHERE id = $1',
-      [req.user.id]
-    );
+    // Update email usage in Supabase
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        emails_used: user.emails_used + 1,
+        emails_left: user.emails_left - 1,
+        daily_emails_used: dailyEmailsUsed + 1,
+        last_reset_date: today
+      })
+      .eq('id', req.user.id);
+
+    if (updateError) {
+      console.error('Error updating email usage:', updateError);
+    }
     
     res.json({ email });
   } catch (error) {
-    console.error("Generation error:", error.message);
+    console.error("Generation error:", error);
     res.status(500).json({ email: "Error generating email." });
   }
 });
 
-// Refine email endpoint
 app.post("/refine-email", authenticateToken, async (req, res) => {
   const { business, context, tone, originalEmail, editedEmail } = req.body;
 
@@ -865,7 +355,7 @@ Formatted email:
     
     res.json({ email });
   } catch (error) {
-    console.error("Groq API Error:", error.message);
+    console.error("Groq API Error:", error);
     res.json({ email: editedEmail });
   }
 });
@@ -898,7 +388,7 @@ app.post("/send-email", authenticateToken, async (req, res) => {
           subject: subject
         }],
         from: {
-          email: process.env.FROM_EMAIL || 'noreply@letimail.com',
+          email: process.env.FROM_EMAIL,
           name: senderName || "LetiMail User"
         },
         content: [
@@ -918,7 +408,7 @@ app.post("/send-email", authenticateToken, async (req, res) => {
       res.status(500).json({ error: "Failed to send email" });
     }
   } catch (error) {
-    console.error("Send Email Error:", error.message);
+    console.error("Send Email Error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1043,9 +533,10 @@ function extractSubject(content) {
   return subjectMatch ? subjectMatch[1].trim() : null;
 }
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 LetiMail backend running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Base URL: http://localhost:${PORT}`);
+// Health check endpoint
+app.get("/", (req, res) => {
+  res.send("✅ LetiMail backend running with Supabase Authentication");
 });
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 LetiMail backend running on port ${PORT}`));
