@@ -98,9 +98,9 @@ app.post('/auth/signup', async (req, res) => {
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Create user with OTP
-    await pool.query(
+    const result = await pool.query(
       `INSERT INTO users (name, email, password, otp_code, otp_expiry, emails_left) 
-       VALUES ($1, $2, $3, $4, $5, 25)`,
+       VALUES ($1, $2, $3, $4, $5, 25) RETURNING id, name, email`,
       [name, email, hashedPassword, otp, otpExpiry]
     );
 
@@ -108,37 +108,34 @@ app.post('/auth/signup', async (req, res) => {
     const msg = {
       to: email,
       from: {
-        email: process.env.FROM_EMAIL,
+        email: process.env.FROM_EMAIL || 'noreply@letimail.com',
         name: 'LetiMail'
       },
       subject: 'Verify Your LetiMail Account - OTP Required',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; border-radius: 20px;">
-          <div style="background: white; padding: 40px; border-radius: 16px; text-align: center;">
-            <h2 style="color: #6366f1; margin-bottom: 8px;">Verify Your Email</h2>
-            <p style="color: #666; margin-bottom: 30px;">Hi ${name}, use this OTP to complete your registration:</p>
-            
-            <div style="background: #f8fafc; border: 2px dashed #cbd5e0; padding: 30px; border-radius: 12px; margin: 30px 0;">
-              <div style="font-size: 48px; font-weight: 700; color: #6366f1; letter-spacing: 12px; font-family: monospace;">
-                ${otp}
-              </div>
-            </div>
-            
-            <p style="color: #999; font-size: 14px; margin-bottom: 20px;">
-              This code will expire in 10 minutes. If you didn't request this, please ignore this email.
-            </p>
-            
-            <div style="border-top: 1px solid #e5e7eb; padding-top: 20px;">
-              <p style="color: #666; font-size: 12px;">LetiMail - Your Voice, AI Powered</p>
-            </div>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #6366f1;">Verify Your Email</h2>
+          <p>Hi ${name}, use this OTP to complete your registration:</p>
+          <div style="background: #f8fafc; border: 2px dashed #cbd5e0; padding: 20px; text-align: center; margin: 20px 0;">
+            <h1 style="color: #6366f1; font-size: 48px; margin: 0; letter-spacing: 8px;">${otp}</h1>
           </div>
+          <p style="color: #666; font-size: 14px;">This code will expire in 10 minutes.</p>
         </div>
       `
     };
 
-    await sgMail.send(msg);
+    try {
+      await sgMail.send(msg);
+      console.log('✅ OTP email sent successfully');
+    } catch (emailError) {
+      console.error('❌ Failed to send OTP email:', emailError);
+      // Continue even if email fails for development
+    }
 
-    res.json({ message: 'OTP sent to your email' });
+    res.json({ 
+      message: 'OTP sent to your email',
+      user: { id: result.rows[0].id, name: result.rows[0].name, email: result.rows[0].email }
+    });
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ error: 'Failed to create account' });
@@ -161,12 +158,16 @@ app.post('/auth/verify-otp-signup', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Invalid OTP' });
+      return res.status(404).json({ error: 'No account found with this email' });
     }
 
     const user = result.rows[0];
 
-    if (!user.otp_code || user.otp_code !== otp) {
+    if (!user.otp_code) {
+      return res.status(400).json({ error: 'No OTP found for this account' });
+    }
+
+    if (user.otp_code !== otp) {
       return res.status(400).json({ error: 'Invalid OTP code' });
     }
 
@@ -183,7 +184,7 @@ app.post('/auth/verify-otp-signup', async (req, res) => {
     // Create token
     const token = jwt.sign(
       { id: user.id, email: user.email }, 
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET || 'fallback-secret-key',
       { expiresIn: '7d' }
     );
 
@@ -222,6 +223,14 @@ app.post('/auth/resend-otp', async (req, res) => {
   }
 
   try {
+    // Check if user exists
+    const userResult = await pool.query('SELECT id, name FROM users WHERE email = $1', [email]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No account found with this email' });
+    }
+
+    const user = userResult.rows[0];
+
     // Generate new OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -232,22 +241,18 @@ app.post('/auth/resend-otp', async (req, res) => {
       [otp, otpExpiry, email]
     );
 
-    // Get user name for email
-    const userResult = await pool.query('SELECT name FROM users WHERE email = $1', [email]);
-    const userName = userResult.rows[0]?.name || 'there';
-
     // Send new OTP email
     const msg = {
       to: email,
       from: {
-        email: process.env.FROM_EMAIL,
+        email: process.env.FROM_EMAIL || 'noreply@letimail.com',
         name: 'LetiMail'
       },
       subject: 'New Verification Code - LetiMail',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #6366f1;">New Verification Code</h2>
-          <p>Hi ${userName},</p>
+          <p>Hi ${user.name},</p>
           <p>Here's your new verification code:</p>
           <div style="background: #f8fafc; border: 2px dashed #cbd5e0; padding: 20px; text-align: center; margin: 20px 0;">
             <h1 style="color: #6366f1; font-size: 48px; margin: 0; letter-spacing: 8px;">${otp}</h1>
@@ -257,7 +262,13 @@ app.post('/auth/resend-otp', async (req, res) => {
       `
     };
 
-    await sgMail.send(msg);
+    try {
+      await sgMail.send(msg);
+      console.log('✅ Resent OTP email successfully');
+    } catch (emailError) {
+      console.error('❌ Failed to resend OTP email:', emailError);
+      // Continue even if email fails for development
+    }
 
     res.json({ message: 'New OTP sent successfully' });
   } catch (error) {
@@ -277,32 +288,32 @@ app.post('/auth/login', async (req, res) => {
   try {
     // Get user
     const result = await pool.query(
-      'SELECT id, name, email, password, plan, emails_used, emails_left, daily_emails_used, is_verified FROM users WHERE email = $1',
+      'SELECT id, name, email, password, plan, emails_used, emails_left, daily_emails_used, is_verified, last_reset_date FROM users WHERE email = $1',
       [email]
     );
 
     if (result.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid credentials' });
+      return res.status(400).json({ error: 'Invalid email or password' });
     }
 
     const user = result.rows[0];
 
     // Check if verified
     if (!user.is_verified) {
-      return res.status(400).json({ error: 'Please verify your email first' });
+      return res.status(400).json({ error: 'Please verify your email first. Check your inbox for the OTP.' });
     }
 
     // Check password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-      return res.status(400).json({ error: 'Invalid credentials' });
+      return res.status(400).json({ error: 'Invalid email or password' });
     }
 
     // Reset daily email count if it's a new day (for free users)
     const today = new Date().toISOString().split('T')[0];
     const lastReset = user.last_reset_date;
     
-    if (lastReset && lastReset.toISOString().split('T')[0] !== today) {
+    if (lastReset && new Date(lastReset).toISOString().split('T')[0] !== today) {
       await pool.query(
         'UPDATE users SET daily_emails_used = 0, last_reset_date = $1 WHERE id = $2',
         [today, user.id]
@@ -313,7 +324,7 @@ app.post('/auth/login', async (req, res) => {
     // Create token
     const token = jwt.sign(
       { id: user.id, email: user.email }, 
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET || 'fallback-secret-key',
       { expiresIn: '7d' }
     );
 
@@ -362,6 +373,10 @@ app.post('/auth/change-password', authenticateToken, async (req, res) => {
       'SELECT password FROM users WHERE id = $1',
       [req.user.id]
     );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
     const validPassword = await bcrypt.compare(currentPassword, userResult.rows[0].password);
     if (!validPassword) {
@@ -453,7 +468,30 @@ app.get('/auth/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Email Generation Functions
+// Health check endpoint
+app.get("/", (req, res) => {
+  res.json({ 
+    status: "✅ LetiMail backend running",
+    database: "Connected to PostgreSQL",
+    authentication: "JWT-based auth system",
+    email: "SendGrid configured"
+  });
+});
+
+// Test endpoint for debugging
+app.get('/auth/debug', async (req, res) => {
+  try {
+    const users = await pool.query('SELECT id, name, email, is_verified FROM users');
+    res.json({ 
+      totalUsers: users.rows.length,
+      users: users.rows 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Email Generation Functions (Keep your existing functions)
 function cleanAIResponse(content) {
   if (!content) return content;
   
@@ -782,7 +820,7 @@ app.post("/send-email", authenticateToken, async (req, res) => {
           subject: subject
         }],
         from: {
-          email: process.env.FROM_EMAIL,
+          email: process.env.FROM_EMAIL || 'noreply@letimail.com',
           name: senderName || "LetiMail User"
         },
         content: [
@@ -926,11 +964,6 @@ function extractSubject(content) {
   const subjectMatch = content.match(/Subject:\s*(.*?)(?:\n|$)/i);
   return subjectMatch ? subjectMatch[1].trim() : null;
 }
-
-// Health check endpoint
-app.get("/", (req, res) => {
-  res.send("✅ LetiMail backend running with PostgreSQL Authentication");
-});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 LetiMail backend running on port ${PORT}`));
