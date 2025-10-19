@@ -4,7 +4,6 @@ import fetch from "node-fetch";
 import { createClient } from '@supabase/supabase-js';
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
