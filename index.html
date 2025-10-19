@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="Frontend/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <!-- Notification System -->
@@ -23,6 +24,9 @@
     </div>
     <div class="notification-progress"></div>
   </div>
+
+  <!-- Auth Modals -->
+  <div id="authModals"></div>
 
   <!-- Navigation -->
   <header class="navbar">
@@ -59,105 +63,6 @@
       </div>
     </div>
   </header>
-
-  <!-- Auth Modals -->
-  <div id="authModals" style="display: none;">
-    <!-- Signup Modal -->
-    <div id="signupModal" class="modal-overlay">
-      <div class="modal-content auth-modal">
-        <button class="modal-close" onclick="hideAuthModal()">
-          <i class="fas fa-times"></i>
-        </button>
-        <div class="auth-header">
-          <h3>Create Your Account</h3>
-          <p>Join thousands of professionals using LetiMail</p>
-        </div>
-        <form id="signupForm" class="auth-form">
-          <div class="input-group">
-            <label for="signupName">Full Name</label>
-            <input type="text" id="signupName" required class="auth-input" placeholder="Enter your full name">
-          </div>
-          <div class="input-group">
-            <label for="signupEmail">Email</label>
-            <input type="email" id="signupEmail" required class="auth-input" placeholder="Enter your email">
-          </div>
-          <div class="input-group">
-            <label for="signupPassword">Password</label>
-            <input type="password" id="signupPassword" required class="auth-input" placeholder="Create a password (min. 6 characters)" minlength="6">
-          </div>
-          <button type="submit" class="auth-btn primary">
-            <span class="btn-text">Create Account</span>
-            <div class="btn-spinner"></div>
-          </button>
-        </form>
-        <div class="auth-footer">
-          <p>Already have an account? <a href="#" id="showLogin">Sign in</a></p>
-        </div>
-      </div>
-    </div>
-
-    <!-- OTP Verification Modal -->
-    <div id="otpModal" class="modal-overlay">
-      <div class="modal-content auth-modal">
-        <button class="modal-close" onclick="hideAuthModal()">
-          <i class="fas fa-times"></i>
-        </button>
-        <div class="auth-header">
-          <h3>Verify Your Email</h3>
-          <p>We've sent a 6-digit code to your email</p>
-        </div>
-        <form id="otpForm" class="auth-form">
-          <div class="input-group">
-            <label for="otpCode">Enter OTP Code</label>
-            <div class="otp-input-container">
-              <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="000000" maxlength="6" pattern="[0-9]{6}">
-              <button type="button" id="resendOtp" class="otp-resend" disabled>
-                Resend (60s)
-              </button>
-            </div>
-            <div class="otp-hint">Enter the 6-digit code sent to your email</div>
-          </div>
-          <button type="submit" class="auth-btn primary">
-            <span class="btn-text">Verify & Continue</span>
-            <div class="btn-spinner"></div>
-          </button>
-        </form>
-        <div class="auth-footer">
-          <p>Wrong email? <a href="#" id="changeEmail">Change email</a></p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Login Modal -->
-    <div id="loginModal" class="modal-overlay">
-      <div class="modal-content auth-modal">
-        <button class="modal-close" onclick="hideAuthModal()">
-          <i class="fas fa-times"></i>
-        </button>
-        <div class="auth-header">
-          <h3>Welcome Back</h3>
-          <p>Sign in to your LetiMail account</p>
-        </div>
-        <form id="loginForm" class="auth-form">
-          <div class="input-group">
-            <label for="loginEmail">Email</label>
-            <input type="email" id="loginEmail" required class="auth-input" placeholder="Enter your email">
-          </div>
-          <div class="input-group">
-            <label for="loginPassword">Password</label>
-            <input type="password" id="loginPassword" required class="auth-input" placeholder="Enter your password">
-          </div>
-          <button type="submit" class="auth-btn primary">
-            <span class="btn-text">Sign In</span>
-            <div class="btn-spinner"></div>
-          </button>
-        </form>
-        <div class="auth-footer">
-          <p>Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Hero Section -->
   <section class="hero">
@@ -217,7 +122,7 @@
       </div>
     </div>
   </section>
-  
+
   <!-- Problem Section -->
   <section class="problem-section">
     <div class="container">
@@ -389,7 +294,7 @@
       </div>
     </div>
   </section>
-  
+
   <!-- Footer -->
   <footer class="footer">
     <div class="container">
@@ -432,7 +337,7 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <p>&copy; 2024 LetiMail. All rights reserved.</p>
+        <p>&copy; 2025 LetiMail. All rights reserved.</p>
         <div class="footer-social">
           <a href="#"><i class="fab fa-twitter"></i></a>
           <a href="#"><i class="fab fa-linkedin"></i></a>
@@ -442,6 +347,6 @@
     </div>
   </footer>
 
-  <script src="Frontend/auth.js"></script>
+  <script src="Frontend/script.js"></script>
 </body>
 </html>
