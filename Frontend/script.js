@@ -4,6 +4,9 @@ let supabase = null;
 // Global Auth State
 let currentUser = null;
 
+// IMPORTANT: Replace this with your actual Railway backend URL
+const BACKEND_URL = 'letimail-production.up.railway.app'; // Change this!
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -21,7 +24,12 @@ async function initializeApp() {
 // Get Supabase configuration from backend
 async function getSupabaseConfig() {
     try {
-        const response = await fetch('/api/config');
+        const response = await fetch(`${BACKEND_URL}/api/config`);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch config: ${response.status}`);
+        }
+        
         const config = await response.json();
         
         // Initialize Supabase client with config from backend
@@ -42,7 +50,7 @@ async function getSupabaseConfig() {
         });
     } catch (error) {
         console.error('Failed to get Supabase config:', error);
-        showNotification('Error', 'Failed to initialize authentication', 'error');
+        showNotification('Error', 'Failed to initialize authentication. Please check your backend URL.', 'error');
     }
 }
 
@@ -498,7 +506,7 @@ async function generateEmail() {
     try {
         const token = (await supabase.auth.getSession()).data.session?.access_token;
         
-        const response = await fetch('/generate', {
+        const response = await fetch(`${BACKEND_URL}/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
