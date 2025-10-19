@@ -6,8 +6,24 @@
   <title>LetiMail App - Generate Your Emails</title>
   <link rel="stylesheet" href="Frontend/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
+  <!-- Notification System -->
+  <div id="notification" class="notification">
+    <div class="notification-content">
+      <div class="notification-icon"></div>
+      <div class="notification-text">
+        <div class="notification-title"></div>
+        <div class="notification-message"></div>
+      </div>
+      <button class="notification-close">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="notification-progress"></div>
+  </div>
+
   <!-- Navigation -->
   <header class="navbar">
     <div class="nav-container">
@@ -22,12 +38,27 @@
         <div class="user-info">
           <span class="user-badge" id="planType">Free Plan</span>
           <span class="email-count" id="emailCount">25 emails left</span>
-          <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
+        <div id="userMenu" class="user-menu">
+          <button class="user-avatar" id="userAvatar">
+            <span id="avatarText">U</span>
+          </button>
+          <div class="dropdown-menu">
+            <a href="app.html" class="dropdown-item">
+              <i class="fas fa-envelope"></i>Email Generator
+            </a>
+            <a href="settings.html" class="dropdown-item">
+              <i class="fas fa-cog"></i>Settings
+            </a>
+            <div class="dropdown-divider"></div>
+            <button id="logoutBtn" class="dropdown-item logout">
+              <i class="fas fa-sign-out-alt"></i>Logout
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </header>
-
   <!-- Main App Section -->
   <section class="app-main">
     <div class="app-container">
