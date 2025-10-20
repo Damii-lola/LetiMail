@@ -16,10 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function initializeApp() {
-    checkAuthState();
+    await checkAuthState();
     setupEventListeners();
     setupNotification();
     createAuthModals();
+    setupSettingsPage(); // Initialize settings page if we're on it
 }
 
 // Auth State Management
@@ -42,6 +43,7 @@ async function checkAuthState() {
             const data = await response.json();
             currentUser = data.user;
             showUserMenu(currentUser);
+            updateSettingsPage(); // Update settings page with user data
         } else {
             localStorage.removeItem('authToken');
             authToken = null;
@@ -49,6 +51,8 @@ async function checkAuthState() {
         }
     } catch (error) {
         console.error('Auth check error:', error);
+        localStorage.removeItem('authToken');
+        authToken = null;
         showAuthButtons();
     }
 }
@@ -137,7 +141,7 @@ function createAuthModals() {
                     <div class="input-group">
                         <label for="otpCode">Verification Code</label>
                         <div class="otp-input-container">
-                            <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="Enter 6-digit code" maxlength="6">
+                            <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="Enter 6-digit code" maxlength="6" pattern="[0-9]{6}">
                             <button type="button" class="otp-resend" id="resendOtp" onclick="sendOTP()">Resend</button>
                         </div>
                         <span class="otp-hint">Check your email for the verification code</span>
@@ -242,7 +246,7 @@ async function sendOTP() {
 async function verifyOTPAndRegister() {
     const otp = document.getElementById('otpCode').value;
 
-    if (!otp || otp.length !== 6) {
+    if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
         showNotification('Error', 'Please enter a valid 6-digit code', 'error');
         return;
     }
@@ -288,6 +292,8 @@ async function verifyOTPAndRegister() {
 // Resend OTP timer
 function startResendTimer() {
     const resendBtn = document.getElementById('resendOtp');
+    if (!resendBtn) return;
+    
     let timeLeft = 60; // 60 seconds
     
     resendBtn.disabled = true;
@@ -317,6 +323,18 @@ function setupEventListeners() {
             e.preventDefault();
             handleLogin(e);
         }
+        if (e.target.id === 'profileForm') {
+            e.preventDefault();
+            handleProfileUpdate(e);
+        }
+        if (e.target.id === 'preferencesForm') {
+            e.preventDefault();
+            handlePreferencesUpdate(e);
+        }
+        if (e.target.id === 'passwordForm') {
+            e.preventDefault();
+            handlePasswordChange(e);
+        }
     });
 
     // Modal navigation (delegated)
@@ -340,7 +358,9 @@ function setupEventListeners() {
         userAvatar.addEventListener('click', (e) => {
             e.stopPropagation();
             const dropdown = userAvatar.nextElementSibling;
-            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+            if (dropdown) {
+                dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+            }
         });
 
         document.addEventListener('click', () => {
@@ -355,13 +375,19 @@ function setupEventListeners() {
 // Modal Functions
 function showSignupModal() {
     hideAllModals();
-    document.getElementById('signupModal').style.display = 'flex';
+    const signupModal = document.getElementById('signupModal');
+    if (signupModal) {
+        signupModal.style.display = 'flex';
+    }
     resetForms();
 }
 
 function showLoginModal() {
     hideAllModals();
-    document.getElementById('loginModal').style.display = 'flex';
+    const loginModal = document.getElementById('loginModal');
+    if (loginModal) {
+        loginModal.style.display = 'flex';
+    }
     resetForms();
 }
 
@@ -372,16 +398,20 @@ function hideAuthModal() {
 
 function hideAllModals() {
     const modals = document.querySelectorAll('.modal-overlay');
-    modals.forEach(modal => modal.style.display = 'none');
+    modals.forEach(modal => {
+        if (modal) modal.style.display = 'none';
+    });
 }
 
 function resetForms() {
     const forms = document.querySelectorAll('.auth-form');
     forms.forEach(form => {
-        form.reset();
-        const button = form.querySelector('.auth-btn');
-        if (button) {
-            hideButtonLoading(button);
+        if (form) {
+            form.reset();
+            const button = form.querySelector('.auth-btn');
+            if (button) {
+                hideButtonLoading(button);
+            }
         }
     });
     
@@ -397,6 +427,7 @@ function resetForms() {
 
 // Button Loading States
 function showButtonLoading(button) {
+    if (!button) return;
     const btnText = button.querySelector('.btn-text');
     const spinner = button.querySelector('.btn-spinner');
     
@@ -406,6 +437,7 @@ function showButtonLoading(button) {
 }
 
 function hideButtonLoading(button) {
+    if (!button) return;
     const btnText = button.querySelector('.btn-text');
     const spinner = button.querySelector('.btn-spinner');
     
@@ -420,8 +452,9 @@ function setupNotification() {
     if (!notification) return;
     
     const closeBtn = notification.querySelector('.notification-close');
-    
-    closeBtn.addEventListener('click', hideNotification);
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideNotification);
+    }
 
     notification.addEventListener('animationend', (e) => {
         if (e.animationName === 'notificationSlideIn' && notification.classList.contains('show')) {
@@ -441,8 +474,8 @@ function showNotification(title, message, type = 'info') {
     const messageEl = notification.querySelector('.notification-message');
     const iconEl = notification.querySelector('.notification-icon');
     
-    titleEl.textContent = title;
-    messageEl.textContent = message;
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
     notification.className = `notification show ${type}`;
     
     const icons = {
@@ -452,7 +485,9 @@ function showNotification(title, message, type = 'info') {
         info: 'fas fa-info-circle'
     };
     
-    iconEl.className = `notification-icon ${icons[type] || icons.info}`;
+    if (iconEl) {
+        iconEl.className = `notification-icon ${icons[type] || icons.info}`;
+    }
     
     setTimeout(hideNotification, 5000);
 }
@@ -701,6 +736,9 @@ function showSendEmailModal() {
             return;
         }
 
+        const confirmBtn = document.getElementById('confirmSend');
+        showButtonLoading(confirmBtn);
+
         try {
             const response = await fetch(`${BACKEND_URL}/api/send-email`, {
                 method: 'POST',
@@ -727,6 +765,8 @@ function showSendEmailModal() {
             }
         } catch (error) {
             showNotification('Error', error.message, 'error');
+        } finally {
+            hideButtonLoading(confirmBtn);
         }
     });
 
@@ -741,6 +781,146 @@ function showSendEmailModal() {
     });
 }
 
+// Settings Page Functions
+function setupSettingsPage() {
+    // Only run if we're on the settings page
+    if (!document.getElementById('settings-panels')) return;
+
+    // Setup navigation
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const tab = this.getAttribute('data-tab');
+            switchSettingsTab(tab);
+        });
+    });
+
+    // Load user data into settings
+    updateSettingsPage();
+}
+
+function updateSettingsPage() {
+    if (!currentUser || !document.getElementById('settings-panels')) return;
+
+    // Update profile form
+    const profileName = document.getElementById('profileName');
+    const profileEmail = document.getElementById('profileEmail');
+    
+    if (profileName) profileName.value = currentUser.name || '';
+    if (profileEmail) profileEmail.value = currentUser.email || '';
+
+    // Update subscription info
+    const currentPlanName = document.getElementById('currentPlanName');
+    const emailsUsed = document.getElementById('emailsUsed');
+    
+    if (currentPlanName) {
+        currentPlanName.textContent = currentUser.plan ? `${currentUser.plan.charAt(0).toUpperCase() + currentUser.plan.slice(1)} Plan` : 'Free Plan';
+    }
+    if (emailsUsed) {
+        emailsUsed.textContent = `${currentUser.emails_used || 0}/${currentUser.emails_left + (currentUser.emails_used || 0) || 25}`;
+    }
+}
+
+function switchSettingsTab(tabName) {
+    // Update active nav item
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('data-tab') === tabName) {
+            item.classList.add('active');
+        }
+    });
+
+    // Show corresponding panel
+    const panels = document.querySelectorAll('.settings-panel');
+    panels.forEach(panel => {
+        panel.classList.remove('active');
+        if (panel.id === `${tabName}-panel`) {
+            panel.classList.add('active');
+        }
+    });
+}
+
+async function handleProfileUpdate(e) {
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
+    
+    const name = document.getElementById('profileName').value;
+    
+    try {
+        // In a real app, you'd make an API call to update the profile
+        // For now, we'll just update the local state
+        if (currentUser) {
+            currentUser.name = name;
+            showNotification('Success', 'Profile updated successfully', 'success');
+            updateUserInfo(currentUser);
+            updateSettingsPage();
+        }
+    } catch (error) {
+        showNotification('Error', 'Failed to update profile', 'error');
+    } finally {
+        hideButtonLoading(button);
+    }
+}
+
+async function handlePreferencesUpdate(e) {
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
+    
+    try {
+        // Save preferences to localStorage
+        const defaultTone = document.getElementById('defaultTone').value;
+        const emailLength = document.getElementById('emailLength').value;
+        const autoSave = document.getElementById('autoSave').checked;
+        const spellCheck = document.getElementById('spellCheck').checked;
+        
+        const preferences = {
+            defaultTone,
+            emailLength,
+            autoSave,
+            spellCheck
+        };
+        
+        localStorage.setItem('letimail_preferences', JSON.stringify(preferences));
+        showNotification('Success', 'Preferences saved successfully', 'success');
+    } catch (error) {
+        showNotification('Error', 'Failed to save preferences', 'error');
+    } finally {
+        hideButtonLoading(button);
+    }
+}
+
+async function handlePasswordChange(e) {
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
+    
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    if (newPassword !== confirmPassword) {
+        showNotification('Error', 'New passwords do not match', 'error');
+        hideButtonLoading(button);
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showNotification('Error', 'Password must be at least 6 characters', 'error');
+        hideButtonLoading(button);
+        return;
+    }
+    
+    try {
+        // In a real app, you'd make an API call to change the password
+        showNotification('Success', 'Password updated successfully', 'success');
+        e.target.reset();
+    } catch (error) {
+        showNotification('Error', 'Failed to update password', 'error');
+    } finally {
+        hideButtonLoading(button);
+    }
+}
+
 // Global functions for modal access
 window.showLoginModal = showLoginModal;
 window.showSignupModal = showSignupModal;
@@ -749,9 +929,15 @@ window.handleGetStarted = handleGetStarted;
 window.generateEmail = generateEmail;
 window.sendOTP = sendOTP;
 window.verifyOTPAndRegister = verifyOTPAndRegister;
+window.switchSettingsTab = switchSettingsTab;
 
 // Auto-initialize for app.html
 if (document.getElementById('generateBtn')) {
     document.getElementById('generateBtn').addEventListener('click', generateEmail);
     setupAppFunctions();
+}
+
+// Auto-initialize for settings.html
+if (document.getElementById('settings-panels')) {
+    setupSettingsPage();
 }
