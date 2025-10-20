@@ -1,17 +1,192 @@
 // Global Auth State
 let currentUser = null;
 let authToken = null;
+let signupData = {}; // Store signup data between OTP steps
 
-const BACKEND_URL = 'https://letimail-production.up.railway.app'; // ⚠️ CHANGE THIS NOW!
+const BACKEND_URL = 'https://letimail-production.up.railway.app';
 
 // Quick check to remind you to update the URL
 if (BACKEND_URL.includes('your-railway-app')) {
   console.error('⚠️⚠️⚠️ STOP! You need to update BACKEND_URL in script.js with your actual Railway URL! ⚠️⚠️⚠️');
 }
 
-// OTP Verification Functions
-let signupData = {}; // Store signup data between steps
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
+});
 
+async function initializeApp() {
+    checkAuthState();
+    setupEventListeners();
+    setupNotification();
+    createAuthModals();
+}
+
+// Auth State Management
+async function checkAuthState() {
+    authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
+        showAuthButtons();
+        return;
+    }
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            currentUser = data.user;
+            showUserMenu(currentUser);
+        } else {
+            localStorage.removeItem('authToken');
+            authToken = null;
+            showAuthButtons();
+        }
+    } catch (error) {
+        console.error('Auth check error:', error);
+        showAuthButtons();
+    }
+}
+
+// UI Management
+function showUserMenu(user) {
+    const userMenu = document.getElementById('userMenu');
+    const authButtons = document.getElementById('authButtons');
+    
+    if (userMenu) userMenu.style.display = 'flex';
+    if (authButtons) authButtons.style.display = 'none';
+    
+    updateUserAvatar(user.name || user.email);
+    updateUserInfo(user);
+}
+
+function showAuthButtons() {
+    const userMenu = document.getElementById('userMenu');
+    const authButtons = document.getElementById('authButtons');
+    
+    if (userMenu) userMenu.style.display = 'none';
+    if (authButtons) authButtons.style.display = 'flex';
+}
+
+function updateUserAvatar(userName) {
+    const avatarElements = document.querySelectorAll('#avatarText');
+    avatarElements.forEach(element => {
+        if (userName) {
+            element.textContent = userName.charAt(0).toUpperCase();
+        }
+    });
+}
+
+function updateUserInfo(user) {
+    const planElement = document.getElementById('planType');
+    const emailCountElement = document.getElementById('emailCount');
+    
+    if (planElement) {
+        planElement.textContent = user.plan ? `${user.plan.charAt(0).toUpperCase() + user.plan.slice(1)} Plan` : 'Free Plan';
+    }
+    
+    if (emailCountElement) {
+        emailCountElement.textContent = `${user.emails_left || 25} emails left`;
+    }
+}
+
+// Auth Modals Creation
+function createAuthModals() {
+    const authModals = document.getElementById('authModals');
+    if (!authModals) return;
+
+    authModals.innerHTML = `
+        <!-- Signup Modal -->
+        <div id="signupModal" class="modal-overlay" style="display: none;">
+            <div class="modal-content auth-modal">
+                <button class="modal-close" onclick="hideAuthModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="auth-header">
+                    <h3>Create Your Account</h3>
+                    <p>Join thousands of professionals using LetiMail</p>
+                </div>
+                
+                <!-- Step 1: Basic Info -->
+                <form id="signupForm" class="auth-form" style="display: block;">
+                    <div class="input-group">
+                        <label for="signupName">Full Name</label>
+                        <input type="text" id="signupName" required class="auth-input" placeholder="Enter your full name">
+                    </div>
+                    <div class="input-group">
+                        <label for="signupEmail">Email</label>
+                        <input type="email" id="signupEmail" required class="auth-input" placeholder="Enter your email">
+                    </div>
+                    <div class="input-group">
+                        <label for="signupPassword">Password</label>
+                        <input type="password" id="signupPassword" required class="auth-input" placeholder="Create a password (min. 6 characters)" minlength="6">
+                    </div>
+                    <button type="button" class="auth-btn primary" onclick="sendOTP()">
+                        <span class="btn-text">Send Verification Code</span>
+                        <div class="btn-spinner"></div>
+                    </button>
+                </form>
+
+                <!-- Step 2: OTP Verification -->
+                <form id="otpForm" class="auth-form" style="display: none;">
+                    <div class="input-group">
+                        <label for="otpCode">Verification Code</label>
+                        <div class="otp-input-container">
+                            <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="Enter 6-digit code" maxlength="6">
+                            <button type="button" class="otp-resend" id="resendOtp" onclick="sendOTP()">Resend</button>
+                        </div>
+                        <span class="otp-hint">Check your email for the verification code</span>
+                    </div>
+                    <button type="button" class="auth-btn primary" onclick="verifyOTPAndRegister()">
+                        <span class="btn-text">Verify & Create Account</span>
+                        <div class="btn-spinner"></div>
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>Already have an account? <a href="#" id="showLoginFromSignup">Sign in</a></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Modal -->
+        <div id="loginModal" class="modal-overlay" style="display: none;">
+            <div class="modal-content auth-modal">
+                <button class="modal-close" onclick="hideAuthModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="auth-header">
+                    <h3>Welcome Back</h3>
+                    <p>Sign in to your LetiMail account</p>
+                </div>
+                <form id="loginForm" class="auth-form">
+                    <div class="input-group">
+                        <label for="loginEmail">Email</label>
+                        <input type="email" id="loginEmail" required class="auth-input" placeholder="Enter your email">
+                    </div>
+                    <div class="input-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" required class="auth-input" placeholder="Enter your password">
+                    </div>
+                    <button type="submit" class="auth-btn primary">
+                        <span class="btn-text">Sign In</span>
+                        <div class="btn-spinner"></div>
+                    </button>
+                </form>
+                <div class="auth-footer">
+                    <p>Don't have an account? <a href="#" id="showSignupFromLogin">Sign up</a></p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// OTP Verification Functions
 async function sendOTP() {
     const email = document.getElementById('signupEmail').value;
     const name = document.getElementById('signupName').value;
@@ -130,201 +305,6 @@ function startResendTimer() {
     }, 1000);
 }
 
-// Update the resetForms function to handle OTP flow
-function resetForms() {
-    const forms = document.querySelectorAll('.auth-form');
-    forms.forEach(form => {
-        form.reset();
-        const button = form.querySelector('.auth-btn');
-        if (button) {
-            hideButtonLoading(button);
-        }
-    });
-    
-    // Reset to first step
-    document.getElementById('signupForm').style.display = 'block';
-    document.getElementById('otpForm').style.display = 'none';
-    
-    // Clear signup data
-    signupData = {};
-}
-
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
-});
-
-async function initializeApp() {
-    checkAuthState();
-    setupEventListeners();
-    setupNotification();
-    createAuthModals();
-}
-
-// Auth State Management
-async function checkAuthState() {
-  authToken = localStorage.getItem('authToken');
-  
-  if (!authToken) {
-    showAuthButtons();
-    return;
-  }
-
-  try {
-    // ✅ FIXED: Proper URL construction
-    const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      currentUser = data.user;
-      showUserMenu(currentUser);
-    } else {
-      localStorage.removeItem('authToken');
-      authToken = null;
-      showAuthButtons();
-    }
-  } catch (error) {
-    console.error('Auth check error:', error);
-    showAuthButtons();
-  }
-}
-
-// UI Management
-function showUserMenu(user) {
-    const userMenu = document.getElementById('userMenu');
-    const authButtons = document.getElementById('authButtons');
-    
-    if (userMenu) userMenu.style.display = 'flex';
-    if (authButtons) authButtons.style.display = 'none';
-    
-    updateUserAvatar(user.name || user.email);
-    updateUserInfo(user);
-}
-
-function showAuthButtons() {
-    const userMenu = document.getElementById('userMenu');
-    const authButtons = document.getElementById('authButtons');
-    
-    if (userMenu) userMenu.style.display = 'none';
-    if (authButtons) authButtons.style.display = 'flex';
-}
-
-function updateUserAvatar(userName) {
-    const avatarElements = document.querySelectorAll('#avatarText');
-    avatarElements.forEach(element => {
-        if (userName) {
-            element.textContent = userName.charAt(0).toUpperCase();
-        }
-    });
-}
-
-function updateUserInfo(user) {
-    const planElement = document.getElementById('planType');
-    const emailCountElement = document.getElementById('emailCount');
-    
-    if (planElement) {
-        planElement.textContent = user.plan ? `${user.plan.charAt(0).toUpperCase() + user.plan.slice(1)} Plan` : 'Free Plan';
-    }
-    
-    if (emailCountElement) {
-        emailCountElement.textContent = `${user.emails_left || 25} emails left`;
-    }
-}
-
-// Auth Modals Creation
-function createAuthModals() {
-    const authModals = document.getElementById('authModals');
-    if (!authModals) return;
-
-    authModals.innerHTML = `
-        <!-- Signup Modal -->
-        <div id="signupModal" class="modal-overlay" style="display: none;">
-            <div class="modal-content auth-modal">
-                <button class="modal-close" onclick="hideAuthModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-                <div class="auth-header">
-                    <h3>Create Your Account</h3>
-                    <p>Join thousands of professionals using LetiMail</p>
-                </div>
-                
-                <!-- Step 1: Basic Info -->
-                <form id="signupForm" class="auth-form" style="display: block;">
-                    <div class="input-group">
-                        <label for="signupName">Full Name</label>
-                        <input type="text" id="signupName" required class="auth-input" placeholder="Enter your full name">
-                    </div>
-                    <div class="input-group">
-                        <label for="signupEmail">Email</label>
-                        <input type="email" id="signupEmail" required class="auth-input" placeholder="Enter your email">
-                    </div>
-                    <div class="input-group">
-                        <label for="signupPassword">Password</label>
-                        <input type="password" id="signupPassword" required class="auth-input" placeholder="Create a password (min. 6 characters)" minlength="6">
-                    </div>
-                    <button type="button" class="auth-btn primary" onclick="sendOTP()">
-                        <span class="btn-text">Send Verification Code</span>
-                        <div class="btn-spinner"></div>
-                    </button>
-                </form>
-
-                <!-- Step 2: OTP Verification -->
-                <form id="otpForm" class="auth-form" style="display: none;">
-                    <div class="input-group">
-                        <label for="otpCode">Verification Code</label>
-                        <div class="otp-input-container">
-                            <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="Enter 6-digit code" maxlength="6">
-                            <button type="button" class="otp-resend" id="resendOtp" onclick="sendOTP()">Resend</button>
-                        </div>
-                        <span class="otp-hint">Check your email for the verification code</span>
-                    </div>
-                    <button type="button" class="auth-btn primary" onclick="verifyOTPAndRegister()">
-                        <span class="btn-text">Verify & Create Account</span>
-                        <div class="btn-spinner"></div>
-                    </button>
-                </form>
-
-                <div class="auth-footer">
-                    <p>Already have an account? <a href="#" id="showLoginFromSignup">Sign in</a></p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Login Modal (unchanged) -->
-        <div id="loginModal" class="modal-overlay" style="display: none;">
-            <div class="modal-content auth-modal">
-                <button class="modal-close" onclick="hideAuthModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-                <div class="auth-header">
-                    <h3>Welcome Back</h3>
-                    <p>Sign in to your LetiMail account</p>
-                </div>
-                <form id="loginForm" class="auth-form">
-                    <div class="input-group">
-                        <label for="loginEmail">Email</label>
-                        <input type="email" id="loginEmail" required class="auth-input" placeholder="Enter your email">
-                    </div>
-                    <div class="input-group">
-                        <label for="loginPassword">Password</label>
-                        <input type="password" id="loginPassword" required class="auth-input" placeholder="Enter your password">
-                    </div>
-                    <button type="submit" class="auth-btn primary">
-                        <span class="btn-text">Sign In</span>
-                        <div class="btn-spinner"></div>
-                    </button>
-                </form>
-                <div class="auth-footer">
-                    <p>Don't have an account? <a href="#" id="showSignupFromLogin">Sign up</a></p>
-                </div>
-            </div>
-        </div>
-    `;
-}
 // Event Listeners Setup
 function setupEventListeners() {
     // Auth modal triggers
@@ -336,10 +316,6 @@ function setupEventListeners() {
         if (e.target.id === 'loginForm') {
             e.preventDefault();
             handleLogin(e);
-        }
-        if (e.target.id === 'signupForm') {
-            e.preventDefault();
-            handleSignup(e);
         }
     });
 
@@ -408,6 +384,15 @@ function resetForms() {
             hideButtonLoading(button);
         }
     });
+    
+    // Reset to first step
+    const signupForm = document.getElementById('signupForm');
+    const otpForm = document.getElementById('otpForm');
+    if (signupForm) signupForm.style.display = 'block';
+    if (otpForm) otpForm.style.display = 'none';
+    
+    // Clear signup data
+    signupData = {};
 }
 
 // Button Loading States
@@ -479,88 +464,45 @@ function hideNotification() {
     }
 }
 
-// Auth Handlers - UPDATED VERSION
-async function handleSignup(e) {
-  const button = e.target.querySelector('button[type="submit"]');
-  showButtonLoading(button);
-  
-  const name = document.getElementById('signupName').value;
-  const email = document.getElementById('signupEmail').value;
-  const password = document.getElementById('signupPassword').value;
-  
-  try {
-    // ✅ FIXED: Proper URL construction
-    const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ name, email, password })
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      authToken = data.token;
-      localStorage.setItem('authToken', authToken);
-      currentUser = data.user;
-      
-      showNotification('Success', 'Account created successfully!', 'success');
-      hideAuthModal();
-      showUserMenu(currentUser);
-    } else {
-      throw new Error(data.error || 'Registration failed');
-    }
-    
-  } catch (error) {
-    console.error('Signup error:', error);
-    showNotification('Signup Failed', error.message, 'error');
-  } finally {
-    hideButtonLoading(button);
-  }
-}
-
+// Auth Handlers
 async function handleLogin(e) {
-  const button = e.target.querySelector('button[type="submit"]');
-  showButtonLoading(button);
-  
-  const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
-  
-  try {
-    // ✅ FIXED: Proper URL construction
-    const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ email, password })
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      authToken = data.token;
-      localStorage.setItem('authToken', authToken);
-      currentUser = data.user;
-      
-      showNotification('Welcome Back!', 'Successfully signed in', 'success');
-      hideAuthModal();
-      showUserMenu(currentUser);
-    } else {
-      throw new Error(data.error || 'Login failed');
-    }
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
     
-  } catch (error) {
-    console.error('Login error:', error);
-    showNotification('Login Failed', error.message, 'error');
-  } finally {
-    hideButtonLoading(button);
-  }
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            authToken = data.token;
+            localStorage.setItem('authToken', authToken);
+            currentUser = data.user;
+            
+            showNotification('Welcome Back!', 'Successfully signed in', 'success');
+            hideAuthModal();
+            showUserMenu(currentUser);
+        } else {
+            throw new Error(data.error || 'Login failed');
+        }
+        
+    } catch (error) {
+        showNotification('Login Failed', error.message, 'error');
+    } finally {
+        hideButtonLoading(button);
+    }
 }
 
 function handleLogout() {
-    // Clear token and user data
     authToken = null;
     currentUser = null;
     localStorage.removeItem('authToken');
@@ -771,6 +713,8 @@ window.showSignupModal = showSignupModal;
 window.hideAuthModal = hideAuthModal;
 window.handleGetStarted = handleGetStarted;
 window.generateEmail = generateEmail;
+window.sendOTP = sendOTP;
+window.verifyOTPAndRegister = verifyOTPAndRegister;
 
 // Auto-initialize for app.html
 if (document.getElementById('generateBtn')) {
