@@ -2,8 +2,16 @@
 let currentUser = null;
 let authToken = null;
 
-// IMPORTANT: Replace this with your actual Railway backend URL
-const BACKEND_URL = 'https://your-railway-app.up.railway.app'; // Change this!
+// 🔥 CRITICAL: Replace this with YOUR actual Railway backend URL! 🔥
+// Find it in Railway: Click your backend service → Settings → copy the domain
+// Example: https://letimail-backend-production.up.railway.app
+// DO NOT include trailing slash!
+const BACKEND_URL = 'letimail-production.up.railway.app'; // ⚠️ CHANGE THIS NOW!
+
+// Quick check to remind you to update the URL
+if (BACKEND_URL.includes('your-railway-app')) {
+  console.error('⚠️⚠️⚠️ STOP! You need to update BACKEND_URL in script.js with your actual Railway URL! ⚠️⚠️⚠️');
+}
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
