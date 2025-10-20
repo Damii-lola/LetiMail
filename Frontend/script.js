@@ -2,7 +2,7 @@
 let currentUser = null;
 let authToken = null;
 
-const BACKEND_URL = 'letimail-production.up.railway.app'; // ⚠️ CHANGE THIS NOW!
+const BACKEND_URL = 'https://letimail-production.up.railway.app'; // ⚠️ CHANGE THIS NOW!
 
 // Quick check to remind you to update the URL
 if (BACKEND_URL.includes('your-railway-app')) {
