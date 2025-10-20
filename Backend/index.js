@@ -287,12 +287,12 @@ app.post("/api/auth/register", async (req, res) => {
     // Verify OTP first
     const otpResult = await pool.query(
       `SELECT * FROM otp_verifications 
-       WHERE email = $1 AND otp = $2 AND verified = true AND expires_at > NOW()`,
+       WHERE email = $1 AND otp = $2 AND expires_at > NOW()`,
       [email, otp]
     );
 
     if (otpResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid or unverified OTP' });
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
     // Check if user exists
