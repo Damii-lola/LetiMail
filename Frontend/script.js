@@ -537,6 +537,7 @@ async function generateEmail() {
     const business = document.getElementById('businessDesc')?.value;
     const context = document.getElementById('context')?.value;
     const tone = document.getElementById('tone')?.value;
+    const emailLength = document.getElementById('emailLength')?.value || 'medium';
 
     if (!business || !context) {
         showNotification('Error', 'Please fill in all fields', 'error');
@@ -563,7 +564,12 @@ async function generateEmail() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({ business, context, tone })
+            body: JSON.stringify({ 
+                business, 
+                context, 
+                tone,
+                emailLength
+            })
         });
 
         const data = await response.json();
@@ -650,8 +656,13 @@ function showSendEmailModal() {
                 <input type="email" id="recipientEmail" class="email-input" placeholder="recipient@example.com" required>
             </div>
             <div class="input-group">
-                <label for="senderName">Your Name</label>
-                <input type="text" id="senderName" class="name-input" placeholder="Your Name" value="${currentUser?.name || ''}" required>
+                <label for="businessName">Business Name</label>
+                <input type="text" id="businessName" class="name-input" placeholder="Your Business Name" value="${currentUser?.name || ''}" required>
+            </div>
+            <div class="input-group">
+                <label for="replyToEmail">Reply-To Email</label>
+                <input type="email" id="replyToEmail" class="email-input" placeholder="your-email@example.com" required>
+                <span class="input-hint">Replies will be sent directly to this email</span>
             </div>
             <div class="modal-actions">
                 <button class="confirm-send-btn" id="confirmSend">Send Email</button>
@@ -663,15 +674,32 @@ function showSendEmailModal() {
     document.body.appendChild(modal);
     modal.style.display = 'flex';
 
+    // Pre-fill the reply-to email with user's email if available
+    if (currentUser?.email) {
+        document.getElementById('replyToEmail').value = currentUser.email;
+    }
+
     document.getElementById('confirmSend').addEventListener('click', async function() {
         const to = document.getElementById('recipientEmail').value;
-        const senderName = document.getElementById('senderName').value;
+        const businessName = document.getElementById('businessName').value;
+        const replyToEmail = document.getElementById('replyToEmail').value;
         const outputDiv = document.getElementById('output');
         const emailContent = outputDiv.innerText;
         
         // Extract subject
         const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
         const subject = subjectMatch ? subjectMatch[1].trim() : 'Email from LetiMail';
+
+        // Validate emails
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(to)) {
+            showNotification('Error', 'Please enter a valid recipient email', 'error');
+            return;
+        }
+        if (!emailRegex.test(replyToEmail)) {
+            showNotification('Error', 'Please enter a valid reply-to email', 'error');
+            return;
+        }
 
         try {
             const response = await fetch(`${BACKEND_URL}/api/send-email`, {
@@ -680,13 +708,19 @@ function showSendEmailModal() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${authToken}`
                 },
-                body: JSON.stringify({ to, subject, content: emailContent, senderName })
+                body: JSON.stringify({ 
+                    to, 
+                    subject, 
+                    content: emailContent, 
+                    businessName,
+                    replyToEmail 
+                })
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                showNotification('Sent!', 'Email sent successfully', 'success');
+                showNotification('Sent!', 'Email sent successfully! Replies will go to: ' + replyToEmail, 'success');
                 document.body.removeChild(modal);
             } else {
                 throw new Error(data.error || 'Failed to send email');
