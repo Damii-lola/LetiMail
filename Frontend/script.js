@@ -2,10 +2,6 @@
 let currentUser = null;
 let authToken = null;
 
-// 🔥 CRITICAL: Replace this with YOUR actual Railway backend URL! 🔥
-// Find it in Railway: Click your backend service → Settings → copy the domain
-// Example: https://letimail-backend-production.up.railway.app
-// DO NOT include trailing slash!
 const BACKEND_URL = 'letimail-production.up.railway.app'; // ⚠️ CHANGE THIS NOW!
 
 // Quick check to remind you to update the URL
