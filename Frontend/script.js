@@ -23,35 +23,34 @@ async function initializeApp() {
 
 // Auth State Management
 async function checkAuthState() {
-    // Get token from localStorage
-    authToken = localStorage.getItem('authToken');
-    
-    if (!authToken) {
-        showAuthButtons();
-        return;
-    }
+  authToken = localStorage.getItem('authToken');
+  
+  if (!authToken) {
+    showAuthButtons();
+    return;
+  }
 
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            }
-        });
+  try {
+    // ✅ FIXED: Proper URL construction
+    const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
 
-        if (response.ok) {
-            const data = await response.json();
-            currentUser = data.user;
-            showUserMenu(currentUser);
-        } else {
-            // Invalid token, clear it
-            localStorage.removeItem('authToken');
-            authToken = null;
-            showAuthButtons();
-        }
-    } catch (error) {
-        console.error('Auth check error:', error);
-        showAuthButtons();
+    if (response.ok) {
+      const data = await response.json();
+      currentUser = data.user;
+      showUserMenu(currentUser);
+    } else {
+      localStorage.removeItem('authToken');
+      authToken = null;
+      showAuthButtons();
     }
+  } catch (error) {
+    console.error('Auth check error:', error);
+    showAuthButtons();
+  }
 }
 
 // UI Management
@@ -322,82 +321,84 @@ function hideNotification() {
     }
 }
 
-// Auth Handlers
+// Auth Handlers - UPDATED VERSION
 async function handleSignup(e) {
-    const button = e.target.querySelector('button[type="submit"]');
-    showButtonLoading(button);
-    
-    const name = document.getElementById('signupName').value;
-    const email = document.getElementById('signupEmail').value;
-    const password = document.getElementById('signupPassword').value;
-    
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ name, email, password })
-        });
+  const button = e.target.querySelector('button[type="submit"]');
+  showButtonLoading(button);
+  
+  const name = document.getElementById('signupName').value;
+  const email = document.getElementById('signupEmail').value;
+  const password = document.getElementById('signupPassword').value;
+  
+  try {
+    // ✅ FIXED: Proper URL construction
+    const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ name, email, password })
+    });
 
-        const data = await response.json();
+    const data = await response.json();
 
-        if (response.ok) {
-            // Save token
-            authToken = data.token;
-            localStorage.setItem('authToken', authToken);
-            currentUser = data.user;
-            
-            showNotification('Success', 'Account created successfully!', 'success');
-            hideAuthModal();
-            showUserMenu(currentUser);
-        } else {
-            throw new Error(data.error || 'Registration failed');
-        }
-        
-    } catch (error) {
-        showNotification('Signup Failed', error.message, 'error');
-    } finally {
-        hideButtonLoading(button);
+    if (response.ok) {
+      authToken = data.token;
+      localStorage.setItem('authToken', authToken);
+      currentUser = data.user;
+      
+      showNotification('Success', 'Account created successfully!', 'success');
+      hideAuthModal();
+      showUserMenu(currentUser);
+    } else {
+      throw new Error(data.error || 'Registration failed');
     }
+    
+  } catch (error) {
+    console.error('Signup error:', error);
+    showNotification('Signup Failed', error.message, 'error');
+  } finally {
+    hideButtonLoading(button);
+  }
 }
 
 async function handleLogin(e) {
-    const button = e.target.querySelector('button[type="submit"]');
-    showButtonLoading(button);
-    
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ email, password })
-        });
+  const button = e.target.querySelector('button[type="submit"]');
+  showButtonLoading(button);
+  
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  
+  try {
+    // ✅ FIXED: Proper URL construction
+    const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
 
-        const data = await response.json();
+    const data = await response.json();
 
-        if (response.ok) {
-            // Save token
-            authToken = data.token;
-            localStorage.setItem('authToken', authToken);
-            currentUser = data.user;
-            
-            showNotification('Welcome Back!', 'Successfully signed in', 'success');
-            hideAuthModal();
-            showUserMenu(currentUser);
-        } else {
-            throw new Error(data.error || 'Login failed');
-        }
-        
-    } catch (error) {
-        showNotification('Login Failed', error.message, 'error');
-    } finally {
-        hideButtonLoading(button);
+    if (response.ok) {
+      authToken = data.token;
+      localStorage.setItem('authToken', authToken);
+      currentUser = data.user;
+      
+      showNotification('Welcome Back!', 'Successfully signed in', 'success');
+      hideAuthModal();
+      showUserMenu(currentUser);
+    } else {
+      throw new Error(data.error || 'Login failed');
     }
+    
+  } catch (error) {
+    console.error('Login error:', error);
+    showNotification('Login Failed', error.message, 'error');
+  } finally {
+    hideButtonLoading(button);
+  }
 }
 
 function handleLogout() {
