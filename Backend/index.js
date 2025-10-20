@@ -49,6 +49,193 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// ============================================
+// OTP VERIFICATION ENDPOINTS
+// ============================================
+
+// Generate and send OTP
+app.post("/api/auth/send-otp", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+    // Store OTP in database (you might want to use a separate OTP table)
+    await pool.query(
+      `INSERT INTO otp_verifications (email, otp, expires_at, verified) 
+       VALUES ($1, $2, $3, $4) 
+       ON CONFLICT (email) 
+       DO UPDATE SET otp = $2, expires_at = $3, verified = $4, created_at = CURRENT_TIMESTAMP`,
+      [email, otp, expiresAt, false]
+    );
+
+    // Send OTP via email
+    const emailContent = `
+Hello,
+
+Thank you for signing up for LetiMail! Please use the following verification code to complete your registration:
+
+🔐 **Verification Code: ${otp}**
+
+This code will expire in 10 minutes.
+
+If you didn't request this code, please ignore this email.
+
+Best regards,
+The LetiMail Team
+    `;
+
+    const emailSubject = "LetiMail - Email Verification Code";
+
+    // Send email using your existing SendGrid integration
+    const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.SENDGRID_API_KEY}`
+      },
+      body: JSON.stringify({
+        personalizations: [{
+          to: [{ email: email }],
+          subject: emailSubject
+        }],
+        from: {
+          email: process.env.FROM_EMAIL,
+          name: "LetiMail Verification"
+        },
+        content: [
+          {
+            type: "text/plain",
+            value: emailContent
+          }
+        ]
+      })
+    });
+
+    if (sendGridResponse.ok) {
+      res.json({ 
+        success: true, 
+        message: 'OTP sent successfully',
+        expiresIn: '10 minutes'
+      });
+    } else {
+      console.error('SendGrid error:', await sendGridResponse.text());
+      res.status(500).json({ error: 'Failed to send OTP email' });
+    }
+
+  } catch (error) {
+    console.error('OTP send error:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+// Verify OTP
+app.post("/api/auth/verify-otp", async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ error: 'Email and OTP are required' });
+  }
+
+  try {
+    // Check OTP from database
+    const result = await pool.query(
+      `SELECT * FROM otp_verifications 
+       WHERE email = $1 AND otp = $2 AND expires_at > NOW() AND verified = false`,
+      [email, otp]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
+
+    // Mark OTP as verified
+    await pool.query(
+      `UPDATE otp_verifications SET verified = true WHERE email = $1 AND otp = $2`,
+      [email, otp]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Email verified successfully' 
+    });
+
+  } catch (error) {
+    console.error('OTP verification error:', error);
+    res.status(500).json({ error: 'OTP verification failed' });
+  }
+});
+
+// Update register endpoint to require OTP verification
+app.post("/api/auth/register", async (req, res) => {
+  const { name, email, password, otp } = req.body;
+
+  if (!name || !email || !password || !otp) {
+    return res.status(400).json({ error: 'All fields including OTP are required' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  try {
+    // Verify OTP first
+    const otpResult = await pool.query(
+      `SELECT * FROM otp_verifications 
+       WHERE email = $1 AND otp = $2 AND verified = true AND expires_at > NOW()`,
+      [email, otp]
+    );
+
+    if (otpResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or unverified OTP' });
+    }
+
+    // Check if user exists
+    const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    // Hash password and create user
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
+       VALUES ($1, $2, $3, 'free', 0, 25, 0, CURRENT_DATE)
+       RETURNING id, name, email, plan, emails_used, emails_left, daily_emails_used, created_at`,
+      [name, email, hashedPassword]
+    );
+
+    const user = result.rows[0];
+
+    // Generate JWT
+    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        plan: user.plan,
+        emails_used: user.emails_used,
+        emails_left: user.emails_left,
+        daily_emails_used: user.daily_emails_used
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
 // Initialize database tables
 async function initializeDatabase() {
   try {
@@ -99,6 +286,25 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_email_history_created ON email_history(created_at)
     `);
 
+    // Add this to your initializeDatabase function
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS otp_verifications (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        otp VARCHAR(6) NOT NULL,
+        verified BOOLEAN DEFAULT false,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_verifications(email)
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_verifications(expires_at)
+    `);
+    
     console.log('✅ Database tables initialized successfully');
   } catch (error) {
     console.error('❌ Error initializing database:', error);
