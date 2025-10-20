@@ -123,6 +123,19 @@
             </select>
           </div>
 
+          <!-- Add this after the tone selection in app.html -->
+          <div class="input-group">
+              <label for="emailLength">
+                  <span class="label-icon">📏</span>
+                  Email Length
+              </label>
+              <select id="emailLength">
+                  <option value="short">Short & Concise (5-8 sentences)</option>
+                  <option value="medium" selected>Medium Length (8-11 sentences)</option>
+                  <option value="long">Detailed & Comprehensive (11+ sentences)</option>
+              </select>
+          </div>
+          
           <button id="generateBtn" class="generate-btn">
             <span class="btn-icon">✨</span>
             Generate My Email
