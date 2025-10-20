@@ -1,14 +1,9 @@
 // Global Auth State
 let currentUser = null;
 let authToken = null;
-let signupData = {}; // Store signup data between OTP steps
+let signupData = {};
 
 const BACKEND_URL = 'https://letimail-production.up.railway.app';
-
-// Quick check to remind you to update the URL
-if (BACKEND_URL.includes('your-railway-app')) {
-  console.error('⚠️⚠️⚠️ STOP! You need to update BACKEND_URL in script.js with your actual Railway URL! ⚠️⚠️⚠️');
-}
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -137,10 +132,10 @@ function createAuthModals() {
                     <div class="input-group">
                         <label for="otpCode">Verification Code</label>
                         <div class="otp-input-container">
-                            <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="Enter 6-digit code" maxlength="6">
+                            <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="Enter 6-digit code" maxlength="6" pattern="[0-9]{6}">
                             <button type="button" class="otp-resend" id="resendOtp" onclick="sendOTP()">Resend</button>
                         </div>
-                        <span class="otp-hint">Check your email for the verification code</span>
+                        <span class="otp-hint">Check your email for the 6-digit verification code</span>
                     </div>
                     <button type="button" class="auth-btn primary" onclick="verifyOTPAndRegister()">
                         <span class="btn-text">Verify & Create Account</span>
@@ -210,6 +205,7 @@ async function sendOTP() {
     signupData = { name, email, password };
 
     try {
+        console.log('Sending OTP to:', email);
         const response = await fetch(`${BACKEND_URL}/api/auth/send-otp`, {
             method: 'POST',
             headers: {
@@ -219,6 +215,7 @@ async function sendOTP() {
         });
 
         const data = await response.json();
+        console.log('OTP response:', data);
 
         if (response.ok) {
             // Switch to OTP verification form
@@ -233,6 +230,7 @@ async function sendOTP() {
             throw new Error(data.error || 'Failed to send verification code');
         }
     } catch (error) {
+        console.error('OTP send error:', error);
         showNotification('Error', error.message, 'error');
     } finally {
         hideButtonLoading(sendOtpBtn);
@@ -251,6 +249,8 @@ async function verifyOTPAndRegister() {
     showButtonLoading(verifyBtn);
 
     try {
+        console.log('Registering with OTP:', { ...signupData, otp: '***' });
+        
         const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
             method: 'POST',
             headers: {
@@ -263,6 +263,7 @@ async function verifyOTPAndRegister() {
         });
 
         const data = await response.json();
+        console.log('Registration response:', data);
 
         if (response.ok) {
             authToken = data.token;
@@ -279,7 +280,8 @@ async function verifyOTPAndRegister() {
             throw new Error(data.error || 'Registration failed');
         }
     } catch (error) {
-        showNotification('Error', error.message, 'error');
+        console.error('Registration error:', error);
+        showNotification('Registration Failed', error.message, 'error');
     } finally {
         hideButtonLoading(verifyBtn);
     }
@@ -288,7 +290,7 @@ async function verifyOTPAndRegister() {
 // Resend OTP timer
 function startResendTimer() {
     const resendBtn = document.getElementById('resendOtp');
-    let timeLeft = 60; // 60 seconds
+    let timeLeft = 60;
     
     resendBtn.disabled = true;
     resendBtn.textContent = `Resend in ${timeLeft}s`;
@@ -311,7 +313,7 @@ function setupEventListeners() {
     document.getElementById('loginBtn')?.addEventListener('click', showLoginModal);
     document.getElementById('signupBtn')?.addEventListener('click', showSignupModal);
     
-    // Form submissions (delegated)
+    // Form submissions
     document.addEventListener('submit', function(e) {
         if (e.target.id === 'loginForm') {
             e.preventDefault();
@@ -319,7 +321,7 @@ function setupEventListeners() {
         }
     });
 
-    // Modal navigation (delegated)
+    // Modal navigation
     document.addEventListener('click', function(e) {
         if (e.target.id === 'showLoginFromSignup' || e.target.id === 'showSignupFromLogin') {
             e.preventDefault();
@@ -420,22 +422,12 @@ function setupNotification() {
     if (!notification) return;
     
     const closeBtn = notification.querySelector('.notification-close');
-    
     closeBtn.addEventListener('click', hideNotification);
-
-    notification.addEventListener('animationend', (e) => {
-        if (e.animationName === 'notificationSlideIn' && notification.classList.contains('show')) {
-            setTimeout(hideNotification, 5000);
-        }
-    });
 }
 
 function showNotification(title, message, type = 'info') {
     const notification = document.getElementById('notification');
-    if (!notification) {
-        console.log(`${type.toUpperCase()}: ${title} - ${message}`);
-        return;
-    }
+    if (!notification) return;
     
     const titleEl = notification.querySelector('.notification-title');
     const messageEl = notification.querySelector('.notification-message');
@@ -526,7 +518,7 @@ function handleGetStarted() {
     }
 }
 
-// Email Generation Functions (for app.html)
+// Email Generation Functions
 async function generateEmail() {
     if (!currentUser || !authToken) {
         showNotification('Authentication Required', 'Please sign in to generate emails', 'error');
@@ -552,7 +544,7 @@ async function generateEmail() {
     // Show loading state
     generateBtn.disabled = true;
     generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Generating...';
-    outputDiv.innerHTML = '<div class="output-placeholder"><div class="placeholder-icon">⏳</div><p>Generating your email...</p><small>Powered by adaptive AI that learns your style</small></div>';
+    outputDiv.innerHTML = '<div class="output-placeholder"><div class="placeholder-icon">⏳</div><p>Generating your email...</p></div>';
     
     if (actionButtons) actionButtons.style.display = 'none';
 
@@ -572,8 +564,6 @@ async function generateEmail() {
             outputDiv.innerText = data.email;
             if (actionButtons) actionButtons.style.display = 'flex';
             showNotification('Success', 'Email generated successfully!', 'success');
-            
-            // Refresh user data to update email count
             await checkAuthState();
         } else {
             throw new Error(data.email || 'Failed to generate email');
@@ -588,125 +578,6 @@ async function generateEmail() {
     }
 }
 
-// Copy, Edit, Send functions for app.html
-function setupAppFunctions() {
-    const copyBtn = document.getElementById('copyBtn');
-    const editBtn = document.getElementById('editBtn');
-    const sendBtn = document.getElementById('sendBtn');
-
-    if (copyBtn) {
-        copyBtn.addEventListener('click', function() {
-            const outputDiv = document.getElementById('output');
-            const text = outputDiv.innerText;
-            
-            navigator.clipboard.writeText(text).then(() => {
-                showNotification('Copied!', 'Email copied to clipboard', 'success');
-            }).catch(err => {
-                showNotification('Error', 'Failed to copy email', 'error');
-            });
-        });
-    }
-
-    if (editBtn) {
-        editBtn.addEventListener('click', function() {
-            const outputDiv = document.getElementById('output');
-            const currentText = outputDiv.innerText;
-            
-            outputDiv.innerHTML = `
-                <textarea class="email-editor" id="emailEditor">${currentText}</textarea>
-                <div class="edit-actions">
-                    <button class="submit-edit-btn" id="submitEdit">Save Changes</button>
-                    <button class="cancel-edit-btn" id="cancelEdit">Cancel</button>
-                </div>
-            `;
-
-            document.getElementById('submitEdit').addEventListener('click', async function() {
-                const editedText = document.getElementById('emailEditor').value;
-                outputDiv.innerText = editedText;
-                showNotification('Saved', 'Changes saved successfully', 'success');
-            });
-
-            document.getElementById('cancelEdit').addEventListener('click', function() {
-                outputDiv.innerText = currentText;
-            });
-        });
-    }
-
-    if (sendBtn) {
-        sendBtn.addEventListener('click', function() {
-            showSendEmailModal();
-        });
-    }
-}
-
-function showSendEmailModal() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h3>Send Email</h3>
-            <div class="input-group">
-                <label for="recipientEmail">Recipient Email</label>
-                <input type="email" id="recipientEmail" class="email-input" placeholder="recipient@example.com" required>
-            </div>
-            <div class="input-group">
-                <label for="senderName">Your Name</label>
-                <input type="text" id="senderName" class="name-input" placeholder="Your Name" value="${currentUser?.name || ''}" required>
-            </div>
-            <div class="modal-actions">
-                <button class="confirm-send-btn" id="confirmSend">Send Email</button>
-                <button class="cancel-send-btn" id="cancelSend">Cancel</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    modal.style.display = 'flex';
-
-    document.getElementById('confirmSend').addEventListener('click', async function() {
-        const to = document.getElementById('recipientEmail').value;
-        const senderName = document.getElementById('senderName').value;
-        const outputDiv = document.getElementById('output');
-        const emailContent = outputDiv.innerText;
-        
-        // Extract subject
-        const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
-        const subject = subjectMatch ? subjectMatch[1].trim() : 'Email from LetiMail';
-
-        try {
-            const response = await fetch(`${BACKEND_URL}/api/send-email`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({ to, subject, content: emailContent, senderName })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                showNotification('Sent!', 'Email sent successfully', 'success');
-                document.body.removeChild(modal);
-            } else {
-                throw new Error(data.error || 'Failed to send email');
-            }
-        } catch (error) {
-            showNotification('Error', error.message, 'error');
-        }
-    });
-
-    document.getElementById('cancelSend').addEventListener('click', function() {
-        document.body.removeChild(modal);
-    });
-
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
-}
-
 // Global functions for modal access
 window.showLoginModal = showLoginModal;
 window.showSignupModal = showSignupModal;
@@ -719,5 +590,4 @@ window.verifyOTPAndRegister = verifyOTPAndRegister;
 // Auto-initialize for app.html
 if (document.getElementById('generateBtn')) {
     document.getElementById('generateBtn').addEventListener('click', generateEmail);
-    setupAppFunctions();
 }
