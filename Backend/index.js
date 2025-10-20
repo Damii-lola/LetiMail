@@ -466,7 +466,7 @@ function addHumanTouches(email) {
 
 // Generate email endpoint
 app.post("/api/generate", authenticateToken, async (req, res) => {
-  const { business, context, tone } = req.body;
+  const { business, context, tone, emailLength } = req.body;
   
   if (!business || !context) {
     return res.status(400).json({ email: "Business description and context are required." });
@@ -550,10 +550,18 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
       }
     };
 
+    const lengthInstructions = {
+      short: "Keep it concise - 5-8 sentences maximum. Get straight to the point while maintaining professionalism.",
+      medium: "Write a balanced email - 8-11 sentences. Include key points with some detail but stay focused.",
+      long: "Write a comprehensive email - 11+ sentences. Include detailed explanations, context, and thorough coverage of the topic."
+    };
+
     const style = humanWritingStyles[tone] || humanWritingStyles.friendly;
 
     const prompt = `
 IMPORTANT: Write this email to sound 100% human-written. Avoid all AI patterns and make it pass AI detection as human-written.
+
+LENGTH REQUIREMENT: ${lengthInstructions[emailLength] || lengthInstructions.medium}
 
 HUMAN WRITING TECHNIQUES TO USE:
 - Use contractions: I'm, you're, don't, can't, won't
@@ -579,6 +587,7 @@ BUSINESS CONTEXT:
 - Business: ${business}
 - Purpose: ${context}
 - Tone: ${tone}
+- Length: ${emailLength}
 
 WRITING STYLE: ${style.instructions}
 
@@ -643,19 +652,22 @@ Return ONLY the email content starting with "Subject:".
 
 // Send email endpoint
 app.post("/api/send-email", authenticateToken, async (req, res) => {
-  const { to, subject, content, senderName } = req.body;
+  const { to, subject, content, businessName, replyToEmail } = req.body;
 
-  if (!to || !subject || !content) {
-    return res.status(400).json({ error: "Missing required fields" });
+  if (!to || !subject || !content || !businessName || !replyToEmail) {
+    return res.status(400).json({ error: "All fields are required" });
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(to)) {
-    return res.status(400).json({ error: "Invalid email address" });
+    return res.status(400).json({ error: "Invalid recipient email address" });
+  }
+  if (!emailRegex.test(replyToEmail)) {
+    return res.status(400).json({ error: "Invalid reply-to email address" });
   }
 
   try {
-    const formattedContent = formatEmailContent(content, senderName);
+    const formattedContent = formatEmailContent(content, businessName);
 
     const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
@@ -666,11 +678,16 @@ app.post("/api/send-email", authenticateToken, async (req, res) => {
       body: JSON.stringify({
         personalizations: [{
           to: [{ email: to }],
-          subject: subject
+          subject: subject,
+          reply_to: { email: replyToEmail }
         }],
         from: {
           email: process.env.FROM_EMAIL,
-          name: senderName || "LetiMail User"
+          name: businessName || "LetiMail User"
+        },
+        reply_to: {
+          email: replyToEmail,
+          name: businessName
         },
         content: [
           {
@@ -682,7 +699,11 @@ app.post("/api/send-email", authenticateToken, async (req, res) => {
     });
 
     if (sendGridResponse.ok) {
-      res.json({ success: true, message: "Email sent successfully" });
+      res.json({ 
+        success: true, 
+        message: "Email sent successfully",
+        replyTo: replyToEmail 
+      });
     } else {
       const errorData = await sendGridResponse.text();
       console.error("SendGrid Error:", errorData);
