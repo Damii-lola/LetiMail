@@ -11,6 +11,7 @@ const app = express();
 // CORS configuration - Allow requests from your frontend
 const allowedOrigins = [
   'https://damii-lola.github.io',
+  'https://damii-lola.github.io/LetiMail',
   'http://localhost:3000',
   'http://localhost:5500',
   'http://127.0.0.1:5500'
@@ -22,7 +23,6 @@ if (process.env.FRONTEND_URL) {
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
@@ -38,8 +38,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// Handle preflight requests
 app.options('*', cors(corsOptions));
 app.use(express.json());
 
@@ -48,6 +46,103 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
+
+// Initialize database tables
+async function initializeDatabase() {
+  try {
+    // Create users table if it doesn't exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        plan VARCHAR(50) DEFAULT 'free',
+        emails_used INTEGER DEFAULT 0,
+        emails_left INTEGER DEFAULT 25,
+        daily_emails_used INTEGER DEFAULT 0,
+        last_reset_date DATE DEFAULT CURRENT_DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create OTP table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS otp_verifications (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        otp VARCHAR(6) NOT NULL,
+        verified BOOLEAN DEFAULT false,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create email history table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        business_context TEXT,
+        email_context TEXT,
+        tone VARCHAR(50),
+        generated_email TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create indexes
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_verifications(email)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_verifications(expires_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_history_user ON email_history(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_history_created ON email_history(created_at)`);
+
+    console.log('✅ Database tables initialized successfully');
+  } catch (error) {
+    console.error('❌ Error initializing database:', error);
+  }
+}
+
+// Test database connection and initialize tables
+pool.connect(async (err, client, release) => {
+  if (err) {
+    console.error('❌ Error connecting to the database', err.stack);
+  } else {
+    console.log('✅ Database connected successfully');
+    release();
+    await initializeDatabase();
+  }
+});
+
+// JWT Secret
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+
+// Auth middleware
+const authenticateToken = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(403).json({ error: 'User not found' });
+    }
+    
+    req.user = result.rows[0];
+    next();
+  } catch (error) {
+    return res.status(403).json({ error: 'Invalid token' });
+  }
+};
 
 // ============================================
 // OTP VERIFICATION ENDPOINTS
@@ -66,7 +161,7 @@ app.post("/api/auth/send-otp", async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
-    // Store OTP in database (you might want to use a separate OTP table)
+    // Store OTP in database
     await pool.query(
       `INSERT INTO otp_verifications (email, otp, expires_at, verified) 
        VALUES ($1, $2, $3, $4) 
@@ -172,7 +267,11 @@ app.post("/api/auth/verify-otp", async (req, res) => {
   }
 });
 
-// Update register endpoint to require OTP verification
+// ============================================
+// AUTH ENDPOINTS
+// ============================================
+
+// Register new user with OTP verification
 app.post("/api/auth/register", async (req, res) => {
   const { name, email, password, otp } = req.body;
 
@@ -205,178 +304,6 @@ app.post("/api/auth/register", async (req, res) => {
     // Hash password and create user
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const result = await pool.query(
-      `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
-       VALUES ($1, $2, $3, 'free', 0, 25, 0, CURRENT_DATE)
-       RETURNING id, name, email, plan, emails_used, emails_left, daily_emails_used, created_at`,
-      [name, email, hashedPassword]
-    );
-
-    const user = result.rows[0];
-
-    // Generate JWT
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        plan: user.plan,
-        emails_used: user.emails_used,
-        emails_left: user.emails_left,
-        daily_emails_used: user.daily_emails_used
-      }
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
-  }
-});
-
-// Initialize database tables
-async function initializeDatabase() {
-  try {
-    // Create users table if it doesn't exist
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        plan VARCHAR(50) DEFAULT 'free',
-        emails_used INTEGER DEFAULT 0,
-        emails_left INTEGER DEFAULT 25,
-        daily_emails_used INTEGER DEFAULT 0,
-        last_reset_date DATE DEFAULT CURRENT_DATE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create indexes for better performance
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)
-    `);
-    
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan)
-    `);
-
-    // Optional: Create email history table for tracking
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS email_history (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        business_context TEXT,
-        email_context TEXT,
-        tone VARCHAR(50),
-        generated_email TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_email_history_user ON email_history(user_id)
-    `);
-
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_email_history_created ON email_history(created_at)
-    `);
-
-    // Add this to your initializeDatabase function
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS otp_verifications (
-        id SERIAL PRIMARY KEY,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        otp VARCHAR(6) NOT NULL,
-        verified BOOLEAN DEFAULT false,
-        expires_at TIMESTAMP NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_verifications(email)
-    `);
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_verifications(expires_at)
-    `);
-    
-    console.log('✅ Database tables initialized successfully');
-  } catch (error) {
-    console.error('❌ Error initializing database:', error);
-  }
-}
-
-// Test database connection and initialize tables
-pool.connect(async (err, client, release) => {
-  if (err) {
-    console.error('❌ Error connecting to the database', err.stack);
-  } else {
-    console.log('✅ Database connected successfully');
-    release();
-    // Initialize database tables
-    await initializeDatabase();
-  }
-});
-
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
-
-// Auth middleware
-const authenticateToken = async (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const result = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
-    
-    if (result.rows.length === 0) {
-      return res.status(403).json({ error: 'User not found' });
-    }
-    
-    req.user = result.rows[0];
-    next();
-  } catch (error) {
-    return res.status(403).json({ error: 'Invalid token' });
-  }
-};
-
-// ============================================
-// AUTH ENDPOINTS
-// ============================================
-
-// Register new user
-app.post("/api/auth/register", async (req, res) => {
-  const { name, email, password } = req.body;
-
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'All fields are required' });
-  }
-
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  }
-
-  try {
-    // Check if user exists
-    const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({ error: 'Email already registered' });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Insert user
     const result = await pool.query(
       `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
        VALUES ($1, $2, $3, 'free', 0, 25, 0, CURRENT_DATE)
@@ -714,68 +641,6 @@ Return ONLY the email content starting with "Subject:".
   }
 });
 
-app.post("/api/refine-email", authenticateToken, async (req, res) => {
-  const { business, context, tone, originalEmail, editedEmail } = req.body;
-
-  if (!validateEmailContent(editedEmail, business, context)) {
-    return res.status(400).json({ 
-      email: "❌ Unable to process edits." 
-    });
-  }
-
-  const prompt = `
-Apply professional formatting to this email while preserving ALL user content exactly. Make it maintain a human-written feel.
-
-USER'S EXACT WORDS (DO NOT CHANGE CONTENT):
-${editedEmail}
-
-CONTEXT (for reference only):
-- Business: ${business}
-- Purpose: ${context} 
-- Tone: ${tone}
-
-INSTRUCTIONS:
-- Preserve every word exactly as written
-- Apply clean email formatting only
-- Maintain the human-like flow and imperfections
-- Don't "improve" or "correct" the writing style
-- Keep any casual language or contractions
-- Return ONLY the formatted email
-
-Formatted email:
-`;
-
-  try {
-    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.4,
-        max_tokens: 800,
-      }),
-    });
-
-    const data = await groqResponse.json();
-    let email = data.choices?.[0]?.message?.content?.trim() || editedEmail;
-    
-    email = cleanAIResponse(email);
-    
-    if (!email || email.length < 10) {
-      email = editedEmail;
-    }
-    
-    res.json({ email });
-  } catch (error) {
-    console.error("Groq API Error:", error);
-    res.json({ email: editedEmail });
-  }
-});
-
 // Send email endpoint
 app.post("/api/send-email", authenticateToken, async (req, res) => {
   const { to, subject, content, senderName } = req.body;
@@ -950,11 +815,11 @@ function extractSubject(content) {
 
 // Health check endpoint
 app.get("/", (req, res) => {
-  res.send("✅ LetiMail backend running with PostgreSQL");
+  res.send("✅ LetiMail backend running with PostgreSQL and OTP verification");
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", database: "postgresql" });
+  res.json({ status: "ok", database: "postgresql", features: ["otp-verification"] });
 });
 
 const PORT = process.env.PORT || 3000;
