@@ -9,6 +9,146 @@ if (BACKEND_URL.includes('your-railway-app')) {
   console.error('⚠️⚠️⚠️ STOP! You need to update BACKEND_URL in script.js with your actual Railway URL! ⚠️⚠️⚠️');
 }
 
+// OTP Verification Functions
+let signupData = {}; // Store signup data between steps
+
+async function sendOTP() {
+    const email = document.getElementById('signupEmail').value;
+    const name = document.getElementById('signupName').value;
+    const password = document.getElementById('signupPassword').value;
+
+    // Basic validation
+    if (!name || !email || !password) {
+        showNotification('Error', 'Please fill in all fields', 'error');
+        return;
+    }
+
+    if (password.length < 6) {
+        showNotification('Error', 'Password must be at least 6 characters', 'error');
+        return;
+    }
+
+    const sendOtpBtn = document.querySelector('#signupForm .auth-btn');
+    showButtonLoading(sendOtpBtn);
+
+    // Store signup data for later use
+    signupData = { name, email, password };
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/send-otp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Switch to OTP verification form
+            document.getElementById('signupForm').style.display = 'none';
+            document.getElementById('otpForm').style.display = 'block';
+            
+            showNotification('Success', `Verification code sent to ${email}`, 'success');
+            
+            // Start resend timer
+            startResendTimer();
+        } else {
+            throw new Error(data.error || 'Failed to send verification code');
+        }
+    } catch (error) {
+        showNotification('Error', error.message, 'error');
+    } finally {
+        hideButtonLoading(sendOtpBtn);
+    }
+}
+
+async function verifyOTPAndRegister() {
+    const otp = document.getElementById('otpCode').value;
+
+    if (!otp || otp.length !== 6) {
+        showNotification('Error', 'Please enter a valid 6-digit code', 'error');
+        return;
+    }
+
+    const verifyBtn = document.querySelector('#otpForm .auth-btn');
+    showButtonLoading(verifyBtn);
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ...signupData,
+                otp: otp
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            authToken = data.token;
+            localStorage.setItem('authToken', authToken);
+            currentUser = data.user;
+            
+            showNotification('Success', 'Account created successfully!', 'success');
+            hideAuthModal();
+            showUserMenu(currentUser);
+            
+            // Clear signup data
+            signupData = {};
+        } else {
+            throw new Error(data.error || 'Registration failed');
+        }
+    } catch (error) {
+        showNotification('Error', error.message, 'error');
+    } finally {
+        hideButtonLoading(verifyBtn);
+    }
+}
+
+// Resend OTP timer
+function startResendTimer() {
+    const resendBtn = document.getElementById('resendOtp');
+    let timeLeft = 60; // 60 seconds
+    
+    resendBtn.disabled = true;
+    resendBtn.textContent = `Resend in ${timeLeft}s`;
+    
+    const timer = setInterval(() => {
+        timeLeft--;
+        resendBtn.textContent = `Resend in ${timeLeft}s`;
+        
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            resendBtn.disabled = false;
+            resendBtn.textContent = 'Resend';
+        }
+    }, 1000);
+}
+
+// Update the resetForms function to handle OTP flow
+function resetForms() {
+    const forms = document.querySelectorAll('.auth-form');
+    forms.forEach(form => {
+        form.reset();
+        const button = form.querySelector('.auth-btn');
+        if (button) {
+            hideButtonLoading(button);
+        }
+    });
+    
+    // Reset to first step
+    document.getElementById('signupForm').style.display = 'block';
+    document.getElementById('otpForm').style.display = 'none';
+    
+    // Clear signup data
+    signupData = {};
+}
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -111,7 +251,9 @@ function createAuthModals() {
                     <h3>Create Your Account</h3>
                     <p>Join thousands of professionals using LetiMail</p>
                 </div>
-                <form id="signupForm" class="auth-form">
+                
+                <!-- Step 1: Basic Info -->
+                <form id="signupForm" class="auth-form" style="display: block;">
                     <div class="input-group">
                         <label for="signupName">Full Name</label>
                         <input type="text" id="signupName" required class="auth-input" placeholder="Enter your full name">
@@ -124,18 +266,35 @@ function createAuthModals() {
                         <label for="signupPassword">Password</label>
                         <input type="password" id="signupPassword" required class="auth-input" placeholder="Create a password (min. 6 characters)" minlength="6">
                     </div>
-                    <button type="submit" class="auth-btn primary">
-                        <span class="btn-text">Create Account</span>
+                    <button type="button" class="auth-btn primary" onclick="sendOTP()">
+                        <span class="btn-text">Send Verification Code</span>
                         <div class="btn-spinner"></div>
                     </button>
                 </form>
+
+                <!-- Step 2: OTP Verification -->
+                <form id="otpForm" class="auth-form" style="display: none;">
+                    <div class="input-group">
+                        <label for="otpCode">Verification Code</label>
+                        <div class="otp-input-container">
+                            <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="Enter 6-digit code" maxlength="6">
+                            <button type="button" class="otp-resend" id="resendOtp" onclick="sendOTP()">Resend</button>
+                        </div>
+                        <span class="otp-hint">Check your email for the verification code</span>
+                    </div>
+                    <button type="button" class="auth-btn primary" onclick="verifyOTPAndRegister()">
+                        <span class="btn-text">Verify & Create Account</span>
+                        <div class="btn-spinner"></div>
+                    </button>
+                </form>
+
                 <div class="auth-footer">
                     <p>Already have an account? <a href="#" id="showLoginFromSignup">Sign in</a></p>
                 </div>
             </div>
         </div>
 
-        <!-- Login Modal -->
+        <!-- Login Modal (unchanged) -->
         <div id="loginModal" class="modal-overlay" style="display: none;">
             <div class="modal-content auth-modal">
                 <button class="modal-close" onclick="hideAuthModal()">
@@ -166,7 +325,6 @@ function createAuthModals() {
         </div>
     `;
 }
-
 // Event Listeners Setup
 function setupEventListeners() {
     // Auth modal triggers
