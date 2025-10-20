@@ -23,13 +23,71 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Test database connection
-pool.connect((err, client, release) => {
+// Initialize database tables
+async function initializeDatabase() {
+  try {
+    // Create users table if it doesn't exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        plan VARCHAR(50) DEFAULT 'free',
+        emails_used INTEGER DEFAULT 0,
+        emails_left INTEGER DEFAULT 25,
+        daily_emails_used INTEGER DEFAULT 0,
+        last_reset_date DATE DEFAULT CURRENT_DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create indexes for better performance
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)
+    `);
+    
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan)
+    `);
+
+    // Optional: Create email history table for tracking
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        business_context TEXT,
+        email_context TEXT,
+        tone VARCHAR(50),
+        generated_email TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_email_history_user ON email_history(user_id)
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_email_history_created ON email_history(created_at)
+    `);
+
+    console.log('✅ Database tables initialized successfully');
+  } catch (error) {
+    console.error('❌ Error initializing database:', error);
+  }
+}
+
+// Test database connection and initialize tables
+pool.connect(async (err, client, release) => {
   if (err) {
-    console.error('Error connecting to the database', err.stack);
+    console.error('❌ Error connecting to the database', err.stack);
   } else {
     console.log('✅ Database connected successfully');
     release();
+    // Initialize database tables
+    await initializeDatabase();
   }
 });
 
