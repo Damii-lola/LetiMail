@@ -243,51 +243,446 @@ async function sendOTP() {
     }
 }
 
-async function verifyOTPAndRegister() {
-    const otp = document.getElementById('otpCode').value;
+// Add this to your script.js file
 
-    if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
-        showNotification('Error', 'Please enter a valid 6-digit code', 'error');
-        return;
-    }
+// Onboarding state management
+let onboardingState = {
+  currentStep: 0,
+  toneEmails: []
+};
 
-    const verifyBtn = document.querySelector('#otpForm .auth-btn');
-    showButtonLoading(verifyBtn);
-
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                ...signupData,
-                otp: otp
-            })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            authToken = data.token;
-            localStorage.setItem('authToken', authToken);
-            currentUser = data.user;
+// Create onboarding modal HTML
+function createOnboardingModal() {
+  const modal = document.createElement('div');
+  modal.id = 'onboardingModal';
+  modal.className = 'modal-overlay onboarding-modal';
+  modal.style.display = 'none';
+  
+  modal.innerHTML = `
+    <div class="modal-content onboarding-content">
+      <div class="onboarding-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" id="onboardingProgress"></div>
+        </div>
+        <span class="progress-text" id="progressText">Step 1 of 3</span>
+      </div>
+      
+      <!-- Step 1: Data Usage & Privacy -->
+      <div class="onboarding-step active" id="step1">
+        <div class="onboarding-header">
+          <div class="onboarding-icon">🔒</div>
+          <h2>Welcome to LetiMail! Let's Get Started.</h2>
+          <h3>Your Privacy is Our Priority</h3>
+        </div>
+        
+        <div class="onboarding-body">
+          <p>To help LetiMail generate emails that sound authentically like you, we use the emails you provide to learn your unique writing style, including your tone, phrasing, and formality.</p>
+          
+          <div class="info-box">
+            <h4>We want to be perfectly clear about how we handle your data:</h4>
+            <ul class="info-list">
+              <li>
+                <span class="check-icon">✓</span>
+                <div>
+                  <strong>Your emails are secure and private.</strong> They are used solely to create your personal tone profile.
+                </div>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <div>
+                  <strong>We do not train our general AI models</strong> on your personal data.
+                </div>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <div>
+                  <strong>You are in control.</strong> You can view, manage, or permanently delete your data at any time in your account settings.
+                </div>
+              </li>
+            </ul>
+          </div>
+          
+          <p class="agreement-text">By clicking 'I Understand,' you agree to this use of your data to personalize your experience.</p>
+        </div>
+        
+        <div class="onboarding-actions">
+          <button class="onboarding-btn primary" onclick="nextOnboardingStep()">
+            I Understand & Next
+          </button>
+        </div>
+      </div>
+      
+      <!-- Step 2: AI Generation Disclaimer -->
+      <div class="onboarding-step" id="step2">
+        <div class="onboarding-header">
+          <div class="onboarding-icon">🤖</div>
+          <h2>AI as Your Assistant</h2>
+        </div>
+        
+        <div class="onboarding-body">
+          <p>LetiMail is a powerful AI tool, but it's not perfect.</p>
+          
+          <div class="warning-box">
+            <div class="warning-item">
+              <strong>⚠️ Please Review Before Sending:</strong>
+              <p>Always proofread and edit generated emails. You are responsible for the final content of all messages you send.</p>
+            </div>
             
-            showNotification('Success', 'Account created successfully!', 'success');
-            hideAuthModal();
-            showUserMenu(currentUser);
+            <div class="warning-item">
+              <strong>🔍 Check for Accuracy:</strong>
+              <p>AI can make mistakes. Ensure all names, dates, facts, and links are correct.</p>
+            </div>
             
-            // Clear signup data
-            signupData = {};
-        } else {
-            throw new Error(data.error || 'Registration failed');
-        }
-    } catch (error) {
-        showNotification('Error', error.message, 'error');
-    } finally {
-        hideButtonLoading(verifyBtn);
-    }
+            <div class="warning-item">
+              <strong>🎯 Use Your Judgment:</strong>
+              <p>The AI provides suggestions. It is your responsibility to ensure the content is appropriate, professional, and free of sensitive information.</p>
+            </div>
+          </div>
+          
+          <p class="disclaimer-footer">LetiMail is designed to assist you, not to replace your critical oversight.</p>
+        </div>
+        
+        <div class="onboarding-actions">
+          <button class="onboarding-btn secondary" onclick="previousOnboardingStep()">
+            Back
+          </button>
+          <button class="onboarding-btn primary" onclick="nextOnboardingStep()">
+            I Agree & Continue
+          </button>
+        </div>
+      </div>
+      
+      <!-- Step 3: Tone System Setup -->
+      <div class="onboarding-step" id="step3">
+        <div class="onboarding-header">
+          <div class="onboarding-icon">✍️</div>
+          <h2>Train Your Personal Writing Style</h2>
+          <p class="step-description">Help LetiMail learn your unique voice by providing examples of emails you've written before.</p>
+        </div>
+        
+        <div class="onboarding-body">
+          <div class="tone-input-section">
+            <label for="toneEmailInput">
+              <strong>Paste a previous email you've sent</strong>
+              <span class="label-hint">Include the full email content (you can provide up to 5 examples)</span>
+            </label>
+            <textarea 
+              id="toneEmailInput" 
+              class="tone-email-textarea" 
+              placeholder="Paste your email here... (Include subject line and body)"
+              rows="8"
+            ></textarea>
+            
+            <button class="add-email-btn" onclick="addToneEmail()" id="addEmailBtn">
+              <span class="btn-icon">➕</span>
+              Add Email (<span id="emailCount">0</span>/5)
+            </button>
+          </div>
+          
+          <div class="added-emails" id="addedEmailsList">
+            <!-- Added emails will appear here -->
+          </div>
+          
+          <div class="info-note">
+            <span class="info-icon">💡</span>
+            <p><strong>Tip:</strong> The more diverse examples you provide, the better LetiMail can adapt to your style. You can add more examples later in Settings.</p>
+          </div>
+        </div>
+        
+        <div class="onboarding-actions">
+          <button class="onboarding-btn secondary" onclick="previousOnboardingStep()">
+            Back
+          </button>
+          <button class="onboarding-btn tertiary" onclick="skipToneSetup()">
+            Skip for Now
+          </button>
+          <button class="onboarding-btn primary" onclick="finishOnboarding()" id="finishBtn" disabled>
+            Finish Setup
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
 }
+
+// Show onboarding modal
+function showOnboardingModal() {
+  let modal = document.getElementById('onboardingModal');
+  if (!modal) {
+    createOnboardingModal();
+    modal = document.getElementById('onboardingModal');
+  }
+  
+  // Reset state
+  onboardingState = {
+    currentStep: 0,
+    toneEmails: []
+  };
+  
+  // Reset UI
+  updateOnboardingProgress();
+  document.querySelectorAll('.onboarding-step').forEach(step => {
+    step.classList.remove('active');
+  });
+  document.getElementById('step1').classList.add('active');
+  
+  modal.style.display = 'flex';
+}
+
+// Update progress bar
+function updateOnboardingProgress() {
+  const progress = ((onboardingState.currentStep + 1) / 3) * 100;
+  const progressFill = document.getElementById('onboardingProgress');
+  const progressText = document.getElementById('progressText');
+  
+  if (progressFill) progressFill.style.width = `${progress}%`;
+  if (progressText) progressText.textContent = `Step ${onboardingState.currentStep + 1} of 3`;
+}
+
+// Navigate to next step
+function nextOnboardingStep() {
+  if (onboardingState.currentStep < 2) {
+    // Hide current step
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.remove('active');
+    
+    // Move to next step
+    onboardingState.currentStep++;
+    
+    // Show next step
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.add('active');
+    
+    // Update progress
+    updateOnboardingProgress();
+  }
+}
+
+// Navigate to previous step
+function previousOnboardingStep() {
+  if (onboardingState.currentStep > 0) {
+    // Hide current step
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.remove('active');
+    
+    // Move to previous step
+    onboardingState.currentStep--;
+    
+    // Show previous step
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.add('active');
+    
+    // Update progress
+    updateOnboardingProgress();
+  }
+}
+
+// Add tone email
+function addToneEmail() {
+  const textarea = document.getElementById('toneEmailInput');
+  const emailContent = textarea.value.trim();
+  
+  if (!emailContent) {
+    showNotification('Error', 'Please paste an email before adding', 'error');
+    return;
+  }
+  
+  if (onboardingState.toneEmails.length >= 5) {
+    showNotification('Limit Reached', 'You can add up to 5 email examples', 'warning');
+    return;
+  }
+  
+  // Add email to array
+  onboardingState.toneEmails.push(emailContent);
+  
+  // Update UI
+  updateAddedEmailsList();
+  
+  // Clear textarea
+  textarea.value = '';
+  
+  // Update counter and button state
+  document.getElementById('emailCount').textContent = onboardingState.toneEmails.length;
+  document.getElementById('finishBtn').disabled = false;
+  
+  if (onboardingState.toneEmails.length >= 5) {
+    document.getElementById('addEmailBtn').disabled = true;
+    document.getElementById('toneEmailInput').disabled = true;
+  }
+  
+  showNotification('Added', `Email ${onboardingState.toneEmails.length} added successfully`, 'success');
+}
+
+// Update the list of added emails
+function updateAddedEmailsList() {
+  const list = document.getElementById('addedEmailsList');
+  if (!list) return;
+  
+  if (onboardingState.toneEmails.length === 0) {
+    list.innerHTML = '';
+    return;
+  }
+  
+  list.innerHTML = '<h4 class="added-emails-title">Added Emails:</h4>';
+  
+  onboardingState.toneEmails.forEach((email, index) => {
+    const preview = email.substring(0, 100) + (email.length > 100 ? '...' : '');
+    
+    const emailCard = document.createElement('div');
+    emailCard.className = 'added-email-card';
+    emailCard.innerHTML = `
+      <div class="email-card-header">
+        <span class="email-number">Email ${index + 1}</span>
+        <button class="remove-email-btn" onclick="removeToneEmail(${index})">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="email-preview">${preview}</div>
+    `;
+    
+    list.appendChild(emailCard);
+  });
+}
+
+// Remove tone email
+function removeToneEmail(index) {
+  onboardingState.toneEmails.splice(index, 1);
+  updateAddedEmailsList();
+  
+  // Update counter and button states
+  document.getElementById('emailCount').textContent = onboardingState.toneEmails.length;
+  document.getElementById('addEmailBtn').disabled = false;
+  document.getElementById('toneEmailInput').disabled = false;
+  
+  if (onboardingState.toneEmails.length === 0) {
+    document.getElementById('finishBtn').disabled = true;
+  }
+}
+
+// Skip tone setup
+function skipToneSetup() {
+  if (confirm('Are you sure you want to skip? You can add email examples later in Settings to improve your personalized tone.')) {
+    completeOnboarding(false);
+  }
+}
+
+// Finish onboarding
+async function finishOnboarding() {
+  if (onboardingState.toneEmails.length === 0) {
+    showNotification('No Emails Added', 'Please add at least one email example or click "Skip for Now"', 'warning');
+    return;
+  }
+  
+  completeOnboarding(true);
+}
+
+// Complete onboarding process
+async function completeOnboarding(withToneData) {
+  const finishBtn = document.getElementById('finishBtn');
+  if (finishBtn) {
+    finishBtn.disabled = true;
+    finishBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
+  }
+  
+  try {
+    if (withToneData && onboardingState.toneEmails.length > 0) {
+      // In a real implementation, send tone emails to backend
+      // await saveToneProfile(onboardingState.toneEmails);
+      
+      // For now, save to localStorage
+      localStorage.setItem('letimail_tone_training', JSON.stringify({
+        emails: onboardingState.toneEmails,
+        trained: true,
+        date: new Date().toISOString()
+      }));
+      
+      showNotification('Success', `${onboardingState.toneEmails.length} email examples saved! Your personalized tone is ready.`, 'success');
+    } else {
+      showNotification('Setup Complete', 'You can add email examples later in Settings to personalize your tone.', 'info');
+    }
+    
+    // Mark onboarding as complete
+    localStorage.setItem('letimail_onboarding_complete', 'true');
+    
+    // Close modal
+    setTimeout(() => {
+      const modal = document.getElementById('onboardingModal');
+      if (modal) modal.style.display = 'none';
+      
+      // Redirect to app
+      window.location.href = 'app.html';
+    }, 1500);
+    
+  } catch (error) {
+    console.error('Onboarding completion error:', error);
+    showNotification('Error', 'Failed to complete setup. Please try again.', 'error');
+    
+    if (finishBtn) {
+      finishBtn.disabled = false;
+      finishBtn.innerHTML = 'Finish Setup';
+    }
+  }
+}
+
+// Modify the verifyOTPAndRegister function to show onboarding after successful registration
+async function verifyOTPAndRegister() {
+  const otp = document.getElementById('otpCode').value;
+
+  if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
+    showNotification('Error', 'Please enter a valid 6-digit code', 'error');
+    return;
+  }
+
+  const verifyBtn = document.querySelector('#otpForm .auth-btn');
+  showButtonLoading(verifyBtn);
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        ...signupData,
+        otp: otp
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      authToken = data.token;
+      localStorage.setItem('authToken', authToken);
+      currentUser = data.user;
+      
+      showNotification('Success', 'Account created successfully!', 'success');
+      hideAuthModal();
+      showUserMenu(currentUser);
+      
+      // Clear signup data
+      signupData = {};
+      
+      // SHOW ONBOARDING MODAL
+      setTimeout(() => {
+        showOnboardingModal();
+      }, 500);
+      
+    } else {
+      throw new Error(data.error || 'Registration failed');
+    }
+  } catch (error) {
+    showNotification('Error', error.message, 'error');
+  } finally {
+    hideButtonLoading(verifyBtn);
+  }
+}
+
+// Add global functions
+window.showOnboardingModal = showOnboardingModal;
+window.nextOnboardingStep = nextOnboardingStep;
+window.previousOnboardingStep = previousOnboardingStep;
+window.addToneEmail = addToneEmail;
+window.removeToneEmail = removeToneEmail;
+window.skipToneSetup = skipToneSetup;
+window.finishOnboarding = finishOnboarding;
 
 // Resend OTP timer
 function startResendTimer() {
