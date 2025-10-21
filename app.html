@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="Frontend/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <!-- Notification System -->
@@ -22,7 +21,6 @@
         <i class="fas fa-times"></i>
       </button>
     </div>
-    <div class="notification-progress"></div>
   </div>
 
   <!-- Auth Modals -->
@@ -48,7 +46,7 @@
             <span id="avatarText">U</span>
           </button>
           <div class="dropdown-menu">
-            <a href="app.html" class="dropdown-item">
+            <a href="app.html" class="dropdown-item active">
               <i class="fas fa-envelope"></i>Email Generator
             </a>
             <a href="settings.html" class="dropdown-item">
@@ -123,22 +121,22 @@
             </select>
           </div>
 
-          <!-- Add this after the tone selection in app.html -->
           <div class="input-group">
-              <label for="emailLength">
-                  <span class="label-icon">📏</span>
-                  Email Length
-              </label>
-              <select id="emailLength">
-                  <option value="short">Short & Concise (5-8 sentences)</option>
-                  <option value="medium" selected>Medium Length (8-11 sentences)</option>
-                  <option value="long">Detailed & Comprehensive (11+ sentences)</option>
-              </select>
+            <label for="emailLength">
+              <span class="label-icon">📏</span>
+              Email Length
+            </label>
+            <select id="emailLength">
+              <option value="short">Short & Concise (5-8 sentences)</option>
+              <option value="medium" selected>Medium Length (8-11 sentences)</option>
+              <option value="long">Detailed & Comprehensive (11+ sentences)</option>
+            </select>
           </div>
           
           <button id="generateBtn" class="generate-btn">
             <span class="btn-icon">✨</span>
-            Generate My Email
+            <span class="btn-text">Generate My Email</span>
+            <div class="btn-spinner"></div>
           </button>
         </div>
 
@@ -156,7 +154,7 @@
                 <div class="placeholder-icon">✉️</div>
               </div>
               <p>Your personalized email will appear here</p>
-              <small>Powered by adaptive AI that learns your style</small>
+              <small>Powered by AI that learns your unique style</small>
             </div>
           </div>
           
@@ -195,6 +193,31 @@
             <span class="tip-icon">✏️</span>
             <h4>Refine & Edit</h4>
             <p>Edit generated emails to train the AI on your style</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Features Highlight -->
+      <div class="app-features">
+        <div class="feature-highlight">
+          <div class="feature-icon">🎨</div>
+          <div class="feature-content">
+            <h4>Personalized Tone Matching</h4>
+            <p>Every email reflects your unique writing style and business voice</p>
+          </div>
+        </div>
+        <div class="feature-highlight">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-content">
+            <h4>Lightning Fast Generation</h4>
+            <p>Get professional emails in seconds, not minutes or hours</p>
+          </div>
+        </div>
+        <div class="feature-highlight">
+          <div class="feature-icon">📤</div>
+          <div class="feature-content">
+            <h4>Direct Sending</h4>
+            <p>Send emails directly from LetiMail with replies to your inbox</p>
           </div>
         </div>
       </div>
