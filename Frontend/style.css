@@ -202,6 +202,123 @@ body {
   line-height: 1.5;
 }
 
+/* Tips Section */
+.tips-section {
+  margin-top: 50px;
+  text-align: center;
+}
+
+.tips-section h3 {
+  font-size: 24px;
+  margin-bottom: 28px;
+}
+
+.tips-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.tip-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  padding: 24px 20px;
+  border-radius: 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.tip-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-primary);
+}
+
+.tip-icon {
+  font-size: 28px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.tip-card h4 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.tip-card p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* App Features Section */
+.app-features {
+  margin-top: 60px;
+  padding: 40px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.feature-highlight {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 24px;
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+
+.feature-highlight:hover {
+  transform: translateX(8px);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.feature-icon {
+  font-size: 36px;
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 14px;
+}
+
+.feature-content {
+  flex: 1;
+}
+
+.feature-content h4 {
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.feature-content p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Settings Preferences Section */
+.preferences-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.preferences-section h4 {
+  font-size: 16px;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
 /* ========================================
    SETTINGS PAGE
 ======================================== */
@@ -993,6 +1110,19 @@ body {
   
   .tips-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .app-features {
+    padding: 28px;
+  }
+  
+  .feature-highlight {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .feature-icon {
+    margin: 0 auto;
   }
   
   .benefits-grid {
