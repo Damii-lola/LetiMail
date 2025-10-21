@@ -856,6 +856,103 @@ body {
 }
 
 /* ========================================
+   BENEFITS SECTION
+======================================== */
+.benefits-section {
+  background: var(--bg-primary);
+}
+
+.benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.benefit-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  padding: 32px 24px;
+  border-radius: 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.benefit-item:hover {
+  transform: translateY(-6px);
+  border-color: var(--accent-primary);
+}
+
+.benefit-icon {
+  font-size: 40px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.benefit-item h4 {
+  font-size: 18px;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+
+.benefit-item p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ========================================
+   WORKFLOW SECTION
+======================================== */
+.workflow-section {
+  background: var(--bg-secondary);
+}
+
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 32px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.workflow-step {
+  text-align: center;
+  position: relative;
+}
+
+.step-number {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 20px;
+  background: var(--accent-gradient);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Playfair Display', serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+}
+
+.step-content h3 {
+  font-size: 20px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.step-content p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ========================================
    RESPONSIVE DESIGN
 ======================================== */
 @media (max-width: 1024px) {
@@ -896,6 +993,14 @@ body {
   
   .tips-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .benefits-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .workflow-steps {
+    grid-template-columns: repeat(2, 1fr);
   }
   
   .footer-content {
@@ -944,6 +1049,14 @@ body {
   
   .section-header h2 {
     font-size: 34px;
+  }
+  
+  .benefits-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .workflow-steps {
+    grid-template-columns: 1fr;
   }
   
   .footer-links {
