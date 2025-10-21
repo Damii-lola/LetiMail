@@ -464,9 +464,11 @@ function addHumanTouches(email) {
   return humanEmail;
 }
 
-// Generate email endpoint
+// UPDATE YOUR BACKEND index.js - Replace the /api/generate endpoint
+
+// Generate email endpoint with tone matching
 app.post("/api/generate", authenticateToken, async (req, res) => {
-  const { business, context, tone, emailLength } = req.body;
+  const { business, context, tone, emailLength, stylePrompt } = req.body;
   
   if (!business || !context) {
     return res.status(400).json({ email: "Business description and context are required." });
@@ -558,10 +560,13 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
     
     const style = humanWritingStyles[tone] || humanWritingStyles.friendly;
     
+    // Build enhanced prompt with style matching
     const prompt = `
 Write this email to sound authentically human and natural.
 
 LENGTH REQUIREMENT: ${lengthInstructions[emailLength] || lengthInstructions.medium}
+
+${stylePrompt ? stylePrompt : ''}
 
 HUMAN WRITING TECHNIQUES TO USE:
 - Use contractions: I'm, you're, don't, can't, won't
@@ -598,7 +603,7 @@ Subject: [Human-sounding subject line - not too perfect]
 [Body with personal touches and slight imperfections]  
 [Genuine closing that matches the tone]
 
-CRITICAL: This should sound like a real human wrote it in 5 minutes, not like a perfectly crafted AI email. Include at least 3-4 human-like elements from the techniques above.
+CRITICAL: This should sound like a real human wrote it in 5 minutes, not like a perfectly crafted AI email. ${stylePrompt ? 'MOST IMPORTANT: Match the user\'s personal writing style from their reference emails.' : 'Include at least 3-4 human-like elements from the techniques above.'}
 
 Return ONLY the email content starting with "Subject:".
 `;
