@@ -513,7 +513,7 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
 
     const humanWritingStyles = {
       friendly: {
-        instructions: `Write this email like a real human would - with slight imperfections, conversational language, and personal touches. Use contractions (I'm, you're, don't), occasional informal phrases, and make it sound like someone typed it quickly while thinking.`,
+        instructions: `Write this email like a real human would - with natural flow, conversational language, and personal touches. Use contractions and make it sound like someone typed it quickly while thinking.`,
         examples: [
           "Hope you're having a good week!",
           "Quick question for you",
@@ -522,7 +522,7 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
         ]
       },
       formal: {
-        instructions: `Write this in a professional but human tone - not too perfect. Use some contractions, vary sentence length, and make it sound like a busy professional wrote it. Avoid overly formal corporate language.`,
+        instructions: `Write this in a professional but human tone. Use some contractions, vary sentence length, and make it sound like a busy professional wrote it. Avoid overly formal corporate language.`,
         examples: [
           "I'm writing to follow up on",
           "Wanted to circle back to",
@@ -531,7 +531,7 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
         ]
       },
       persuasive: {
-        instructions: `Write this persuasively but naturally - like a real salesperson or marketer would. Use conversational persuasion, not corporate jargon. Sound confident but human.`,
+        instructions: `Write this persuasively but naturally. Use conversational persuasion, not corporate jargon. Sound confident but authentic.`,
         examples: [
           "I think this could really help with",
           "What if we tried",
@@ -540,7 +540,7 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
         ]
       },
       casual: {
-        instructions: `Write this very casually like you're messaging a colleague. Use plenty of contractions, short sentences, and natural speech patterns. Make it sound completely unscripted.`,
+        instructions: `Write this very casually like you're messaging a colleague. Use natural speech patterns and make it sound unscripted.`,
         examples: [
           "Hey, quick question",
           "Just checking in on",
@@ -549,17 +549,17 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
         ]
       }
     };
-
+    
     const lengthInstructions = {
-      short: "Keep it concise - 5-8 sentences maximum. Get straight to the point while maintaining professionalism.",
+      short: "Keep it concise - 5-8 sentences maximum. Get straight to the point while maintaining warmth.",
       medium: "Write a balanced email - 8-11 sentences. Include key points with some detail but stay focused.",
-      long: "Write a comprehensive email - 11+ sentences. Include detailed explanations, context, and thorough coverage of the topic."
+      long: "Write a comprehensive email - 11+ sentences. Include detailed explanations and thorough context."
     };
-
+    
     const style = humanWritingStyles[tone] || humanWritingStyles.friendly;
-
+    
     const prompt = `
-IMPORTANT: Write this email to sound 100% human-written. Avoid all AI patterns and make it pass AI detection as human-written.
+Write this email to sound authentically human and natural.
 
 LENGTH REQUIREMENT: ${lengthInstructions[emailLength] || lengthInstructions.medium}
 
