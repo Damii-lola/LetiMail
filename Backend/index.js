@@ -306,7 +306,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
-       VALUES ($1, $2, $3, 'free', 0, 5, 0, CURRENT_DATE)
+       VALUES ($1, $2, $3, 'free', 0, 10, 0, CURRENT_DATE)
        RETURNING id, name, email, plan, emails_used, emails_left, daily_emails_used, created_at`,
       [name, email, hashedPassword]
     );
@@ -487,9 +487,9 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
     const user = req.user;
     
     // Check if user has emails left (Free plan: 5 emails total)
-    if (user.plan === 'free' && user.emails_used >= 5) {
+    if (user.plan === 'free' && user.emails_used >= 10) {
       return res.status(400).json({ 
-        email: "❌ You've used all 5 free emails! Upgrade to Premium for unlimited emails." 
+        email: "❌ You've used all 10 free emails! Upgrade to Premium for unlimited emails." 
       });
     }
 
@@ -753,6 +753,65 @@ function extractSubject(content) {
   const subjectMatch = content.match(/Subject:\s*(.*?)(?:\n|$)/i);
   return subjectMatch ? subjectMatch[1].trim() : null;
 }
+
+// Email improvement endpoint (doesn't count toward email limit)
+app.post("/api/improve-email", authenticateToken, async (req, res) => {
+  const { originalEmail, editedEmail } = req.body;
+
+  if (!originalEmail || !editedEmail) {
+    return res.status(400).json({ error: "Original and edited email are required" });
+  }
+
+  try {
+    const prompt = `
+IMPROVE THIS EDITED EMAIL:
+
+ORIGINAL EMAIL:
+${originalEmail}
+
+USER'S EDITED VERSION:
+${editedEmail}
+
+TASK:
+1. Analyze the changes the user made
+2. Maintain the user's intended meaning and style
+3. Improve grammar, clarity, and flow while preserving the user's voice
+4. Keep the core message and structure intact
+5. Make it sound more professional and natural
+
+Return ONLY the improved email content.
+`;
+
+    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 800,
+      }),
+    });
+
+    const data = await groqResponse.json();
+    const improvedEmail = data.choices?.[0]?.message?.content?.trim() || editedEmail;
+
+    res.json({ 
+      improvedEmail: cleanAIResponse(improvedEmail),
+      success: true 
+    });
+  } catch (error) {
+    console.error("Email improvement error:", error);
+    // Return the edited email if improvement fails
+    res.json({ 
+      improvedEmail: editedEmail,
+      success: false 
+    });
+  }
+});
 
 // Health check endpoint
 app.get("/", (req, res) => {
