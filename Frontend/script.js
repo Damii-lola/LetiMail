@@ -1,4 +1,4 @@
-// COMPLETE LETIMAIL SCRIPT.JS WITH ENHANCED TONE SYSTEM
+// COMPLETE LETIMAIL SCRIPT.JS WITH ALL FIXES
 
 // Global Auth State
 let currentUser = null;
@@ -224,6 +224,11 @@ async function initializeApp() {
     createAuthModals();
     setupSettingsPage();
     setupToneManagement();
+    setupComingSoonButtons();
+    fixLoadingIndicator();
+    
+    // Update email tracking display
+    updateEmailTracking();
 }
 
 // ========================================
@@ -250,6 +255,14 @@ async function checkAuthState() {
             currentUser = data.user;
             showUserMenu(currentUser);
             updateSettingsPage();
+            updateEmailTracking();
+            
+            // Check if user needs upgrade
+            if (currentUser.plan === 'free' && currentUser.emails_used >= 5) {
+                setTimeout(() => {
+                    showUpgradePrompt();
+                }, 2000);
+            }
         } else {
             localStorage.removeItem('authToken');
             authToken = null;
@@ -303,8 +316,150 @@ function updateUserInfo(user) {
         planElement.textContent = user.plan ? `${user.plan.charAt(0).toUpperCase() + user.plan.slice(1)} Plan` : 'Free Plan';
     }
     
+    updateEmailTracking();
+}
+
+// ========================================
+// EMAIL TRACKING & UPGRADE SYSTEM
+// ========================================
+
+function updateEmailTracking() {
+    if (!currentUser) return;
+
+    const emailCountElement = document.getElementById('emailCount');
+    const emailsUsedElement = document.getElementById('emailsUsed');
+    
     if (emailCountElement) {
-        emailCountElement.textContent = `${user.emails_left || 25} emails left`;
+        if (currentUser.plan === 'free') {
+            const emailsLeft = Math.max(0, 5 - (currentUser.emails_used || 0));
+            emailCountElement.textContent = `${emailsLeft} emails left`;
+        } else {
+            emailCountElement.textContent = 'Unlimited emails';
+        }
+    }
+    
+    if (emailsUsedElement) {
+        emailsUsedElement.textContent = `${currentUser.emails_used || 0}/5`;
+    }
+}
+
+function showUpgradePrompt() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'upgradeModal';
+    
+    modal.innerHTML = `
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('upgradeModal')">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="upgrade-header">
+                <div class="upgrade-icon">🚀</div>
+                <h3>Upgrade to Premium</h3>
+                <p>You've used all your free emails. Upgrade to continue using LetiMail!</p>
+            </div>
+            
+            <div class="upgrade-features">
+                <div class="upgrade-feature">
+                    <i class="fas fa-infinity"></i>
+                    <div>
+                        <strong>Unlimited Email Generation</strong>
+                        <span>No more limits on how many emails you can create</span>
+                    </div>
+                </div>
+                <div class="upgrade-feature">
+                    <i class="fas fa-bolt"></i>
+                    <div>
+                        <strong>Priority Generation</strong>
+                        <span>Faster email generation with premium priority</span>
+                    </div>
+                </div>
+                <div class="upgrade-feature">
+                    <i class="fas fa-star"></i>
+                    <div>
+                        <strong>Advanced Tone Matching</strong>
+                        <span>Enhanced AI that better matches your writing style</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="upgrade-actions">
+                <button class="upgrade-btn primary" onclick="startPremiumUpgrade()">
+                    <i class="fas fa-crown"></i>
+                    Upgrade to Premium - $9.99/month
+                </button>
+                <button class="upgrade-btn secondary" onclick="closeModal('upgradeModal')">
+                    Maybe Later
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+}
+
+function startPremiumUpgrade() {
+    showNotification('Coming Soon', 'Premium upgrade functionality will be available soon!', 'info');
+    closeModal('upgradeModal');
+}
+
+// ========================================
+// DELETE ACCOUNT FUNCTIONALITY
+// ========================================
+
+async function handleDeleteAccount() {
+    if (!confirm('Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/delete-account`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (response.ok) {
+            showNotification('Account Deleted', 'Your account has been successfully deleted.', 'success');
+            handleLogout();
+        } else {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to delete account');
+        }
+    } catch (error) {
+        showNotification('Error', error.message, 'error');
+    }
+}
+
+// ========================================
+// COMING SOON BUTTONS
+// ========================================
+
+function setupComingSoonButtons() {
+    // Add coming soon functionality to all buttons without specific functions
+    const comingSoonButtons = [
+        '#upgradePremiumBtn',
+        '.plan-button:not([onclick])',
+        '.secondary-cta',
+        '.footer a:not([href^="#"])',
+        '.social-links a'
+    ];
+
+    comingSoonButtons.forEach(selector => {
+        document.querySelectorAll(selector).forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                showNotification('Coming Soon', 'This feature is under development and will be available soon!', 'info');
+            });
+        });
+    });
+
+    // Add delete account button listener
+    const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+    if (deleteAccountBtn) {
+        deleteAccountBtn.addEventListener('click', handleDeleteAccount);
     }
 }
 
@@ -486,13 +641,12 @@ async function verifyOTPAndRegister() {
             showNotification('Success', 'Account created successfully!', 'success');
             hideAuthModal();
             showUserMenu(currentUser);
+            updateEmailTracking();
             
             signupData = {};
             
-            // SHOW ONBOARDING MODAL
-            setTimeout(() => {
-                showOnboardingModal();
-            }, 500);
+            // Use improved redirect handling
+            handlePostAuthRedirect();
             
         } else {
             throw new Error(data.error || 'Registration failed');
@@ -523,6 +677,24 @@ function startResendTimer() {
             resendBtn.textContent = 'Resend';
         }
     }, 1000);
+}
+
+// ========================================
+// IMPROVED ONBOARDING REDIRECT
+// ========================================
+
+function handlePostAuthRedirect() {
+    const onboardingComplete = localStorage.getItem('letimail_onboarding_complete');
+    
+    if (!onboardingComplete) {
+        // Show onboarding modal instead of redirecting immediately
+        setTimeout(() => {
+            showOnboardingModal();
+        }, 1000);
+    } else {
+        // If onboarding is complete, show success and let user choose where to go
+        showNotification('Welcome!', 'Successfully signed in. You can start generating emails or manage your settings.', 'success');
+    }
 }
 
 // ========================================
@@ -844,7 +1016,8 @@ async function completeOnboarding(withToneData) {
       const modal = document.getElementById('onboardingModal');
       if (modal) modal.style.display = 'none';
       
-      window.location.href = 'app.html';
+      // Don't force redirect, let user stay where they are
+      showNotification('Ready!', 'Your LetiMail account is now fully set up.', 'success');
     }, 1500);
     
   } catch (error) {
@@ -1077,6 +1250,10 @@ async function handleLogin(e) {
             showNotification('Welcome Back!', 'Successfully signed in', 'success');
             hideAuthModal();
             showUserMenu(currentUser);
+            updateEmailTracking();
+            
+            // Use improved redirect handling
+            handlePostAuthRedirect();
         } else {
             throw new Error(data.error || 'Login failed');
         }
@@ -1119,6 +1296,12 @@ async function generateEmailWithTone() {
   if (!currentUser || !authToken) {
     showNotification('Authentication Required', 'Please sign in to generate emails', 'error');
     showLoginModal();
+    return;
+  }
+
+  // Check email limits for free users
+  if (currentUser.plan === 'free' && currentUser.emails_used >= 5) {
+    showUpgradePrompt();
     return;
   }
 
@@ -1181,6 +1364,7 @@ async function generateEmailWithTone() {
         'success'
       );
       
+      // Update email count
       await checkAuthState();
     } else {
       throw new Error(data.email || 'Failed to generate email');
@@ -1402,14 +1586,12 @@ function updateSettingsPage() {
     if (profileEmail) profileEmail.value = currentUser.email || '';
 
     const currentPlanName = document.getElementById('currentPlanName');
-    const emailsUsed = document.getElementById('emailsUsed');
     
     if (currentPlanName) {
-        currentPlanName.textContent = currentUser.plan ? `${currentUser.plan.charAt(0).toUpperCase() + currentUser.plan.slice(1)} Plan` : 'Free Plan';
+        currentPlanName.textContent = currentUser.plan ? `${currentUser.plan.charAt(0).toUpperCase() + user.plan.slice(1)} Plan` : 'Free Plan';
     }
-    if (emailsUsed) {
-        emailsUsed.textContent = `${currentUser.emails_used || 0}/${currentUser.emails_left + (currentUser.emails_used || 0) || 25}`;
-    }
+    
+    updateEmailTracking();
 }
 
 function switchSettingsTab(tabName) {
@@ -1805,6 +1987,33 @@ function closeModal(modalId) {
 }
 
 // ========================================
+// FIX LOADING INDICATOR IN APP.HTML
+// ========================================
+
+function fixLoadingIndicator() {
+  const outputDiv = document.getElementById('output');
+  if (outputDiv) {
+    // Remove any existing problematic styles
+    outputDiv.style.overflow = 'visible';
+    outputDiv.style.minHeight = '400px';
+    
+    // Ensure proper placeholder display
+    if (!outputDiv.querySelector('.output-placeholder')) {
+      outputDiv.innerHTML = `
+        <div class="output-placeholder">
+          <div class="placeholder-animation">
+            <div class="animation-ring"></div>
+            <div class="placeholder-icon">✉️</div>
+          </div>
+          <p>Your personalized email will appear here</p>
+          <small>Powered by adaptable AI that learns your unique style</small>
+        </div>
+      `;
+    }
+  }
+}
+
+// ========================================
 // GLOBAL FUNCTION EXPORTS
 // ========================================
 
@@ -1833,6 +2042,8 @@ window.viewFullEmail = viewFullEmail;
 window.closeModal = closeModal;
 window.closeSendModal = closeSendModal;
 window.confirmSendEmail = confirmSendEmail;
+window.handleDeleteAccount = handleDeleteAccount;
+window.startPremiumUpgrade = startPremiumUpgrade;
 
 // ========================================
 // AUTO-INITIALIZATION
