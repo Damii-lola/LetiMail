@@ -4430,3 +4430,221 @@ textarea::-webkit-scrollbar-thumb:hover {
 ::-webkit-scrollbar-thumb:active {
   animation: scrollbarGlow 0.5s ease-in-out;
 }
+
+/* ========================================
+   FIX LOADING INDICATOR & SCROLL ISSUES
+======================================== */
+
+.output-text {
+  flex: 1;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 400px;
+  white-space: pre-wrap;
+  line-height: 1.7;
+  overflow-y: auto;
+  font-size: 14px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.output-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.placeholder-animation {
+  width: 70px;
+  height: 70px;
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.animation-ring {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  border: 3px solid transparent;
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 2s linear infinite;
+}
+
+.placeholder-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 28px;
+  opacity: 0.5;
+}
+
+.output-placeholder p {
+  font-size: 15px;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.output-placeholder small {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Remove scrollbar when there's minimal content */
+.output-text:not(:has(> :not(.output-placeholder))) {
+  overflow: hidden;
+}
+
+/* ========================================
+   UPGRADE MODAL STYLES
+======================================== */
+
+.upgrade-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.upgrade-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.upgrade-header h3 {
+  font-size: 24px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.upgrade-header p {
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+
+.upgrade-features {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.upgrade-feature {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+}
+
+.upgrade-feature i {
+  font-size: 20px;
+  color: var(--accent-primary);
+  width: 24px;
+  text-align: center;
+}
+
+.upgrade-feature div {
+  flex: 1;
+}
+
+.upgrade-feature strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.upgrade-feature span {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.upgrade-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.upgrade-btn {
+  padding: 14px 20px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.upgrade-btn.primary {
+  background: var(--accent-gradient);
+  color: white;
+}
+
+.upgrade-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+}
+
+.upgrade-btn.secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+}
+
+.upgrade-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+/* ========================================
+   WRITING STYLE PANEL FIXES
+======================================== */
+
+#tone-panel {
+  min-height: 400px;
+}
+
+.tone-section {
+  margin-bottom: 30px;
+}
+
+.tone-emails-list {
+  display: grid;
+  gap: 16px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: var(--bg-secondary);
+  border: 2px dashed var(--border-subtle);
+  border-radius: 16px;
+  color: var(--text-muted);
+}
+
+/* ========================================
+   DELETE BUTTON STYLES
+======================================== */
+
+.delete-account-btn {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: var(--error) !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+}
+
+.delete-account-btn:hover {
+  background: rgba(239, 68, 68, 0.2) !important;
+  transform: translateY(-1px);
+}
