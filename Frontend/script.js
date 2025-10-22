@@ -1383,6 +1383,7 @@ async function generateEmailWithTone() {
 // APP FUNCTIONS (COPY, EDIT, SEND)
 // ========================================
 
+// Update the edit button functionality
 function setupEnhancedAppFunctions() {
   const copyBtn = document.getElementById('copyBtn');
   const editBtn = document.getElementById('editBtn');
@@ -1408,25 +1409,53 @@ function setupEnhancedAppFunctions() {
       const originalEmail = outputDiv.getAttribute('data-original-email') || currentText;
       
       outputDiv.innerHTML = `
+        <div class="edit-mode-header">
+          <h4>Edit Your Email</h4>
+          <p class="edit-description">Make your changes below. The AI will help improve your edits.</p>
+        </div>
         <textarea class="email-editor" id="emailEditor">${currentText}</textarea>
         <div class="edit-actions">
           <button class="submit-edit-btn" id="submitEdit">
-            <i class="fas fa-check"></i> Save & Learn from Edits
+            <i class="fas fa-magic"></i> Save & Improve with AI
           </button>
           <button class="cancel-edit-btn" id="cancelEdit">
             <i class="fas fa-times"></i> Cancel
           </button>
         </div>
-        <p class="edit-hint">💡 Your edits help LetiMail learn your writing style</p>
+        <div class="edit-options">
+          <label class="checkbox-label">
+            <input type="checkbox" id="aiImprovement" checked>
+            <span class="checkmark"></span>
+            Use AI to improve my edits
+          </label>
+        </div>
+        <p class="edit-hint">💡 Your edits help LetiMail learn your writing style. AI improvement doesn't count toward your email limit.</p>
       `;
 
       document.getElementById('submitEdit').addEventListener('click', async function() {
+        const submitBtn = this;
         const editedText = document.getElementById('emailEditor').value;
+        const useAI = document.getElementById('aiImprovement').checked;
         
-        const saved = ToneProfileManager.saveEditedEmail(originalEmail, editedText);
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="btn-spinner"></span> Improving...';
         
-        outputDiv.innerText = editedText;
-        outputDiv.setAttribute('data-original-email', editedText);
+        let finalText = editedText;
+        
+        if (useAI) {
+            try {
+                finalText = await improveEditedEmail(originalEmail, editedText);
+                showNotification('Improved!', 'AI has enhanced your edited email', 'success');
+            } catch (error) {
+                console.error('AI improvement failed:', error);
+                showNotification('Notice', 'Using your original edits (AI improvement unavailable)', 'info');
+            }
+        }
+        
+        const saved = ToneProfileManager.saveEditedEmail(originalEmail, finalText);
+        
+        outputDiv.innerText = finalText;
+        outputDiv.setAttribute('data-original-email', finalText);
         
         if (saved) {
           showNotification(
@@ -1437,6 +1466,9 @@ function setupEnhancedAppFunctions() {
         } else {
           showNotification('Saved', 'Changes saved successfully', 'success');
         }
+        
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-magic"></i> Save & Improve with AI';
       });
 
       document.getElementById('cancelEdit').addEventListener('click', function() {
@@ -1451,6 +1483,38 @@ function setupEnhancedAppFunctions() {
       showSendEmailModal();
     });
   }
+}
+
+async function improveEditedEmail(originalEmail, editedEmail) {
+    if (!currentUser || !authToken) {
+        showNotification('Authentication Required', 'Please sign in to improve emails', 'error');
+        return editedEmail;
+    }
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/improve-email`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                originalEmail: originalEmail,
+                editedEmail: editedEmail
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            return data.improvedEmail;
+        } else {
+            throw new Error('Failed to improve email');
+        }
+    } catch (error) {
+        console.error('Email improvement error:', error);
+        // Return the original edited email if improvement fails
+        return editedEmail;
+    }
 }
 
 function showSendEmailModal() {
