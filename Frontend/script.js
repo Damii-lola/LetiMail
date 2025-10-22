@@ -1,3 +1,5 @@
+// COMPLETE LETIMAIL SCRIPT.JS WITH ENHANCED TONE SYSTEM
+
 // Global Auth State
 let currentUser = null;
 let authToken = null;
@@ -5,12 +7,212 @@ let signupData = {}; // Store signup data between OTP steps
 
 const BACKEND_URL = 'https://letimail-production.up.railway.app';
 
-// Quick check to remind you to update the URL
-if (BACKEND_URL.includes('your-railway-app')) {
-  console.error('⚠️⚠️⚠️ STOP! You need to update BACKEND_URL in script.js with your actual Railway URL! ⚠️⚠️⚠️');
-}
+// Onboarding state management
+let onboardingState = {
+  currentStep: 0,
+  toneEmails: []
+};
 
-// Initialize when DOM is loaded
+// ========================================
+// TONE PROFILE MANAGER
+// ========================================
+
+const ToneProfileManager = {
+  // Get all reference emails
+  getReferenceEmails: function() {
+    const training = localStorage.getItem('letimail_tone_training');
+    const edited = localStorage.getItem('letimail_edited_emails');
+    
+    const trainingEmails = training ? JSON.parse(training).emails || [] : [];
+    const editedEmails = edited ? JSON.parse(edited) || [] : [];
+    
+    return {
+      training: trainingEmails,
+      edited: editedEmails,
+      all: [...trainingEmails, ...editedEmails]
+    };
+  },
+  
+  // Add training email
+  addTrainingEmail: function(emailContent) {
+    const data = localStorage.getItem('letimail_tone_training');
+    const profile = data ? JSON.parse(data) : { emails: [], trained: false };
+    
+    profile.emails.push({
+      content: emailContent,
+      dateAdded: new Date().toISOString(),
+      id: Date.now()
+    });
+    profile.trained = true;
+    profile.lastUpdated = new Date().toISOString();
+    
+    localStorage.setItem('letimail_tone_training', JSON.stringify(profile));
+    return profile;
+  },
+  
+  // Update training email
+  updateTrainingEmail: function(id, newContent) {
+    const data = localStorage.getItem('letimail_tone_training');
+    if (!data) return null;
+    
+    const profile = JSON.parse(data);
+    const emailIndex = profile.emails.findIndex(e => e.id === id);
+    
+    if (emailIndex !== -1) {
+      profile.emails[emailIndex].content = newContent;
+      profile.emails[emailIndex].lastEdited = new Date().toISOString();
+      profile.lastUpdated = new Date().toISOString();
+      
+      localStorage.setItem('letimail_tone_training', JSON.stringify(profile));
+      return profile;
+    }
+    return null;
+  },
+  
+  // Delete training email
+  deleteTrainingEmail: function(id) {
+    const data = localStorage.getItem('letimail_tone_training');
+    if (!data) return null;
+    
+    const profile = JSON.parse(data);
+    profile.emails = profile.emails.filter(e => e.id !== id);
+    profile.lastUpdated = new Date().toISOString();
+    
+    localStorage.setItem('letimail_tone_training', JSON.stringify(profile));
+    return profile;
+  },
+  
+  // Save edited email
+  saveEditedEmail: function(originalEmail, editedEmail) {
+    // Only save if significantly edited (more than 30% changed)
+    const similarity = this.calculateSimilarity(originalEmail, editedEmail);
+    
+    if (similarity < 0.7) { // More than 30% different
+      const data = localStorage.getItem('letimail_edited_emails');
+      const editedEmails = data ? JSON.parse(data) : [];
+      
+      editedEmails.push({
+        content: editedEmail,
+        original: originalEmail,
+        dateEdited: new Date().toISOString(),
+        id: Date.now(),
+        similarity: similarity
+      });
+      
+      // Keep only last 20 edited emails
+      if (editedEmails.length > 20) {
+        editedEmails.shift();
+      }
+      
+      localStorage.setItem('letimail_edited_emails', JSON.stringify(editedEmails));
+      return true;
+    }
+    return false;
+  },
+  
+  // Calculate text similarity (simple implementation)
+  calculateSimilarity: function(text1, text2) {
+    const words1 = text1.toLowerCase().split(/\s+/);
+    const words2 = text2.toLowerCase().split(/\s+/);
+    const set1 = new Set(words1);
+    const set2 = new Set(words2);
+    
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+    
+    return intersection.size / union.size;
+  },
+  
+  // Analyze writing style from reference emails
+  analyzeWritingStyle: function(emails) {
+    if (!emails || emails.length === 0) return null;
+    
+    const allText = emails.map(e => typeof e === 'string' ? e : e.content).join(' ');
+    const sentences = allText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const words = allText.split(/\s+/);
+    
+    // Calculate metrics
+    const avgSentenceLength = words.length / sentences.length;
+    const avgWordLength = allText.replace(/\s/g, '').length / words.length;
+    
+    // Common phrases
+    const commonPhrases = this.extractCommonPhrases(allText);
+    
+    // Formality indicators
+    const contractions = (allText.match(/n't|'m|'re|'ve|'ll|'d/g) || []).length;
+    const formalWords = (allText.match(/\b(furthermore|moreover|therefore|consequently|nevertheless)\b/gi) || []).length;
+    
+    return {
+      avgSentenceLength,
+      avgWordLength,
+      totalEmails: emails.length,
+      commonPhrases,
+      usesContractions: contractions > 5,
+      formalityScore: formalWords / (words.length / 100), // formal words per 100 words
+      sentences: sentences.slice(0, 10) // Sample sentences
+    };
+  },
+  
+  // Extract common phrases (2-3 word combinations)
+  extractCommonPhrases: function(text) {
+    const words = text.toLowerCase().split(/\s+/);
+    const phrases = {};
+    
+    for (let i = 0; i < words.length - 2; i++) {
+      const phrase = `${words[i]} ${words[i + 1]}`;
+      phrases[phrase] = (phrases[phrase] || 0) + 1;
+    }
+    
+    return Object.entries(phrases)
+      .filter(([_, count]) => count > 2)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([phrase]) => phrase);
+  },
+  
+  // Generate style prompt for AI
+  generateStylePrompt: function() {
+    const refs = this.getReferenceEmails();
+    
+    if (refs.all.length === 0) {
+      return '';
+    }
+    
+    const style = this.analyzeWritingStyle(refs.all);
+    
+    let prompt = `\n\nIMPORTANT - WRITING STYLE ADAPTATION:
+The user has provided ${style.totalEmails} reference emails. Adapt to their unique style:
+
+WRITING CHARACTERISTICS:
+- Average sentence length: ${Math.round(style.avgSentenceLength)} words
+- ${style.usesContractions ? 'Uses contractions frequently (I\'m, don\'t, can\'t)' : 'Prefers full forms (I am, do not, cannot)'}
+- Formality level: ${style.formalityScore > 2 ? 'Formal' : style.formalityScore > 1 ? 'Professional' : 'Casual'}
+`;
+
+    if (style.commonPhrases.length > 0) {
+      prompt += `- Common phrases to incorporate: "${style.commonPhrases.slice(0, 5).join('", "')}"
+`;
+    }
+
+    // Add sample sentences
+    if (style.sentences.length > 0) {
+      prompt += `\nEXAMPLE SENTENCES FROM USER:
+`;
+      style.sentences.slice(0, 3).forEach((sentence, i) => {
+        prompt += `${i + 1}. "${sentence.trim()}"\n`;
+      });
+    }
+
+    prompt += `\nMATCH THIS STYLE CLOSELY: Use similar sentence structures, vocabulary level, and tone. Make it sound like the user wrote it themselves.`;
+    
+    return prompt;
+  }
+};
+
+// ========================================
+// INITIALIZATION
+// ========================================
+
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
 });
@@ -20,10 +222,14 @@ async function initializeApp() {
     setupEventListeners();
     setupNotification();
     createAuthModals();
-    setupSettingsPage(); // Initialize settings page if we're on it
+    setupSettingsPage();
+    setupToneManagement();
 }
 
-// Auth State Management
+// ========================================
+// AUTH STATE MANAGEMENT
+// ========================================
+
 async function checkAuthState() {
     authToken = localStorage.getItem('authToken');
     
@@ -43,7 +249,7 @@ async function checkAuthState() {
             const data = await response.json();
             currentUser = data.user;
             showUserMenu(currentUser);
-            updateSettingsPage(); // Update settings page with user data
+            updateSettingsPage();
         } else {
             localStorage.removeItem('authToken');
             authToken = null;
@@ -57,7 +263,10 @@ async function checkAuthState() {
     }
 }
 
-// UI Management
+// ========================================
+// UI MANAGEMENT
+// ========================================
+
 function showUserMenu(user) {
     const userMenu = document.getElementById('userMenu');
     const authButtons = document.getElementById('authButtons');
@@ -99,7 +308,10 @@ function updateUserInfo(user) {
     }
 }
 
-// Auth Modals Creation
+// ========================================
+// AUTH MODALS CREATION
+// ========================================
+
 function createAuthModals() {
     const authModals = document.getElementById('authModals');
     if (!authModals) return;
@@ -190,13 +402,15 @@ function createAuthModals() {
     `;
 }
 
-// OTP Verification Functions
+// ========================================
+// OTP VERIFICATION
+// ========================================
+
 async function sendOTP() {
     const email = document.getElementById('signupEmail').value;
     const name = document.getElementById('signupName').value;
     const password = document.getElementById('signupPassword').value;
 
-    // Basic validation
     if (!name || !email || !password) {
         showNotification('Error', 'Please fill in all fields', 'error');
         return;
@@ -210,7 +424,6 @@ async function sendOTP() {
     const sendOtpBtn = document.querySelector('#signupForm .auth-btn');
     showButtonLoading(sendOtpBtn);
 
-    // Store signup data for later use
     signupData = { name, email, password };
 
     try {
@@ -225,13 +438,10 @@ async function sendOTP() {
         const data = await response.json();
 
         if (response.ok) {
-            // Switch to OTP verification form
             document.getElementById('signupForm').style.display = 'none';
             document.getElementById('otpForm').style.display = 'block';
             
             showNotification('Success', `Verification code sent to ${email}`, 'success');
-            
-            // Start resend timer
             startResendTimer();
         } else {
             throw new Error(data.error || 'Failed to send verification code');
@@ -243,15 +453,82 @@ async function sendOTP() {
     }
 }
 
-// Add this to your script.js file
+async function verifyOTPAndRegister() {
+    const otp = document.getElementById('otpCode').value;
 
-// Onboarding state management
-let onboardingState = {
-  currentStep: 0,
-  toneEmails: []
-};
+    if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
+        showNotification('Error', 'Please enter a valid 6-digit code', 'error');
+        return;
+    }
 
-// Create onboarding modal HTML
+    const verifyBtn = document.querySelector('#otpForm .auth-btn');
+    showButtonLoading(verifyBtn);
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ...signupData,
+                otp: otp
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            authToken = data.token;
+            localStorage.setItem('authToken', authToken);
+            currentUser = data.user;
+            
+            showNotification('Success', 'Account created successfully!', 'success');
+            hideAuthModal();
+            showUserMenu(currentUser);
+            
+            signupData = {};
+            
+            // SHOW ONBOARDING MODAL
+            setTimeout(() => {
+                showOnboardingModal();
+            }, 500);
+            
+        } else {
+            throw new Error(data.error || 'Registration failed');
+        }
+    } catch (error) {
+        showNotification('Error', error.message, 'error');
+    } finally {
+        hideButtonLoading(verifyBtn);
+    }
+}
+
+function startResendTimer() {
+    const resendBtn = document.getElementById('resendOtp');
+    if (!resendBtn) return;
+    
+    let timeLeft = 60;
+    
+    resendBtn.disabled = true;
+    resendBtn.textContent = `Resend in ${timeLeft}s`;
+    
+    const timer = setInterval(() => {
+        timeLeft--;
+        resendBtn.textContent = `Resend in ${timeLeft}s`;
+        
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            resendBtn.disabled = false;
+            resendBtn.textContent = 'Resend';
+        }
+    }, 1000);
+}
+
+// ========================================
+// ONBOARDING SYSTEM
+// ========================================
+
 function createOnboardingModal() {
   const modal = document.createElement('div');
   modal.id = 'onboardingModal';
@@ -407,7 +684,6 @@ function createOnboardingModal() {
   document.body.appendChild(modal);
 }
 
-// Show onboarding modal
 function showOnboardingModal() {
   let modal = document.getElementById('onboardingModal');
   if (!modal) {
@@ -415,13 +691,11 @@ function showOnboardingModal() {
     modal = document.getElementById('onboardingModal');
   }
   
-  // Reset state
   onboardingState = {
     currentStep: 0,
     toneEmails: []
   };
   
-  // Reset UI
   updateOnboardingProgress();
   document.querySelectorAll('.onboarding-step').forEach(step => {
     step.classList.remove('active');
@@ -431,7 +705,6 @@ function showOnboardingModal() {
   modal.style.display = 'flex';
 }
 
-// Update progress bar
 function updateOnboardingProgress() {
   const progress = ((onboardingState.currentStep + 1) / 3) * 100;
   const progressFill = document.getElementById('onboardingProgress');
@@ -441,41 +714,24 @@ function updateOnboardingProgress() {
   if (progressText) progressText.textContent = `Step ${onboardingState.currentStep + 1} of 3`;
 }
 
-// Navigate to next step
 function nextOnboardingStep() {
   if (onboardingState.currentStep < 2) {
-    // Hide current step
     document.getElementById(`step${onboardingState.currentStep + 1}`).classList.remove('active');
-    
-    // Move to next step
     onboardingState.currentStep++;
-    
-    // Show next step
     document.getElementById(`step${onboardingState.currentStep + 1}`).classList.add('active');
-    
-    // Update progress
     updateOnboardingProgress();
   }
 }
 
-// Navigate to previous step
 function previousOnboardingStep() {
   if (onboardingState.currentStep > 0) {
-    // Hide current step
     document.getElementById(`step${onboardingState.currentStep + 1}`).classList.remove('active');
-    
-    // Move to previous step
     onboardingState.currentStep--;
-    
-    // Show previous step
     document.getElementById(`step${onboardingState.currentStep + 1}`).classList.add('active');
-    
-    // Update progress
     updateOnboardingProgress();
   }
 }
 
-// Add tone email
 function addToneEmail() {
   const textarea = document.getElementById('toneEmailInput');
   const emailContent = textarea.value.trim();
@@ -490,16 +746,10 @@ function addToneEmail() {
     return;
   }
   
-  // Add email to array
   onboardingState.toneEmails.push(emailContent);
-  
-  // Update UI
   updateAddedEmailsList();
-  
-  // Clear textarea
   textarea.value = '';
   
-  // Update counter and button state
   document.getElementById('emailCount').textContent = onboardingState.toneEmails.length;
   document.getElementById('finishBtn').disabled = false;
   
@@ -511,7 +761,6 @@ function addToneEmail() {
   showNotification('Added', `Email ${onboardingState.toneEmails.length} added successfully`, 'success');
 }
 
-// Update the list of added emails
 function updateAddedEmailsList() {
   const list = document.getElementById('addedEmailsList');
   if (!list) return;
@@ -542,12 +791,10 @@ function updateAddedEmailsList() {
   });
 }
 
-// Remove tone email
 function removeToneEmail(index) {
   onboardingState.toneEmails.splice(index, 1);
   updateAddedEmailsList();
   
-  // Update counter and button states
   document.getElementById('emailCount').textContent = onboardingState.toneEmails.length;
   document.getElementById('addEmailBtn').disabled = false;
   document.getElementById('toneEmailInput').disabled = false;
@@ -557,14 +804,12 @@ function removeToneEmail(index) {
   }
 }
 
-// Skip tone setup
 function skipToneSetup() {
   if (confirm('Are you sure you want to skip? You can add email examples later in Settings to improve your personalized tone.')) {
     completeOnboarding(false);
   }
 }
 
-// Finish onboarding
 async function finishOnboarding() {
   if (onboardingState.toneEmails.length === 0) {
     showNotification('No Emails Added', 'Please add at least one email example or click "Skip for Now"', 'warning');
@@ -574,7 +819,6 @@ async function finishOnboarding() {
   completeOnboarding(true);
 }
 
-// Complete onboarding process
 async function completeOnboarding(withToneData) {
   const finishBtn = document.getElementById('finishBtn');
   if (finishBtn) {
@@ -584,30 +828,22 @@ async function completeOnboarding(withToneData) {
   
   try {
     if (withToneData && onboardingState.toneEmails.length > 0) {
-      // In a real implementation, send tone emails to backend
-      // await saveToneProfile(onboardingState.toneEmails);
-      
-      // For now, save to localStorage
-      localStorage.setItem('letimail_tone_training', JSON.stringify({
-        emails: onboardingState.toneEmails,
-        trained: true,
-        date: new Date().toISOString()
-      }));
+      // Save to ToneProfileManager
+      onboardingState.toneEmails.forEach(email => {
+        ToneProfileManager.addTrainingEmail(email);
+      });
       
       showNotification('Success', `${onboardingState.toneEmails.length} email examples saved! Your personalized tone is ready.`, 'success');
     } else {
       showNotification('Setup Complete', 'You can add email examples later in Settings to personalize your tone.', 'info');
     }
     
-    // Mark onboarding as complete
     localStorage.setItem('letimail_onboarding_complete', 'true');
     
-    // Close modal
     setTimeout(() => {
       const modal = document.getElementById('onboardingModal');
       if (modal) modal.style.display = 'none';
       
-      // Redirect to app
       window.location.href = 'app.html';
     }, 1500);
     
@@ -622,97 +858,14 @@ async function completeOnboarding(withToneData) {
   }
 }
 
-// Modify the verifyOTPAndRegister function to show onboarding after successful registration
-async function verifyOTPAndRegister() {
-  const otp = document.getElementById('otpCode').value;
+// ========================================
+// EVENT LISTENERS SETUP
+// ========================================
 
-  if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
-    showNotification('Error', 'Please enter a valid 6-digit code', 'error');
-    return;
-  }
-
-  const verifyBtn = document.querySelector('#otpForm .auth-btn');
-  showButtonLoading(verifyBtn);
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        ...signupData,
-        otp: otp
-      })
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      authToken = data.token;
-      localStorage.setItem('authToken', authToken);
-      currentUser = data.user;
-      
-      showNotification('Success', 'Account created successfully!', 'success');
-      hideAuthModal();
-      showUserMenu(currentUser);
-      
-      // Clear signup data
-      signupData = {};
-      
-      // SHOW ONBOARDING MODAL
-      setTimeout(() => {
-        showOnboardingModal();
-      }, 500);
-      
-    } else {
-      throw new Error(data.error || 'Registration failed');
-    }
-  } catch (error) {
-    showNotification('Error', error.message, 'error');
-  } finally {
-    hideButtonLoading(verifyBtn);
-  }
-}
-
-// Add global functions
-window.showOnboardingModal = showOnboardingModal;
-window.nextOnboardingStep = nextOnboardingStep;
-window.previousOnboardingStep = previousOnboardingStep;
-window.addToneEmail = addToneEmail;
-window.removeToneEmail = removeToneEmail;
-window.skipToneSetup = skipToneSetup;
-window.finishOnboarding = finishOnboarding;
-
-// Resend OTP timer
-function startResendTimer() {
-    const resendBtn = document.getElementById('resendOtp');
-    if (!resendBtn) return;
-    
-    let timeLeft = 60; // 60 seconds
-    
-    resendBtn.disabled = true;
-    resendBtn.textContent = `Resend in ${timeLeft}s`;
-    
-    const timer = setInterval(() => {
-        timeLeft--;
-        resendBtn.textContent = `Resend in ${timeLeft}s`;
-        
-        if (timeLeft <= 0) {
-            clearInterval(timer);
-            resendBtn.disabled = false;
-            resendBtn.textContent = 'Resend';
-        }
-    }, 1000);
-}
-
-// Event Listeners Setup
 function setupEventListeners() {
-    // Auth modal triggers
     document.getElementById('loginBtn')?.addEventListener('click', showLoginModal);
     document.getElementById('signupBtn')?.addEventListener('click', showSignupModal);
     
-    // Form submissions (delegated)
     document.addEventListener('submit', function(e) {
         if (e.target.id === 'loginForm') {
             e.preventDefault();
@@ -732,7 +885,6 @@ function setupEventListeners() {
         }
     });
 
-    // Modal navigation (delegated)
     document.addEventListener('click', function(e) {
         if (e.target.id === 'showLoginFromSignup' || e.target.id === 'showSignupFromLogin') {
             e.preventDefault();
@@ -744,10 +896,8 @@ function setupEventListeners() {
         }
     });
 
-    // Logout
     document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
 
-    // User avatar dropdown
     const userAvatar = document.getElementById('userAvatar');
     if (userAvatar) {
         userAvatar.addEventListener('click', (e) => {
@@ -767,7 +917,10 @@ function setupEventListeners() {
     }
 }
 
-// Modal Functions
+// ========================================
+// MODAL FUNCTIONS
+// ========================================
+
 function showSignupModal() {
     hideAllModals();
     const signupModal = document.getElementById('signupModal');
@@ -810,17 +963,14 @@ function resetForms() {
         }
     });
     
-    // Reset to first step
     const signupForm = document.getElementById('signupForm');
     const otpForm = document.getElementById('otpForm');
     if (signupForm) signupForm.style.display = 'block';
     if (otpForm) otpForm.style.display = 'none';
     
-    // Clear signup data
     signupData = {};
 }
 
-// Button Loading States
 function showButtonLoading(button) {
     if (!button) return;
     const btnText = button.querySelector('.btn-text');
@@ -841,7 +991,10 @@ function hideButtonLoading(button) {
     button.disabled = false;
 }
 
-// Notification System
+// ========================================
+// NOTIFICATION SYSTEM
+// ========================================
+
 function setupNotification() {
     const notification = document.getElementById('notification');
     if (!notification) return;
@@ -894,7 +1047,10 @@ function hideNotification() {
     }
 }
 
-// Auth Handlers
+// ========================================
+// AUTH HANDLERS
+// ========================================
+
 async function handleLogin(e) {
     const button = e.target.querySelector('button[type="submit"]');
     showButtonLoading(button);
@@ -947,7 +1103,6 @@ function handleLogout() {
     }
 }
 
-// Handle "Start Writing" button
 function handleGetStarted() {
     if (currentUser) {
         window.location.href = 'app.html';
@@ -956,232 +1111,276 @@ function handleGetStarted() {
     }
 }
 
-// Email Generation Functions (for app.html)
-async function generateEmail() {
-    if (!currentUser || !authToken) {
-        showNotification('Authentication Required', 'Please sign in to generate emails', 'error');
-        showLoginModal();
-        return;
-    }
+// ========================================
+// EMAIL GENERATION WITH TONE MATCHING
+// ========================================
 
-    const business = document.getElementById('businessDesc')?.value;
-    const context = document.getElementById('context')?.value;
-    const tone = document.getElementById('tone')?.value;
-    const emailLength = document.getElementById('emailLength')?.value || 'medium';
+async function generateEmailWithTone() {
+  if (!currentUser || !authToken) {
+    showNotification('Authentication Required', 'Please sign in to generate emails', 'error');
+    showLoginModal();
+    return;
+  }
 
-    if (!business || !context) {
-        showNotification('Error', 'Please fill in all fields', 'error');
-        return;
-    }
+  const business = document.getElementById('businessDesc')?.value;
+  const context = document.getElementById('context')?.value;
+  const tone = document.getElementById('tone')?.value;
+  const emailLength = document.getElementById('emailLength')?.value || 'medium';
 
-    const generateBtn = document.getElementById('generateBtn');
-    const outputDiv = document.getElementById('output');
-    const actionButtons = document.getElementById('actionButtons');
+  if (!business || !context) {
+    showNotification('Error', 'Please fill in all fields', 'error');
+    return;
+  }
 
-    if (!generateBtn || !outputDiv) return;
+  const generateBtn = document.getElementById('generateBtn');
+  const outputDiv = document.getElementById('output');
+  const actionButtons = document.getElementById('actionButtons');
 
-    // Show loading state
-    generateBtn.disabled = true;
-    generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Generating...';
-    outputDiv.innerHTML = '<div class="output-placeholder"><div class="placeholder-icon">⏳</div><p>Generating your email...</p><small>Powered by adaptive AI that learns your style</small></div>';
+  if (!generateBtn || !outputDiv) return;
+
+  generateBtn.disabled = true;
+  generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Generating...';
+  outputDiv.innerHTML = '<div class="output-placeholder"><div class="placeholder-animation"><div class="animation-ring"></div><div class="placeholder-icon">✉️</div></div><p>Analyzing your writing style...</p><small>Generating personalized email</small></div>';
+  
+  if (actionButtons) actionButtons.style.display = 'none';
+
+  try {
+    const stylePrompt = ToneProfileManager.generateStylePrompt();
     
-    if (actionButtons) actionButtons.style.display = 'none';
+    const response = await fetch(`${BACKEND_URL}/api/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ 
+        business, 
+        context, 
+        tone,
+        emailLength,
+        stylePrompt: stylePrompt
+      })
+    });
 
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({ 
-                business, 
-                context, 
-                tone,
-                emailLength
-            })
-        });
-
-        const data = await response.json();
-        
-        if (response.ok) {
-            outputDiv.innerText = data.email;
-            if (actionButtons) actionButtons.style.display = 'flex';
-            showNotification('Success', 'Email generated successfully!', 'success');
-            
-            // Refresh user data to update email count
-            await checkAuthState();
-        } else {
-            throw new Error(data.email || 'Failed to generate email');
-        }
-    } catch (error) {
-        console.error('Generation error:', error);
-        outputDiv.innerText = '❌ ' + error.message;
-        showNotification('Error', error.message, 'error');
-    } finally {
-        generateBtn.disabled = false;
-        generateBtn.innerHTML = '<span class="btn-icon">✨</span> Generate My Email';
+    const data = await response.json();
+    
+    if (response.ok) {
+      outputDiv.innerText = data.email;
+      outputDiv.setAttribute('data-original-email', data.email);
+      
+      if (actionButtons) actionButtons.style.display = 'flex';
+      
+      const refs = ToneProfileManager.getReferenceEmails();
+      const refCount = refs.all.length;
+      
+      showNotification(
+        'Success', 
+        refCount > 0 
+          ? `Email generated using ${refCount} reference example${refCount > 1 ? 's' : ''}!` 
+          : 'Email generated successfully!', 
+        'success'
+      );
+      
+      await checkAuthState();
+    } else {
+      throw new Error(data.email || 'Failed to generate email');
     }
+  } catch (error) {
+    console.error('Generation error:', error);
+    outputDiv.innerText = '❌ ' + error.message;
+    showNotification('Error', error.message, 'error');
+  } finally {
+    generateBtn.disabled = false;
+    generateBtn.innerHTML = '<span class="btn-icon">✨</span> Generate My Email';
+  }
 }
 
-// Copy, Edit, Send functions for app.html
-function setupAppFunctions() {
-    const copyBtn = document.getElementById('copyBtn');
-    const editBtn = document.getElementById('editBtn');
-    const sendBtn = document.getElementById('sendBtn');
+// ========================================
+// APP FUNCTIONS (COPY, EDIT, SEND)
+// ========================================
 
-    if (copyBtn) {
-        copyBtn.addEventListener('click', function() {
-            const outputDiv = document.getElementById('output');
-            const text = outputDiv.innerText;
-            
-            navigator.clipboard.writeText(text).then(() => {
-                showNotification('Copied!', 'Email copied to clipboard', 'success');
-            }).catch(err => {
-                showNotification('Error', 'Failed to copy email', 'error');
-            });
-        });
-    }
+function setupEnhancedAppFunctions() {
+  const copyBtn = document.getElementById('copyBtn');
+  const editBtn = document.getElementById('editBtn');
+  const sendBtn = document.getElementById('sendBtn');
 
-    if (editBtn) {
-        editBtn.addEventListener('click', function() {
-            const outputDiv = document.getElementById('output');
-            const currentText = outputDiv.innerText;
-            
-            outputDiv.innerHTML = `
-                <textarea class="email-editor" id="emailEditor">${currentText}</textarea>
-                <div class="edit-actions">
-                    <button class="submit-edit-btn" id="submitEdit">Save Changes</button>
-                    <button class="cancel-edit-btn" id="cancelEdit">Cancel</button>
-                </div>
-            `;
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function() {
+      const outputDiv = document.getElementById('output');
+      const text = outputDiv.innerText;
+      
+      navigator.clipboard.writeText(text).then(() => {
+        showNotification('Copied!', 'Email copied to clipboard', 'success');
+      }).catch(err => {
+        showNotification('Error', 'Failed to copy email', 'error');
+      });
+    });
+  }
 
-            document.getElementById('submitEdit').addEventListener('click', async function() {
-                const editedText = document.getElementById('emailEditor').value;
-                outputDiv.innerText = editedText;
-                showNotification('Saved', 'Changes saved successfully', 'success');
-            });
+  if (editBtn) {
+    editBtn.addEventListener('click', function() {
+      const outputDiv = document.getElementById('output');
+      const currentText = outputDiv.innerText;
+      const originalEmail = outputDiv.getAttribute('data-original-email') || currentText;
+      
+      outputDiv.innerHTML = `
+        <textarea class="email-editor" id="emailEditor">${currentText}</textarea>
+        <div class="edit-actions">
+          <button class="submit-edit-btn" id="submitEdit">
+            <i class="fas fa-check"></i> Save & Learn from Edits
+          </button>
+          <button class="cancel-edit-btn" id="cancelEdit">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+        </div>
+        <p class="edit-hint">💡 Your edits help LetiMail learn your writing style</p>
+      `;
 
-            document.getElementById('cancelEdit').addEventListener('click', function() {
-                outputDiv.innerText = currentText;
-            });
-        });
-    }
+      document.getElementById('submitEdit').addEventListener('click', async function() {
+        const editedText = document.getElementById('emailEditor').value;
+        
+        const saved = ToneProfileManager.saveEditedEmail(originalEmail, editedText);
+        
+        outputDiv.innerText = editedText;
+        outputDiv.setAttribute('data-original-email', editedText);
+        
+        if (saved) {
+          showNotification(
+            'Saved & Learning!', 
+            'Your edits have been saved to improve future emails', 
+            'success'
+          );
+        } else {
+          showNotification('Saved', 'Changes saved successfully', 'success');
+        }
+      });
 
-    if (sendBtn) {
-        sendBtn.addEventListener('click', function() {
-            showSendEmailModal();
-        });
-    }
+      document.getElementById('cancelEdit').addEventListener('click', function() {
+        outputDiv.innerText = currentText;
+        outputDiv.setAttribute('data-original-email', originalEmail);
+      });
+    });
+  }
+
+  if (sendBtn) {
+    sendBtn.addEventListener('click', function() {
+      showSendEmailModal();
+    });
+  }
 }
 
 function showSendEmailModal() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h3>Send Email</h3>
-            <div class="input-group">
-                <label for="recipientEmail">Recipient Email</label>
-                <input type="email" id="recipientEmail" class="email-input" placeholder="recipient@example.com" required>
-            </div>
-            <div class="input-group">
-                <label for="businessName">Business Name</label>
-                <input type="text" id="businessName" class="name-input" placeholder="Your Business Name" value="${currentUser?.name || ''}" required>
-            </div>
-            <div class="input-group">
-                <label for="replyToEmail">Reply-To Email</label>
-                <input type="email" id="replyToEmail" class="email-input" placeholder="your-email@example.com" required>
-                <span class="input-hint">Replies will be sent directly to this email</span>
-            </div>
-            <div class="modal-actions">
-                <button class="confirm-send-btn" id="confirmSend">Send Email</button>
-                <button class="cancel-send-btn" id="cancelSend">Cancel</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    modal.style.display = 'flex';
-
-    // Pre-fill the reply-to email with user's email if available
-    if (currentUser?.email) {
-        document.getElementById('replyToEmail').value = currentUser.email;
-    }
-
-    document.getElementById('confirmSend').addEventListener('click', async function() {
-        const to = document.getElementById('recipientEmail').value;
-        const businessName = document.getElementById('businessName').value;
-        const replyToEmail = document.getElementById('replyToEmail').value;
-        const outputDiv = document.getElementById('output');
-        const emailContent = outputDiv.innerText;
-        
-        // Extract subject
-        const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
-        const subject = subjectMatch ? subjectMatch[1].trim() : 'Email from LetiMail';
-
-        // Validate emails
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(to)) {
-            showNotification('Error', 'Please enter a valid recipient email', 'error');
-            return;
-        }
-        if (!emailRegex.test(replyToEmail)) {
-            showNotification('Error', 'Please enter a valid reply-to email', 'error');
-            return;
-        }
-
-        const confirmBtn = document.getElementById('confirmSend');
-        showButtonLoading(confirmBtn);
-
-        try {
-            const response = await fetch(`${BACKEND_URL}/api/send-email`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({ 
-                    to, 
-                    subject, 
-                    content: emailContent, 
-                    businessName,
-                    replyToEmail 
-                })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                showNotification('Sent!', 'Email sent successfully! Replies will go to: ' + replyToEmail, 'success');
-                document.body.removeChild(modal);
-            } else {
-                throw new Error(data.error || 'Failed to send email');
-            }
-        } catch (error) {
-            showNotification('Error', error.message, 'error');
-        } finally {
-            hideButtonLoading(confirmBtn);
-        }
-    });
-
-    document.getElementById('cancelSend').addEventListener('click', function() {
-        document.body.removeChild(modal);
-    });
-
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'sendEmailModal';
+  
+  modal.innerHTML = `
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeSendModal()">
+        <i class="fas fa-times"></i>
+      </button>
+      <h3>Send Email</h3>
+      <p class="modal-description">Send your generated email directly from LetiMail.</p>
+      
+      <div class="input-group">
+        <label for="recipientEmail">Recipient Email</label>
+        <input type="email" id="recipientEmail" class="auth-input" placeholder="recipient@example.com" required>
+      </div>
+      <div class="input-group">
+        <label for="businessName">Business Name</label>
+        <input type="text" id="businessName" class="auth-input" placeholder="Your Business Name" value="${currentUser?.name || ''}" required>
+      </div>
+      <div class="input-group">
+        <label for="replyToEmail">Reply-To Email</label>
+        <input type="email" id="replyToEmail" class="auth-input" placeholder="your-email@example.com" value="${currentUser?.email || ''}" required>
+        <span class="input-hint">Replies will be sent directly to this email</span>
+      </div>
+      <div class="modal-actions">
+        <button class="settings-btn secondary" onclick="closeSendModal()">Cancel</button>
+        <button class="settings-btn primary" onclick="confirmSendEmail()">
+          <i class="fas fa-paper-plane"></i> Send Email
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
 }
 
-// Settings Page Functions
+function closeSendModal() {
+  const modal = document.getElementById('sendEmailModal');
+  if (modal) {
+    document.body.removeChild(modal);
+  }
+}
+
+async function confirmSendEmail() {
+  const to = document.getElementById('recipientEmail').value;
+  const businessName = document.getElementById('businessName').value;
+  const replyToEmail = document.getElementById('replyToEmail').value;
+  const outputDiv = document.getElementById('output');
+  const emailContent = outputDiv.innerText;
+  
+  const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
+  const subject = subjectMatch ? subjectMatch[1].trim() : 'Email from LetiMail';
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(to)) {
+    showNotification('Error', 'Please enter a valid recipient email', 'error');
+    return;
+  }
+  if (!emailRegex.test(replyToEmail)) {
+    showNotification('Error', 'Please enter a valid reply-to email', 'error');
+    return;
+  }
+
+  const confirmBtn = document.querySelector('#sendEmailModal .settings-btn.primary');
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<span class="btn-spinner"></span> Sending...';
+  }
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ 
+        to, 
+        subject, 
+        content: emailContent, 
+        businessName,
+        replyToEmail 
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showNotification('Sent!', 'Email sent successfully! Replies will go to: ' + replyToEmail, 'success');
+      closeSendModal();
+    } else {
+      throw new Error(data.error || 'Failed to send email');
+    }
+  } catch (error) {
+    showNotification('Error', error.message, 'error');
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Email';
+    }
+  }
+}
+
+// ========================================
+// SETTINGS PAGE
+// ========================================
+
 function setupSettingsPage() {
-    // Only run if we're on the settings page
     if (!document.getElementById('settings-panels')) return;
 
-    // Setup navigation
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
         item.addEventListener('click', function() {
@@ -1190,21 +1389,18 @@ function setupSettingsPage() {
         });
     });
 
-    // Load user data into settings
     updateSettingsPage();
 }
 
 function updateSettingsPage() {
     if (!currentUser || !document.getElementById('settings-panels')) return;
 
-    // Update profile form
     const profileName = document.getElementById('profileName');
     const profileEmail = document.getElementById('profileEmail');
     
     if (profileName) profileName.value = currentUser.name || '';
     if (profileEmail) profileEmail.value = currentUser.email || '';
 
-    // Update subscription info
     const currentPlanName = document.getElementById('currentPlanName');
     const emailsUsed = document.getElementById('emailsUsed');
     
@@ -1217,7 +1413,6 @@ function updateSettingsPage() {
 }
 
 function switchSettingsTab(tabName) {
-    // Update active nav item
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
         item.classList.remove('active');
@@ -1226,7 +1421,6 @@ function switchSettingsTab(tabName) {
         }
     });
 
-    // Show corresponding panel
     const panels = document.querySelectorAll('.settings-panel');
     panels.forEach(panel => {
         panel.classList.remove('active');
@@ -1234,6 +1428,11 @@ function switchSettingsTab(tabName) {
             panel.classList.add('active');
         }
     });
+    
+    // Load tone management if switching to tone tab
+    if (tabName === 'tone') {
+        loadToneManagementUI();
+    }
 }
 
 async function handleProfileUpdate(e) {
@@ -1243,8 +1442,6 @@ async function handleProfileUpdate(e) {
     const name = document.getElementById('profileName').value;
     
     try {
-        // In a real app, you'd make an API call to update the profile
-        // For now, we'll just update the local state
         if (currentUser) {
             currentUser.name = name;
             showNotification('Success', 'Profile updated successfully', 'success');
@@ -1263,7 +1460,6 @@ async function handlePreferencesUpdate(e) {
     showButtonLoading(button);
     
     try {
-        // Save preferences to localStorage
         const defaultTone = document.getElementById('defaultTone').value;
         const emailLength = document.getElementById('emailLength').value;
         const autoSave = document.getElementById('autoSave').checked;
@@ -1306,7 +1502,6 @@ async function handlePasswordChange(e) {
     }
     
     try {
-        // In a real app, you'd make an API call to change the password
         showNotification('Success', 'Password updated successfully', 'success');
         e.target.reset();
     } catch (error) {
@@ -1316,23 +1511,342 @@ async function handlePasswordChange(e) {
     }
 }
 
-// Global functions for modal access
+// ========================================
+// TONE MANAGEMENT IN SETTINGS
+// ========================================
+
+function setupToneManagement() {
+  if (!document.getElementById('settings-panels')) return;
+  
+  // Will be loaded when user clicks on tone tab
+}
+
+function loadToneManagementUI() {
+  const tonePanel = document.getElementById('tone-panel');
+  if (!tonePanel) return;
+
+  const profile = ToneProfileManager.getReferenceEmails();
+  const style = profile.all.length > 0 ? ToneProfileManager.analyzeWritingStyle(profile.all) : null;
+
+  tonePanel.innerHTML = `
+    <h2>Writing Style & Tone Profile</h2>
+    <p class="panel-description">Manage your reference emails to help LetiMail match your unique writing style.</p>
+
+    ${style ? `
+      <div class="style-analysis-card">
+        <h4><i class="fas fa-chart-line"></i> Your Writing Style Analysis</h4>
+        <div class="style-metrics">
+          <div class="metric">
+            <span class="metric-label">Reference Emails</span>
+            <span class="metric-value">${style.totalEmails}</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Avg. Sentence Length</span>
+            <span class="metric-value">${Math.round(style.avgSentenceLength)} words</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Writing Style</span>
+            <span class="metric-value">${style.usesContractions ? 'Conversational' : 'Formal'}</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Formality</span>
+            <span class="metric-value">${style.formalityScore > 2 ? 'High' : style.formalityScore > 1 ? 'Medium' : 'Low'}</span>
+          </div>
+        </div>
+        ${style.commonPhrases.length > 0 ? `
+          <div class="common-phrases">
+            <strong>Your signature phrases:</strong>
+            <div class="phrase-tags">
+              ${style.commonPhrases.slice(0, 5).map(phrase => `<span class="phrase-tag">${phrase}</span>`).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    ` : ''}
+
+    <div class="tone-section">
+      <div class="section-header-inline">
+        <h3>Training Emails (${profile.training.length}/10)</h3>
+        <button class="add-tone-email-btn" onclick="showAddToneEmailModal()">
+          <i class="fas fa-plus"></i> Add Email
+        </button>
+      </div>
+      <p class="section-description">These emails are used to train the AI on your writing style.</p>
+      
+      <div class="tone-emails-list" id="trainingEmailsList">
+        ${profile.training.length === 0 ? `
+          <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <p>No training emails yet</p>
+            <small>Add examples of your writing to personalize your tone</small>
+          </div>
+        ` : profile.training.map(email => `
+          <div class="tone-email-card" data-id="${email.id}">
+            <div class="email-card-header">
+              <span class="email-date">${new Date(email.dateAdded).toLocaleDateString()}</span>
+              <div class="email-actions">
+                <button class="icon-btn edit" onclick="editToneEmail(${email.id})" title="Edit">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button class="icon-btn delete" onclick="deleteToneEmail(${email.id})" title="Delete">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+            <div class="email-preview">${email.content.substring(0, 150)}...</div>
+            <button class="view-full-btn" onclick="viewFullEmail(${email.id}, 'training')">
+              View Full Email <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="tone-section">
+      <div class="section-header-inline">
+        <h3>Learned from Edits (${profile.edited.length}/20)</h3>
+        <span class="info-badge" title="These are emails you edited significantly">
+          <i class="fas fa-info-circle"></i>
+        </span>
+      </div>
+      <p class="section-description">AI learns from your edits to better match your style.</p>
+      
+      <div class="tone-emails-list" id="editedEmailsList">
+        ${profile.edited.length === 0 ? `
+          <div class="empty-state">
+            <i class="fas fa-edit"></i>
+            <p>No edited emails yet</p>
+            <small>As you edit generated emails, they'll appear here</small>
+          </div>
+        ` : profile.edited.map(email => `
+          <div class="tone-email-card edited">
+            <div class="email-card-header">
+              <span class="email-date">${new Date(email.dateEdited).toLocaleDateString()}</span>
+              <div class="email-actions">
+                <button class="icon-btn delete" onclick="deleteEditedEmail(${email.id})" title="Remove">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+            <div class="email-preview">${email.content.substring(0, 150)}...</div>
+            <div class="edit-badge">
+              <i class="fas fa-pencil-alt"></i> ${Math.round((1 - email.similarity) * 100)}% edited
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function showAddToneEmailModal() {
+  const profile = ToneProfileManager.getReferenceEmails();
+  
+  if (profile.training.length >= 10) {
+    showNotification('Limit Reached', 'You can have up to 10 training emails', 'warning');
+    return;
+  }
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'addToneModal';
+  
+  modal.innerHTML = `
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('addToneModal')">
+        <i class="fas fa-times"></i>
+      </button>
+      <h3>Add Training Email</h3>
+      <p class="modal-description">Paste a complete email you've written before (including subject line).</p>
+      
+      <textarea id="newToneEmail" class="tone-email-textarea" rows="12" placeholder="Subject: Example subject
+
+Hi [Name],
+
+Your email content here...
+
+Best regards,
+[Your Name]"></textarea>
+      
+      <div class="modal-actions">
+        <button class="settings-btn secondary" onclick="closeModal('addToneModal')">Cancel</button>
+        <button class="settings-btn primary" onclick="saveToneEmail()">
+          <i class="fas fa-check"></i> Add Email
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+}
+
+function saveToneEmail() {
+  const content = document.getElementById('newToneEmail').value.trim();
+  
+  if (!content || content.length < 50) {
+    showNotification('Error', 'Please provide a complete email (at least 50 characters)', 'error');
+    return;
+  }
+  
+  ToneProfileManager.addTrainingEmail(content);
+  closeModal('addToneModal');
+  loadToneManagementUI();
+  showNotification('Success', 'Training email added successfully!', 'success');
+}
+
+function editToneEmail(id) {
+  const data = localStorage.getItem('letimail_tone_training');
+  if (!data) return;
+  
+  const profile = JSON.parse(data);
+  const email = profile.emails.find(e => e.id === id);
+  
+  if (!email) return;
+  
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'editToneModal';
+  
+  modal.innerHTML = `
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('editToneModal')">
+        <i class="fas fa-times"></i>
+      </button>
+      <h3>Edit Training Email</h3>
+      
+      <textarea id="editToneEmail" class="tone-email-textarea" rows="12">${email.content}</textarea>
+      
+      <div class="modal-actions">
+        <button class="settings-btn secondary" onclick="closeModal('editToneModal')">Cancel</button>
+        <button class="settings-btn primary" onclick="updateToneEmail(${id})">
+          <i class="fas fa-save"></i> Save Changes
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+}
+
+function updateToneEmail(id) {
+  const content = document.getElementById('editToneEmail').value.trim();
+  
+  if (!content) {
+    showNotification('Error', 'Email content cannot be empty', 'error');
+    return;
+  }
+  
+  ToneProfileManager.updateTrainingEmail(id, content);
+  closeModal('editToneModal');
+  loadToneManagementUI();
+  showNotification('Success', 'Training email updated!', 'success');
+}
+
+function deleteToneEmail(id) {
+  if (confirm('Are you sure you want to delete this training email?')) {
+    ToneProfileManager.deleteTrainingEmail(id);
+    loadToneManagementUI();
+    showNotification('Deleted', 'Training email removed', 'info');
+  }
+}
+
+function deleteEditedEmail(id) {
+  const data = localStorage.getItem('letimail_edited_emails');
+  if (!data) return;
+  
+  let emails = JSON.parse(data);
+  emails = emails.filter(e => e.id !== id);
+  localStorage.setItem('letimail_edited_emails', JSON.stringify(emails));
+  
+  loadToneManagementUI();
+  showNotification('Removed', 'Edited email removed from learning', 'info');
+}
+
+function viewFullEmail(id, type) {
+  let email;
+  
+  if (type === 'training') {
+    const data = localStorage.getItem('letimail_tone_training');
+    if (!data) return;
+    const profile = JSON.parse(data);
+    email = profile.emails.find(e => e.id === id);
+  }
+  
+  if (!email) return;
+  
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'viewEmailModal';
+  
+  modal.innerHTML = `
+    <div class="modal-content view-email-modal">
+      <button class="modal-close" onclick="closeModal('viewEmailModal')">
+        <i class="fas fa-times"></i>
+      </button>
+      <h3>Full Email</h3>
+      <div class="full-email-content">${email.content.replace(/\n/g, '<br>')}</div>
+      <div class="modal-actions">
+        <button class="settings-btn primary" onclick="closeModal('viewEmailModal')">Close</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+}
+
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    document.body.removeChild(modal);
+  }
+}
+
+// ========================================
+// GLOBAL FUNCTION EXPORTS
+// ========================================
+
 window.showLoginModal = showLoginModal;
 window.showSignupModal = showSignupModal;
 window.hideAuthModal = hideAuthModal;
 window.handleGetStarted = handleGetStarted;
-window.generateEmail = generateEmail;
+window.generateEmailWithTone = generateEmailWithTone;
 window.sendOTP = sendOTP;
 window.verifyOTPAndRegister = verifyOTPAndRegister;
 window.switchSettingsTab = switchSettingsTab;
+window.showOnboardingModal = showOnboardingModal;
+window.nextOnboardingStep = nextOnboardingStep;
+window.previousOnboardingStep = previousOnboardingStep;
+window.addToneEmail = addToneEmail;
+window.removeToneEmail = removeToneEmail;
+window.skipToneSetup = skipToneSetup;
+window.finishOnboarding = finishOnboarding;
+window.showAddToneEmailModal = showAddToneEmailModal;
+window.saveToneEmail = saveToneEmail;
+window.editToneEmail = editToneEmail;
+window.updateToneEmail = updateToneEmail;
+window.deleteToneEmail = deleteToneEmail;
+window.deleteEditedEmail = deleteEditedEmail;
+window.viewFullEmail = viewFullEmail;
+window.closeModal = closeModal;
+window.closeSendModal = closeSendModal;
+window.confirmSendEmail = confirmSendEmail;
+
+// ========================================
+// AUTO-INITIALIZATION
+// ========================================
 
 // Auto-initialize for app.html
 if (document.getElementById('generateBtn')) {
-    document.getElementById('generateBtn').addEventListener('click', generateEmail);
-    setupAppFunctions();
+    document.getElementById('generateBtn').addEventListener('click', generateEmailWithTone);
+    setupEnhancedAppFunctions();
 }
 
 // Auto-initialize for settings.html
 if (document.getElementById('settings-panels')) {
     setupSettingsPage();
 }
+
+console.log('✅ LetiMail Enhanced System Loaded Successfully!');
