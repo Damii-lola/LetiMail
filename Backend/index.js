@@ -59,7 +59,7 @@ async function initializeDatabase() {
         password VARCHAR(255) NOT NULL,
         plan VARCHAR(50) DEFAULT 'free',
         emails_used INTEGER DEFAULT 0,
-        emails_left INTEGER DEFAULT 25,
+        emails_left INTEGER DEFAULT 5,
         daily_emails_used INTEGER DEFAULT 0,
         last_reset_date DATE DEFAULT CURRENT_DATE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -306,7 +306,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
-       VALUES ($1, $2, $3, 'free', 0, 25, 0, CURRENT_DATE)
+       VALUES ($1, $2, $3, 'free', 0, 5, 0, CURRENT_DATE)
        RETURNING id, name, email, plan, emails_used, emails_left, daily_emails_used, created_at`,
       [name, email, hashedPassword]
     );
@@ -398,6 +398,17 @@ app.get("/api/auth/me", authenticateToken, async (req, res) => {
   }
 });
 
+// Delete account
+app.delete("/api/auth/delete-account", authenticateToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1', [req.user.id]);
+    res.json({ success: true, message: 'Account deleted successfully' });
+  } catch (error) {
+    console.error('Delete account error:', error);
+    res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
 // ============================================
 // EMAIL GENERATION
 // ============================================
@@ -464,9 +475,7 @@ function addHumanTouches(email) {
   return humanEmail;
 }
 
-// UPDATE YOUR BACKEND index.js - Replace the /api/generate endpoint
-
-// Generate email endpoint with tone matching
+// Generate email endpoint with tone matching and proper email tracking
 app.post("/api/generate", authenticateToken, async (req, res) => {
   const { business, context, tone, emailLength, stylePrompt } = req.body;
   
@@ -477,25 +486,11 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
   try {
     const user = req.user;
     
-    // Check monthly limit
-    if (user.emails_left <= 0) {
+    // Check if user has emails left (Free plan: 5 emails total)
+    if (user.plan === 'free' && user.emails_used >= 5) {
       return res.status(400).json({ 
-        email: "❌ Monthly email limit reached. Upgrade to Premium for more emails." 
+        email: "❌ You've used all 5 free emails! Upgrade to Premium for unlimited emails." 
       });
-    }
-
-    // Check daily limit for free users
-    const today = new Date().toISOString().split('T')[0];
-    if (user.plan === 'free' && user.daily_emails_used >= 5 && user.last_reset_date === today) {
-      return res.status(400).json({ 
-        email: "❌ Daily email limit reached (5 emails/day). Upgrade to Premium for unlimited daily emails." 
-      });
-    }
-
-    // Reset daily count if new day
-    let dailyEmailsUsed = user.daily_emails_used;
-    if (user.last_reset_date !== today) {
-      dailyEmailsUsed = 0;
     }
 
     const spamInputPatterns = [
@@ -513,80 +508,11 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
       }
     }
 
-    const humanWritingStyles = {
-      friendly: {
-        instructions: `Write this email like a real human would - with natural flow, conversational language, and personal touches. Use contractions and make it sound like someone typed it quickly while thinking.`,
-        examples: [
-          "Hope you're having a good week!",
-          "Quick question for you",
-          "Just wanted to follow up on this",
-          "No rush at all on this"
-        ]
-      },
-      formal: {
-        instructions: `Write this in a professional but human tone. Use some contractions, vary sentence length, and make it sound like a busy professional wrote it. Avoid overly formal corporate language.`,
-        examples: [
-          "I'm writing to follow up on",
-          "Wanted to circle back to",
-          "When you have a moment",
-          "Look forward to hearing your thoughts"
-        ]
-      },
-      persuasive: {
-        instructions: `Write this persuasively but naturally. Use conversational persuasion, not corporate jargon. Sound confident but authentic.`,
-        examples: [
-          "I think this could really help with",
-          "What if we tried",
-          "Have you considered",
-          "This might be a game-changer for"
-        ]
-      },
-      casual: {
-        instructions: `Write this very casually like you're messaging a colleague. Use natural speech patterns and make it sound unscripted.`,
-        examples: [
-          "Hey, quick question",
-          "Just checking in on",
-          "Let me know what you think",
-          "No pressure either way"
-        ]
-      }
-    };
-    
-    const lengthInstructions = {
-      short: "Keep it concise - 5-8 sentences maximum. Get straight to the point while maintaining warmth.",
-      medium: "Write a balanced email - 8-11 sentences. Include key points with some detail but stay focused.",
-      long: "Write a comprehensive email - 11+ sentences. Include detailed explanations and thorough context."
-    };
-    
-    const style = humanWritingStyles[tone] || humanWritingStyles.friendly;
-    
     // Build enhanced prompt with style matching
     const prompt = `
 Write this email to sound authentically human and natural.
 
-LENGTH REQUIREMENT: ${lengthInstructions[emailLength] || lengthInstructions.medium}
-
 ${stylePrompt ? stylePrompt : ''}
-
-HUMAN WRITING TECHNIQUES TO USE:
-- Use contractions: I'm, you're, don't, can't, won't
-- Vary sentence length dramatically
-- Include occasional minor grammatical imperfections
-- Use conversational phrases like "${style.examples[0]}"
-- Add personal observations or thoughts
-- Mix formal and informal language naturally
-- Use industry-specific terms from the business context
-- Include brief asides or personal touches
-- Sound like a busy professional wrote it quickly
-
-AVOID THESE AI PATTERNS:
-- Perfect grammar and punctuation
-- Overly structured paragraphs
-- Repetitive sentence patterns
-- Corporate jargon and buzzwords
-- Generic "I hope this email finds you well"
-- Overly formal language
-- Perfect logical flow (humans jump around a bit)
 
 BUSINESS CONTEXT:
 - Business: ${business}
@@ -594,16 +520,7 @@ BUSINESS CONTEXT:
 - Tone: ${tone}
 - Length: ${emailLength}
 
-WRITING STYLE: ${style.instructions}
-
-EMAIL STRUCTURE (but make it flow naturally):
-Subject: [Human-sounding subject line - not too perfect]
-
-[Natural opening that sounds conversational]
-[Body with personal touches and slight imperfections]  
-[Genuine closing that matches the tone]
-
-CRITICAL: This should sound like a real human wrote it in 5 minutes, not like a perfectly crafted AI email. ${stylePrompt ? 'MOST IMPORTANT: Match the user\'s personal writing style from their reference emails.' : 'Include at least 3-4 human-like elements from the techniques above.'}
+IMPORTANT: Make this email sound like a real human wrote it - natural, conversational, and authentic.
 
 Return ONLY the email content starting with "Subject:".
 `;
@@ -629,7 +546,6 @@ Return ONLY the email content starting with "Subject:".
     let email = data.choices?.[0]?.message?.content?.trim() || "Error generating email.";
     
     email = cleanAIResponse(email);
-    email = addHumanTouches(email);
     
     if (!validateEmailContent(email, business, context)) {
       return res.status(400).json({ 
@@ -637,16 +553,15 @@ Return ONLY the email content starting with "Subject:".
       });
     }
 
-    // Update email usage
-    await pool.query(
-      `UPDATE users 
-       SET emails_used = emails_used + 1, 
-           emails_left = emails_left - 1,
-           daily_emails_used = $1,
-           last_reset_date = $2
-       WHERE id = $3`,
-      [dailyEmailsUsed + 1, today, user.id]
-    );
+    // Update email usage (only for free plan)
+    if (user.plan === 'free') {
+      await pool.query(
+        `UPDATE users 
+         SET emails_used = emails_used + 1
+         WHERE id = $1`,
+        [user.id]
+      );
+    }
     
     res.json({ email });
   } catch (error) {
