@@ -395,24 +395,6 @@ function cleanAIResponse(content) {
   return cleaned || content;
 }
 
-function addHumanTouches(email) {
-  if (!email) return email;
-
-  let humanEmail = email
-    .replace(/I am writing to/g, 'I\'m reaching out')
-    .replace(/I would like to/g, 'I wanted to')
-    .replace(/Please be advised/g, 'Just wanted to let you know')
-    .replace(/It is important to note/g, 'Worth mentioning')
-    .replace(/Furthermore/g, 'Also')
-    .replace(/Additionally/g, 'Plus')
-    .replace(/In conclusion/g, 'Anyway')
-    .replace(/Utilize/g, 'Use')
-    .replace(/Approximately/g, 'About')
-    .replace(/Approach/g, 'Way');
-
-  return humanEmail;
-}
-
 // Generate email endpoint with tone matching and proper email tracking
 app.post("/api/generate", authenticateToken, async (req, res) => {
   const { business, context, tone, emailLength, stylePrompt } = req.body;
