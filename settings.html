@@ -73,7 +73,6 @@
         <h1>Account Settings</h1>
         <p>Manage your LetiMail account and preferences</p>
       </div>
-
       <div class="settings-content">
         <!-- Sidebar Navigation -->
         <div class="settings-sidebar">
@@ -166,10 +165,6 @@
                 </div>
               </div>
 
-              <div class="settings-panel" id="tone-panel">
-                <!-- Content will be dynamically loaded by JavaScript -->
-              </div>
-              
               <div class="upgrade-options">
                 <h4>Upgrade Your Plan</h4>
                 <div class="plan-option">
@@ -187,7 +182,6 @@
                   </ul>
                   <button class="settings-btn primary">Upgrade to Premium</button>
                 </div>
-
                 <div class="plan-option" style="margin-top: 20px;">
                   <div class="option-header">
                     <h5>Business</h5>
@@ -202,6 +196,79 @@
                     <li><i class="fas fa-check"></i> Dedicated support</li>
                   </ul>
                   <button class="settings-btn secondary">Contact Sales</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Writing Style Tab -->
+          <div class="settings-panel" id="tone-panel">
+            <h2>Writing Style & Tone Profile</h2>
+            <p class="panel-description">Manage your reference emails to help LetiMail match your unique writing style.</p>
+
+            <!-- Style Analysis Card -->
+            <div class="style-analysis-card">
+              <h4><i class="fas fa-chart-line"></i> Your Writing Style Analysis</h4>
+              <div class="style-metrics">
+                <div class="metric">
+                  <span class="metric-label">Reference Emails</span>
+                  <span class="metric-value" id="referenceEmailsCount">0</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Avg. Sentence Length</span>
+                  <span class="metric-value" id="avgSentenceLength">0 words</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Writing Style</span>
+                  <span class="metric-value" id="writingStyle">Formal</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Formality</span>
+                  <span class="metric-value" id="formalityLevel">Low</span>
+                </div>
+              </div>
+              <div class="common-phrases">
+                <strong>Your signature phrases:</strong>
+                <div class="phrase-tags" id="commonPhrasesContainer">
+                  <!-- Phrases will be added here dynamically -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Training Emails Section -->
+            <div class="tone-section">
+              <div class="section-header-inline">
+                <h3>Training Emails (<span id="trainingEmailsCount">0</span>/10)</h3>
+                <button class="add-tone-email-btn" id="addToneEmailBtn">
+                  <i class="fas fa-plus"></i> Add Email
+                </button>
+              </div>
+              <p class="section-description">These emails are used to train the AI on your writing style.</p>
+              <div class="tone-emails-list" id="trainingEmailsList">
+                <!-- Training emails will be added here dynamically -->
+                <div class="empty-state">
+                  <i class="fas fa-inbox"></i>
+                  <p>No training emails yet</p>
+                  <small>Add examples of your writing to personalize your tone</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Edited Emails Section -->
+            <div class="tone-section">
+              <div class="section-header-inline">
+                <h3>Learned from Edits (<span id="editedEmailsCount">0</span>/20)</h3>
+                <span class="info-badge" title="These are emails you edited significantly">
+                  <i class="fas fa-info-circle"></i>
+                </span>
+              </div>
+              <p class="section-description">AI learns from your edits to better match your style.</p>
+              <div class="tone-emails-list" id="editedEmailsList">
+                <!-- Edited emails will be added here dynamically -->
+                <div class="empty-state">
+                  <i class="fas fa-edit"></i>
+                  <p>No edited emails yet</p>
+                  <small>As you edit generated emails, they'll appear here</small>
                 </div>
               </div>
             </div>
@@ -230,7 +297,7 @@
                 </select>
                 <span class="input-hint">Choose your preferred default length</span>
               </div>
-              
+
               <div class="preferences-section">
                 <h4>Additional Settings</h4>
                 <div class="form-group checkbox-group">
@@ -255,7 +322,7 @@
                   </label>
                 </div>
               </div>
-              
+
               <button type="submit" class="settings-btn primary">
                 <span class="btn-text">Save Preferences</span>
                 <div class="btn-spinner"></div>
@@ -289,7 +356,6 @@
                   </button>
                 </form>
               </div>
-
               <div class="security-section">
                 <h4>Login Activity</h4>
                 <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">
@@ -305,7 +371,6 @@
                   </div>
                 </div>
               </div>
-
               <div class="security-section">
                 <h4>Account Management</h4>
                 <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">
