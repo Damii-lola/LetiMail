@@ -4,8 +4,8 @@ import fetch from "node-fetch";
 import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-
 const { Pool } = pkg;
+
 const app = express();
 
 // CORS configuration - Allow requests from your frontend
@@ -24,7 +24,7 @@ if (process.env.FRONTEND_URL) {
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
@@ -124,19 +124,17 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-t
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
   }
-
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const result = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
-    
+
     if (result.rows.length === 0) {
       return res.status(403).json({ error: 'User not found' });
     }
-    
+
     req.user = result.rows[0];
     next();
   } catch (error) {
@@ -147,47 +145,35 @@ const authenticateToken = async (req, res, next) => {
 // ============================================
 // OTP VERIFICATION ENDPOINTS
 // ============================================
-
 // Generate and send OTP
 app.post("/api/auth/send-otp", async (req, res) => {
   const { email } = req.body;
-
   if (!email) {
     return res.status(400).json({ error: 'Email is required' });
   }
-
   try {
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
-
     // Store OTP in database
     await pool.query(
-      `INSERT INTO otp_verifications (email, otp, expires_at, verified) 
-       VALUES ($1, $2, $3, $4) 
-       ON CONFLICT (email) 
+      `INSERT INTO otp_verifications (email, otp, expires_at, verified)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (email)
        DO UPDATE SET otp = $2, expires_at = $3, verified = $4, created_at = CURRENT_TIMESTAMP`,
       [email, otp, expiresAt, false]
     );
-
     // Send OTP via email
     const emailContent = `
 Hello,
-
 Thank you for signing up for LetiMail! Please use the following verification code to complete your registration:
-
 🔐 **Verification Code: ${otp}**
-
 This code will expire in 10 minutes.
-
 If you didn't request this code, please ignore this email.
-
 Best regards,
 The LetiMail Team
     `;
-
     const emailSubject = "LetiMail - Email Verification Code";
-
     // Send email using your existing SendGrid integration
     const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
@@ -212,10 +198,9 @@ The LetiMail Team
         ]
       })
     });
-
     if (sendGridResponse.ok) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: 'OTP sent successfully',
         expiresIn: '10 minutes'
       });
@@ -223,7 +208,6 @@ The LetiMail Team
       console.error('SendGrid error:', await sendGridResponse.text());
       res.status(500).json({ error: 'Failed to send OTP email' });
     }
-
   } catch (error) {
     console.error('OTP send error:', error);
     res.status(500).json({ error: 'Failed to send OTP' });
@@ -233,34 +217,28 @@ The LetiMail Team
 // Verify OTP
 app.post("/api/auth/verify-otp", async (req, res) => {
   const { email, otp } = req.body;
-
   if (!email || !otp) {
     return res.status(400).json({ error: 'Email and OTP are required' });
   }
-
   try {
     // Check OTP from database
     const result = await pool.query(
-      `SELECT * FROM otp_verifications 
+      `SELECT * FROM otp_verifications
        WHERE email = $1 AND otp = $2 AND expires_at > NOW() AND verified = false`,
       [email, otp]
     );
-
     if (result.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
-
     // Mark OTP as verified
     await pool.query(
       `UPDATE otp_verifications SET verified = true WHERE email = $1 AND otp = $2`,
       [email, otp]
     );
-
-    res.json({ 
-      success: true, 
-      message: 'Email verified successfully' 
+    res.json({
+      success: true,
+      message: 'Email verified successfully'
     });
-
   } catch (error) {
     console.error('OTP verification error:', error);
     res.status(500).json({ error: 'OTP verification failed' });
@@ -270,52 +248,41 @@ app.post("/api/auth/verify-otp", async (req, res) => {
 // ============================================
 // AUTH ENDPOINTS
 // ============================================
-
 // Register new user with OTP verification
 app.post("/api/auth/register", async (req, res) => {
   const { name, email, password, otp } = req.body;
-
   if (!name || !email || !password || !otp) {
     return res.status(400).json({ error: 'All fields including OTP are required' });
   }
-
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
-
   try {
     // Verify OTP first
     const otpResult = await pool.query(
-      `SELECT * FROM otp_verifications 
+      `SELECT * FROM otp_verifications
        WHERE email = $1 AND otp = $2 AND expires_at > NOW()`,
       [email, otp]
     );
-
     if (otpResult.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
-
     // Check if user exists
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(400).json({ error: 'Email already registered' });
     }
-
     // Hash password and create user
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const result = await pool.query(
       `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
        VALUES ($1, $2, $3, 'free', 0, 10, 0, CURRENT_DATE)
        RETURNING id, name, email, plan, emails_used, emails_left, daily_emails_used, created_at`,
       [name, email, hashedPassword]
     );
-
     const user = result.rows[0];
-
     // Generate JWT
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-
     res.json({
       success: true,
       token,
@@ -338,28 +305,22 @@ app.post("/api/auth/register", async (req, res) => {
 // Login user
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
-
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password required' });
   }
-
   try {
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    
+
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-
     const user = result.rows[0];
     const validPassword = await bcrypt.compare(password, user.password);
-
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-
     // Generate JWT
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-
     res.json({
       success: true,
       token,
@@ -386,11 +347,9 @@ app.get("/api/auth/me", authenticateToken, async (req, res) => {
       'SELECT id, name, email, plan, emails_used, emails_left, daily_emails_used, last_reset_date FROM users WHERE id = $1',
       [req.user.id]
     );
-
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-
     res.json({ user: result.rows[0] });
   } catch (error) {
     console.error('Get user error:', error);
@@ -412,10 +371,9 @@ app.delete("/api/auth/delete-account", authenticateToken, async (req, res) => {
 // ============================================
 // EMAIL GENERATION
 // ============================================
-
 function cleanAIResponse(content) {
   if (!content) return content;
-  
+
   let cleaned = content
     .replace(/^(Here is|Here's) your (.+? email|refined email|email)[\s\S]*?(?=Subject:)/i, '')
     .replace(/\n*Note:[\s\S]*?(?=\n\n|$)/gi, '')
@@ -423,14 +381,14 @@ function cleanAIResponse(content) {
     .replace(/\n*I have (preserved|applied|maintained)[\s\S]*?(?=\n\n|$)/gi, '')
     .replace(/\n*This email[\s\S]*?(?=\n\n|$)/gi, '')
     .trim();
-  
+
   if (!cleaned.startsWith('Subject:')) {
     const subjectIndex = cleaned.indexOf('Subject:');
     if (subjectIndex > 0) {
       cleaned = cleaned.substring(subjectIndex);
     }
   }
-  
+
   return cleaned || content;
 }
 
@@ -447,19 +405,17 @@ function validateEmailContent(content, business, context) {
     /\b(adult|dating|singles|meet people)\b/gi,
     /\b(investment|bitcoin|crypto|forex|stocks)\b/gi
   ];
-
   for (const pattern of spamIndicators) {
     if (pattern.test(content)) {
       return false;
     }
   }
-
   return true;
 }
 
 function addHumanTouches(email) {
   if (!email) return email;
-  
+
   let humanEmail = email
     .replace(/I am writing to/g, 'I\'m reaching out')
     .replace(/I would like to/g, 'I wanted to')
@@ -471,60 +427,51 @@ function addHumanTouches(email) {
     .replace(/Utilize/g, 'Use')
     .replace(/Approximately/g, 'About')
     .replace(/Approach/g, 'Way');
-  
+
   return humanEmail;
 }
 
 // Generate email endpoint with tone matching and proper email tracking
 app.post("/api/generate", authenticateToken, async (req, res) => {
   const { business, context, tone, emailLength, stylePrompt } = req.body;
-  
+
   if (!business || !context) {
     return res.status(400).json({ email: "Business description and context are required." });
   }
-
   try {
     const user = req.user;
-    
+
     // Check if user has emails left (Free plan: 5 emails total)
     if (user.plan === 'free' && user.emails_used >= 10) {
-      return res.status(400).json({ 
-        email: "❌ You've used all 10 free emails! Upgrade to Premium for unlimited emails." 
+      return res.status(400).json({
+        email: "❌ You've used all 10 free emails! Upgrade to Premium for unlimited emails."
       });
     }
-
     const spamInputPatterns = [
       /make money|get rich|earn cash|work from home/gi,
       /free|discount|sale|limited time/gi,
       /viagra|cialis|pharmacy|prescription/gi,
       /bitcoin|crypto|investment|forex/gi
     ];
-
     for (const pattern of spamInputPatterns) {
       if (pattern.test(business) || pattern.test(context)) {
-        return res.status(400).json({ 
-          email: "❌ Unable to generate email. Please provide legitimate business context." 
+        return res.status(400).json({
+          email: "❌ Unable to generate email. Please provide legitimate business context."
         });
       }
     }
-
     // Build enhanced prompt with style matching
     const prompt = `
 Write this email to sound authentically human and natural.
-
 ${stylePrompt ? stylePrompt : ''}
-
 BUSINESS CONTEXT:
 - Business: ${business}
 - Purpose: ${context}
 - Tone: ${tone}
 - Length: ${emailLength}
-
 IMPORTANT: Make this email sound like a real human wrote it - natural, conversational, and authentic.
-
 Return ONLY the email content starting with "Subject:".
 `;
-
     const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -541,28 +488,26 @@ Return ONLY the email content starting with "Subject:".
         presence_penalty: 0.3,
       }),
     });
-
     const data = await groqResponse.json();
     let email = data.choices?.[0]?.message?.content?.trim() || "Error generating email.";
-    
+
     email = cleanAIResponse(email);
-    
+
     if (!validateEmailContent(email, business, context)) {
-      return res.status(400).json({ 
-        email: "❌ Unable to generate appropriate email content." 
+      return res.status(400).json({
+        email: "❌ Unable to generate appropriate email content."
       });
     }
-
     // Update email usage (only for free plan)
     if (user.plan === 'free') {
       await pool.query(
-        `UPDATE users 
+        `UPDATE users
          SET emails_used = emails_used + 1
          WHERE id = $1`,
         [user.id]
       );
     }
-    
+
     res.json({ email });
   } catch (error) {
     console.error("Generation error:", error);
@@ -573,11 +518,9 @@ Return ONLY the email content starting with "Subject:".
 // Send email endpoint
 app.post("/api/send-email", authenticateToken, async (req, res) => {
   const { to, subject, content, businessName, replyToEmail } = req.body;
-
   if (!to || !subject || !content || !businessName || !replyToEmail) {
     return res.status(400).json({ error: "All fields are required" });
   }
-
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(to)) {
     return res.status(400).json({ error: "Invalid recipient email address" });
@@ -585,10 +528,8 @@ app.post("/api/send-email", authenticateToken, async (req, res) => {
   if (!emailRegex.test(replyToEmail)) {
     return res.status(400).json({ error: "Invalid reply-to email address" });
   }
-
   try {
     const formattedContent = formatEmailContent(content, businessName);
-
     const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: {
@@ -617,12 +558,11 @@ app.post("/api/send-email", authenticateToken, async (req, res) => {
         ]
       })
     });
-
     if (sendGridResponse.ok) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "Email sent successfully",
-        replyTo: replyToEmail 
+        replyTo: replyToEmail
       });
     } else {
       const errorData = await sendGridResponse.text();
@@ -639,7 +579,6 @@ function formatEmailContent(content, senderName) {
   let emailBody = content.replace(/^Subject:\s*.+\n?/i, '').trim();
   let htmlContent = convertTextToSimpleHTML(emailBody);
   const emailSubject = extractSubject(content) || 'Professional Communication';
-
   const htmlEmail = `
 <!DOCTYPE html>
 <html>
@@ -702,20 +641,20 @@ function formatEmailContent(content, senderName) {
 </body>
 </html>
   `;
-  
+
   return htmlEmail;
 }
 
 function convertTextToSimpleHTML(text) {
   if (!text) return '<p>No content available.</p>';
-  
+
   let html = '';
   const lines = text.split('\n');
   let currentParagraph = '';
-  
+
   lines.forEach((line, index) => {
     const trimmedLine = line.trim();
-    
+
     if (!trimmedLine) {
       if (currentParagraph) {
         html += `<p>${currentParagraph}</p>`;
@@ -723,9 +662,9 @@ function convertTextToSimpleHTML(text) {
       }
       return;
     }
-    
+
     const isBulletPoint = trimmedLine.startsWith('•') || trimmedLine.startsWith('-') || /^\d+\./.test(trimmedLine);
-    
+
     if (isBulletPoint) {
       if (currentParagraph) {
         html += `<p>${currentParagraph}</p>`;
@@ -741,11 +680,11 @@ function convertTextToSimpleHTML(text) {
       }
     }
   });
-  
+
   if (currentParagraph) {
     html += `<p>${currentParagraph}</p>`;
   }
-  
+
   return html;
 }
 
@@ -757,15 +696,12 @@ function extractSubject(content) {
 // Enhanced email improvement endpoint
 app.post("/api/improve-email", authenticateToken, async (req, res) => {
     const { originalEmail, editedEmail } = req.body;
-
     if (!originalEmail || !editedEmail) {
         return res.status(400).json({ error: "Original and edited email are required" });
     }
-
     try {
         const prompt = `
 ANALYZE AND REFINE EDITED EMAIL:
-
 ORIGINAL AI-GENERATED EMAIL:
 ${originalEmail}
 
@@ -788,7 +724,6 @@ IMPORTANT: Only make minimal changes to ensure the edited parts blend naturally 
 
 Return ONLY the final refined email without any explanations.
 `;
-
         const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -802,25 +737,22 @@ Return ONLY the final refined email without any explanations.
                 max_tokens: 1000,
             }),
         });
-
         const data = await groqResponse.json();
         let improvedEmail = data.choices?.[0]?.message?.content?.trim() || editedEmail;
-
         // Clean up any AI prefixes
         improvedEmail = improvedEmail.replace(/^(Here is|Here's) (the )?(refined|improved|final) (version of the )?email:\s*/i, '');
         improvedEmail = improvedEmail.replace(/^(Based on your edits, here( is|'s))?/i, '');
         improvedEmail = improvedEmail.trim();
-
-        res.json({ 
+        res.json({
             improvedEmail: improvedEmail || editedEmail,
-            success: true 
+            success: true
         });
     } catch (error) {
         console.error("Email improvement error:", error);
         // Return the edited email if improvement fails
-        res.json({ 
+        res.json({
             improvedEmail: editedEmail,
-            success: false 
+            success: false
         });
     }
 });
@@ -830,18 +762,18 @@ app.get("/api/health", async (req, res) => {
   try {
     // Test database connection
     await pool.query('SELECT 1');
-    res.json({ 
-      status: "ok", 
+    res.json({
+      status: "ok",
       database: "connected",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       memory: process.memoryUsage()
     });
   } catch (error) {
-    res.status(500).json({ 
-      status: "error", 
+    res.status(500).json({
+      status: "error",
       database: "disconnected",
-      error: error.message 
+      error: error.message
     });
   }
 });
