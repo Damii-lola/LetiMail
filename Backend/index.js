@@ -754,63 +754,75 @@ function extractSubject(content) {
   return subjectMatch ? subjectMatch[1].trim() : null;
 }
 
-// Email improvement endpoint (doesn't count toward email limit)
+// Enhanced email improvement endpoint
 app.post("/api/improve-email", authenticateToken, async (req, res) => {
-  const { originalEmail, editedEmail } = req.body;
+    const { originalEmail, editedEmail } = req.body;
 
-  if (!originalEmail || !editedEmail) {
-    return res.status(400).json({ error: "Original and edited email are required" });
-  }
+    if (!originalEmail || !editedEmail) {
+        return res.status(400).json({ error: "Original and edited email are required" });
+    }
 
-  try {
-    const prompt = `
-IMPROVE THIS EDITED EMAIL:
+    try {
+        const prompt = `
+ANALYZE AND REFINE EDITED EMAIL:
 
-ORIGINAL EMAIL:
+ORIGINAL AI-GENERATED EMAIL:
 ${originalEmail}
 
 USER'S EDITED VERSION:
 ${editedEmail}
 
 TASK:
-1. Analyze the changes the user made
-2. Maintain the user's intended meaning and style
-3. Improve grammar, clarity, and flow while preserving the user's voice
-4. Keep the core message and structure intact
-5. Make it sound more professional and natural
+1. Compare the two versions and identify EXACTLY what the user changed
+2. ONLY modify the parts that the user edited - leave everything else exactly as the user wrote it
+3. For the edited parts, ensure they match the:
+   - Formatting style (bullet points, paragraphs, spacing)
+   - Tone and language level
+   - Professional consistency
+   - Grammar and flow
+4. PRESERVE the user's intent and meaning completely
+5. Do NOT rewrite the entire email - only refine the specific edited sections
+6. Maintain the exact same structure and formatting as the user's edited version
 
-Return ONLY the improved email content.
+IMPORTANT: Only make minimal changes to ensure the edited parts blend naturally with the rest of the email. Keep the user's voice and choices intact.
+
+Return ONLY the final refined email without any explanations.
 `;
 
-    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 800,
-      }),
-    });
+        const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+            },
+            body: JSON.stringify({
+                model: "llama-3.1-8b-instant",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.3, // Lower temperature for more consistent results
+                max_tokens: 1000,
+            }),
+        });
 
-    const data = await groqResponse.json();
-    const improvedEmail = data.choices?.[0]?.message?.content?.trim() || editedEmail;
+        const data = await groqResponse.json();
+        let improvedEmail = data.choices?.[0]?.message?.content?.trim() || editedEmail;
 
-    res.json({ 
-      improvedEmail: cleanAIResponse(improvedEmail),
-      success: true 
-    });
-  } catch (error) {
-    console.error("Email improvement error:", error);
-    // Return the edited email if improvement fails
-    res.json({ 
-      improvedEmail: editedEmail,
-      success: false 
-    });
-  }
+        // Clean up any AI prefixes
+        improvedEmail = improvedEmail.replace(/^(Here is|Here's) (the )?(refined|improved|final) (version of the )?email:\s*/i, '');
+        improvedEmail = improvedEmail.replace(/^(Based on your edits, here( is|'s))?/i, '');
+        improvedEmail = improvedEmail.trim();
+
+        res.json({ 
+            improvedEmail: improvedEmail || editedEmail,
+            success: true 
+        });
+    } catch (error) {
+        console.error("Email improvement error:", error);
+        // Return the edited email if improvement fails
+        res.json({ 
+            improvedEmail: editedEmail,
+            success: false 
+        });
+    }
 });
 
 // Enhanced health check endpoint
