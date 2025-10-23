@@ -306,7 +306,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
-       VALUES ($1, $2, $3, 'free', 0, 25, 0, CURRENT_DATE)
+       VALUES ($1, $2, $3, 'free', 0, 10, 0, CURRENT_DATE)
        RETURNING id, name, email, plan, emails_used, emails_left, daily_emails_used, created_at`,
       [name, email, hashedPassword]
     );
@@ -487,9 +487,9 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
     const user = req.user;
     
     // Check if user has emails left (Free plan: 5 emails total)
-    if (user.plan === 'free' && user.emails_used >= 25) {
+    if (user.plan === 'free' && user.emails_used >= 10) {
       return res.status(400).json({ 
-        email: "❌ You've used all 25 free emails! Upgrade to Premium for unlimited emails." 
+        email: "❌ You've used all 10 free emails! Upgrade to Premium for unlimited emails." 
       });
     }
 
@@ -813,14 +813,66 @@ Return ONLY the improved email content.
   }
 });
 
+// Enhanced health check endpoint
+app.get("/api/health", async (req, res) => {
+  try {
+    // Test database connection
+    await pool.query('SELECT 1');
+    res.json({ 
+      status: "ok", 
+      database: "connected",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: "error", 
+      database: "disconnected",
+      error: error.message 
+    });
+  }
+});
+
 // Health check endpoint
 app.get("/", (req, res) => {
   res.send("✅ LetiMail backend running with PostgreSQL and OTP verification");
 });
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", database: "postgresql", features: ["otp-verification"] });
+const PORT = process.env.PORT || 3000;
+
+// Graceful shutdown handling
+const server = app.listen(PORT, () => console.log(`🚀 LetiMail backend running on port ${PORT}`));
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, starting graceful shutdown');
+  server.close(() => {
+    console.log('Process terminated');
+    pool.end(() => {
+      console.log('Database connections closed');
+      process.exit(0);
+    });
+  });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 LetiMail backend running on port ${PORT}`));
+process.on('SIGINT', () => {
+  console.log('SIGINT received, starting graceful shutdown');
+  server.close(() => {
+    console.log('Process terminated');
+    pool.end(() => {
+      console.log('Database connections closed');
+      process.exit(0);
+    });
+  });
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
