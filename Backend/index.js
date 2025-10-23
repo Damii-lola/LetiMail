@@ -306,7 +306,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
-       VALUES ($1, $2, $3, 'free', 0, 10, 0, CURRENT_DATE)
+       VALUES ($1, $2, $3, 'free', 0, 25, 0, CURRENT_DATE)
        RETURNING id, name, email, plan, emails_used, emails_left, daily_emails_used, created_at`,
       [name, email, hashedPassword]
     );
@@ -487,9 +487,9 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
     const user = req.user;
     
     // Check if user has emails left (Free plan: 5 emails total)
-    if (user.plan === 'free' && user.emails_used >= 10) {
+    if (user.plan === 'free' && user.emails_used >= 25) {
       return res.status(400).json({ 
-        email: "❌ You've used all 10 free emails! Upgrade to Premium for unlimited emails." 
+        email: "❌ You've used all 25 free emails! Upgrade to Premium for unlimited emails." 
       });
     }
 
