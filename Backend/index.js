@@ -382,35 +382,17 @@ function cleanAIResponse(content) {
     .replace(/\n*This email[\s\S]*?(?=\n\n|$)/gi, '')
     .trim();
 
+  // Ensure the email starts with "Subject:"
   if (!cleaned.startsWith('Subject:')) {
     const subjectIndex = cleaned.indexOf('Subject:');
     if (subjectIndex > 0) {
       cleaned = cleaned.substring(subjectIndex);
+    } else {
+      cleaned = "Subject: Professional Communication\n\n" + cleaned;
     }
   }
 
   return cleaned || content;
-}
-
-function validateEmailContent(content, business, context) {
-  const spamIndicators = [
-    /\b(act now|limited time|urgent|immediate|don't miss|once in a lifetime)\b/gi,
-    /\b(risk-free|guaranteed|miracle|cure|amazing|incredible)\b/gi,
-    /\b(millionaire|billionaire|get rich|make money|earn cash)\b/gi,
-    /\b(free money|no cost|zero cost|no fees)\b/gi,
-    /\b(winner|prize|reward|bonus|discount|sale)\b/gi,
-    /\b(click here|buy now|order now|sign up today)\b/gi,
-    /\b(no obligation|no purchase necessary|not spam)\b/gi,
-    /\b(viagra|cialis|pharmacy|prescription)\b/gi,
-    /\b(adult|dating|singles|meet people)\b/gi,
-    /\b(investment|bitcoin|crypto|forex|stocks)\b/gi
-  ];
-  for (const pattern of spamIndicators) {
-    if (pattern.test(content)) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function addHumanTouches(email) {
@@ -438,6 +420,7 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
   if (!business || !context) {
     return res.status(400).json({ email: "Business description and context are required." });
   }
+
   try {
     const user = req.user;
 
@@ -447,19 +430,7 @@ app.post("/api/generate", authenticateToken, async (req, res) => {
         email: "❌ You've used all 10 free emails! Upgrade to Premium for unlimited emails."
       });
     }
-    const spamInputPatterns = [
-      /make money|get rich|earn cash|work from home/gi,
-      /free|discount|sale|limited time/gi,
-      /viagra|cialis|pharmacy|prescription/gi,
-      /bitcoin|crypto|investment|forex/gi
-    ];
-    for (const pattern of spamInputPatterns) {
-      if (pattern.test(business) || pattern.test(context)) {
-        return res.status(400).json({
-          email: "❌ Unable to generate email. Please provide legitimate business context."
-        });
-      }
-    }
+
     // Build enhanced prompt with style matching
     const prompt = `
 Write this email to sound authentically human and natural.
@@ -472,6 +443,9 @@ BUSINESS CONTEXT:
 IMPORTANT: Make this email sound like a real human wrote it - natural, conversational, and authentic.
 Return ONLY the email content starting with "Subject:".
 `;
+
+    console.log("📝 Generating email with prompt:", prompt);
+
     const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -488,16 +462,16 @@ Return ONLY the email content starting with "Subject:".
         presence_penalty: 0.3,
       }),
     });
+
     const data = await groqResponse.json();
     let email = data.choices?.[0]?.message?.content?.trim() || "Error generating email.";
 
     email = cleanAIResponse(email);
 
-    if (!validateEmailContent(email, business, context)) {
-      return res.status(400).json({
-        email: "❌ Unable to generate appropriate email content."
-      });
+    if (!email.startsWith("Subject:")) {
+      email = "Subject: Professional Communication\n\n" + email;
     }
+
     // Update email usage (only for free plan)
     if (user.plan === 'free') {
       await pool.query(
