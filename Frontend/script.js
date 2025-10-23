@@ -218,16 +218,57 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function initializeApp() {
+    console.log('🔄 Initializing LetiMail...');
+    
+    // Test backend connection first
+    const backendConnected = await testBackendConnection();
+    if (!backendConnected) {
+        showNotification('Warning', 'Backend connection issues detected. Some features may not work.', 'warning');
+    }
+    
     await checkAuthState();
     setupEventListeners();
     setupNotification();
     createAuthModals();
-    initializePageSpecificFeatures(); // Add this line
+    initializePageSpecificFeatures();
     setupComingSoonButtons();
     fixLoadingIndicator();
     
-    // Update email tracking display
     updateEmailTracking();
+    console.log('✅ LetiMail initialized successfully');
+}
+
+// Test backend connection
+async function testBackendConnection() {
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/health`);
+        if (response.ok) {
+            console.log('✅ Backend connection successful');
+            return true;
+        } else {
+            console.error('❌ Backend connection failed');
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Backend connection error:', error);
+        return false;
+    }
+}
+
+function initializePageSpecificFeatures() {
+    const currentPage = window.location.pathname;
+    
+    if (currentPage.includes('settings.html')) {
+        setupSettingsPage();
+        loadToneManagementUI(); // Load tone management immediately
+    } else if (currentPage.includes('app.html')) {
+        setupEnhancedAppFunctions();
+        // Add event listener for generate button
+        const generateBtn = document.getElementById('generateBtn');
+        if (generateBtn) {
+            generateBtn.addEventListener('click', generateEmailWithTone);
+        }
+    }
 }
 
 // ========================================
@@ -288,22 +329,6 @@ async function checkAuthState() {
         authToken = null;
         currentUser = null;
         showAuthButtons();
-    }
-}
-
-function initializePageSpecificFeatures() {
-    const currentPage = window.location.pathname;
-    
-    if (currentPage.includes('settings.html')) {
-        setupSettingsPage();
-        loadToneManagementUI(); // Load tone management immediately
-    } else if (currentPage.includes('app.html')) {
-        setupEnhancedAppFunctions();
-        // Add event listener for generate button
-        const generateBtn = document.getElementById('generateBtn');
-        if (generateBtn) {
-            generateBtn.addEventListener('click', generateEmailWithTone);
-        }
     }
 }
 
@@ -1414,7 +1439,6 @@ async function generateEmailWithTone() {
 // APP FUNCTIONS (COPY, EDIT, SEND)
 // ========================================
 
-// Update the edit button functionality
 function setupEnhancedAppFunctions() {
   const copyBtn = document.getElementById('copyBtn');
   const editBtn = document.getElementById('editBtn');
@@ -1521,7 +1545,7 @@ function setupEnhancedAppFunctions() {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fas fa-magic"></i> Save & Improve with AI';
       });
-  
+
       document.getElementById('cancelEdit').addEventListener('click', function() {
         outputDiv.classList.remove('edit-mode');
         outputDiv.innerText = currentText;
@@ -1529,6 +1553,7 @@ function setupEnhancedAppFunctions() {
       });
     });
   }
+
   if (sendBtn) {
     sendBtn.addEventListener('click', function() {
       showSendEmailModal();
@@ -1703,7 +1728,7 @@ function updateSettingsPage() {
     const currentPlanName = document.getElementById('currentPlanName');
     
     if (currentPlanName) {
-        currentPlanName.textContent = currentUser.plan ? `${currentUser.plan.charAt(0).toUpperCase() + user.plan.slice(1)} Plan` : 'Free Plan';
+        currentPlanName.textContent = currentUser.plan ? `${currentUser.plan.charAt(0).toUpperCase() + currentUser.plan.slice(1)} Plan` : 'Free Plan';
     }
     
     updateEmailTracking();
