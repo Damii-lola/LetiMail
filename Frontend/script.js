@@ -11,7 +11,7 @@ let onboardingState = {
 };
 
 // ========================================
-// TONE PROFILE MANAGER (YOUR ORIGINAL CODE)
+// TONE PROFILE MANAGER
 // ========================================
 const ToneProfileManager = {
   // Get all reference emails
@@ -202,7 +202,7 @@ WRITING CHARACTERISTICS:
 };
 
 // ========================================
-// INITIALIZATION (YOUR ORIGINAL CODE)
+// INITIALIZATION
 // ========================================
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -263,7 +263,7 @@ function initializePageSpecificFeatures() {
 }
 
 // ========================================
-// AUTH STATE MANAGEMENT (YOUR ORIGINAL CODE)
+// AUTH STATE MANAGEMENT
 // ========================================
 async function checkAuthState() {
     authToken = localStorage.getItem('authToken');
@@ -321,7 +321,7 @@ async function checkAuthState() {
 }
 
 // ========================================
-// UI MANAGEMENT (YOUR ORIGINAL CODE)
+// UI MANAGEMENT
 // ========================================
 function showUserMenu(user) {
     const userMenu = document.getElementById('userMenu');
@@ -363,7 +363,7 @@ function updateUserInfo(user) {
 }
 
 // ========================================
-// EMAIL TRACKING & UPGRADE SYSTEM (YOUR ORIGINAL CODE)
+// EMAIL TRACKING & UPGRADE SYSTEM
 // ========================================
 function updateEmailTracking() {
     if (!currentUser) return;
@@ -446,7 +446,7 @@ function startPremiumUpgrade() {
 }
 
 // ========================================
-// DELETE ACCOUNT FUNCTIONALITY (YOUR ORIGINAL CODE)
+// DELETE ACCOUNT FUNCTIONALITY
 // ========================================
 async function handleDeleteAccount() {
     if (!confirm('Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.')) {
@@ -472,9 +472,10 @@ async function handleDeleteAccount() {
 }
 
 // ========================================
-// COMING SOON BUTTONS (YOUR ORIGINAL CODE)
+// COMING SOON BUTTONS
 // ========================================
 function setupComingSoonButtons() {
+    // Add coming soon functionality to all buttons without specific functions
     const comingSoonButtons = [
         '#upgradePremiumBtn',
         '.plan-button:not([onclick])',
@@ -490,6 +491,7 @@ function setupComingSoonButtons() {
             });
         });
     });
+    // Add delete account button listener
     const deleteAccountBtn = document.getElementById('deleteAccountBtn');
     if (deleteAccountBtn) {
         deleteAccountBtn.addEventListener('click', handleDeleteAccount);
@@ -497,7 +499,7 @@ function setupComingSoonButtons() {
 }
 
 // ========================================
-// AUTH MODALS CREATION (YOUR ORIGINAL CODE)
+// AUTH MODALS CREATION
 // ========================================
 function createAuthModals() {
     const authModals = document.getElementById('authModals');
@@ -541,7 +543,7 @@ function createAuthModals() {
                             <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="Enter 6-digit code" maxlength="6" pattern="[0-9]{6}">
                             <button type="button" class="otp-resend" id="resendOtp" onclick="sendOTP()">Resend</button>
                         </div>
-                        <span class="otp-hint">Check your email for the verification code</span>
+                        <span class="otp-hint">Check your email for the verification code. Also check the console for the OTP.</span>
                     </div>
                     <button type="button" class="auth-btn primary" onclick="verifyOTPAndRegister()">
                         <span class="btn-text">Verify & Create Account</span>
@@ -586,7 +588,7 @@ function createAuthModals() {
 }
 
 // ========================================
-// OTP VERIFICATION (YOUR ORIGINAL CODE)
+// OTP VERIFICATION
 // ========================================
 async function sendOTP() {
     const email = document.getElementById('signupEmail').value;
@@ -616,7 +618,7 @@ async function sendOTP() {
             document.getElementById('signupForm').style.display = 'none';
             document.getElementById('otpForm').style.display = 'block';
 
-            showNotification('Success', `Verification code sent to ${email}`, 'success');
+            showNotification('Success', `Verification code sent to ${email}. Check console for the OTP.`, 'success');
             startResendTimer();
         } else {
             throw new Error(data.error || 'Failed to send verification code');
@@ -660,7 +662,9 @@ async function verifyOTPAndRegister() {
 
             signupData = {};
 
+            // Use improved redirect handling
             handlePostAuthRedirect();
+
         } else {
             throw new Error(data.error || 'Registration failed');
         }
@@ -693,22 +697,24 @@ function startResendTimer() {
 }
 
 // ========================================
-// IMPROVED ONBOARDING REDIRECT (YOUR ORIGINAL CODE)
+// IMPROVED ONBOARDING REDIRECT
 // ========================================
 function handlePostAuthRedirect() {
     const onboardingComplete = localStorage.getItem('letimail_onboarding_complete');
 
     if (!onboardingComplete) {
+        // Show onboarding modal instead of redirecting immediately
         setTimeout(() => {
             showOnboardingModal();
         }, 1000);
     } else {
+        // If onboarding is complete, show success and let user choose where to go
         showNotification('Welcome!', 'Successfully signed in. You can start generating emails or manage your settings.', 'success');
     }
 }
 
 // ========================================
-// ONBOARDING SYSTEM (YOUR ORIGINAL CODE)
+// ONBOARDING SYSTEM
 // ========================================
 function createOnboardingModal() {
   const modal = document.createElement('div');
@@ -865,8 +871,183 @@ function createOnboardingModal() {
   document.body.appendChild(modal);
 }
 
+function showOnboardingModal() {
+  let modal = document.getElementById('onboardingModal');
+  if (!modal) {
+    createOnboardingModal();
+    modal = document.getElementById('onboardingModal');
+  }
+
+  onboardingState = {
+    currentStep: 0,
+    toneEmails: []
+  };
+
+  updateOnboardingProgress();
+  document.querySelectorAll('.onboarding-step').forEach(step => {
+    step.classList.remove('active');
+  });
+  document.getElementById('step1').classList.add('active');
+
+  modal.style.display = 'flex';
+}
+
+function updateOnboardingProgress() {
+  const progress = ((onboardingState.currentStep + 1) / 3) * 100;
+  const progressFill = document.getElementById('onboardingProgress');
+  const progressText = document.getElementById('progressText');
+
+  if (progressFill) progressFill.style.width = `${progress}%`;
+  if (progressText) progressText.textContent = `Step ${onboardingState.currentStep + 1} of 3`;
+}
+
+function nextOnboardingStep() {
+  if (onboardingState.currentStep < 2) {
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.remove('active');
+    onboardingState.currentStep++;
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.add('active');
+    updateOnboardingProgress();
+  }
+}
+
+function previousOnboardingStep() {
+  if (onboardingState.currentStep > 0) {
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.remove('active');
+    onboardingState.currentStep--;
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.add('active');
+    updateOnboardingProgress();
+  }
+}
+
+function addToneEmail() {
+  const textarea = document.getElementById('toneEmailInput');
+  const emailContent = textarea.value.trim();
+
+  if (!emailContent) {
+    showNotification('Error', 'Please paste an email before adding', 'error');
+    return;
+  }
+
+  if (onboardingState.toneEmails.length >= 5) {
+    showNotification('Limit Reached', 'You can add up to 5 email examples', 'warning');
+    return;
+  }
+
+  onboardingState.toneEmails.push(emailContent);
+  updateAddedEmailsList();
+  textarea.value = '';
+
+  document.getElementById('emailCount').textContent = onboardingState.toneEmails.length;
+  document.getElementById('finishBtn').disabled = false;
+
+  if (onboardingState.toneEmails.length >= 5) {
+    document.getElementById('addEmailBtn').disabled = true;
+    document.getElementById('toneEmailInput').disabled = true;
+  }
+
+  showNotification('Added', `Email ${onboardingState.toneEmails.length} added successfully`, 'success');
+}
+
+function updateAddedEmailsList() {
+  const list = document.getElementById('addedEmailsList');
+  if (!list) return;
+
+  if (onboardingState.toneEmails.length === 0) {
+    list.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = '<h4 class="added-emails-title">Added Emails:</h4>';
+
+  onboardingState.toneEmails.forEach((email, index) => {
+    const preview = email.substring(0, 100) + (email.length > 100 ? '...' : '');
+
+    const emailCard = document.createElement('div');
+    emailCard.className = 'added-email-card';
+    emailCard.innerHTML = `
+      <div class="email-card-header">
+        <span class="email-number">Email ${index + 1}</span>
+        <button class="remove-email-btn" onclick="removeToneEmail(${index})">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="email-preview">${preview}</div>
+    `;
+
+    list.appendChild(emailCard);
+  });
+}
+
+function removeToneEmail(index) {
+  onboardingState.toneEmails.splice(index, 1);
+  updateAddedEmailsList();
+
+  document.getElementById('emailCount').textContent = onboardingState.toneEmails.length;
+  document.getElementById('addEmailBtn').disabled = false;
+  document.getElementById('toneEmailInput').disabled = false;
+
+  if (onboardingState.toneEmails.length === 0) {
+    document.getElementById('finishBtn').disabled = true;
+  }
+}
+
+function skipToneSetup() {
+  if (confirm('Are you sure you want to skip? You can add email examples later in Settings to improve your personalized tone.')) {
+    completeOnboarding(false);
+  }
+}
+
+async function finishOnboarding() {
+  if (onboardingState.toneEmails.length === 0) {
+    showNotification('No Emails Added', 'Please add at least one email example or click "Skip for Now"', 'warning');
+    return;
+  }
+
+  completeOnboarding(true);
+}
+
+async function completeOnboarding(withToneData) {
+  const finishBtn = document.getElementById('finishBtn');
+  if (finishBtn) {
+    finishBtn.disabled = true;
+    finishBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
+  }
+
+  try {
+    if (withToneData && onboardingState.toneEmails.length > 0) {
+      // Save to ToneProfileManager
+      onboardingState.toneEmails.forEach(email => {
+        ToneProfileManager.addTrainingEmail(email);
+      });
+
+      showNotification('Success', `${onboardingState.toneEmails.length} email examples saved! Your personalized tone is ready.`, 'success');
+    } else {
+      showNotification('Setup Complete', 'You can add email examples later in Settings to personalize your tone.', 'info');
+    }
+
+    localStorage.setItem('letimail_onboarding_complete', 'true');
+
+    setTimeout(() => {
+      const modal = document.getElementById('onboardingModal');
+      if (modal) modal.style.display = 'none';
+
+      // Don't force redirect, let user stay where they are
+      showNotification('Ready!', 'Your LetiMail account is now fully set up.', 'success');
+    }, 1500);
+
+  } catch (error) {
+    console.error('Onboarding completion error:', error);
+    showNotification('Error', 'Failed to complete setup. Please try again.', 'error');
+
+    if (finishBtn) {
+      finishBtn.disabled = false;
+      finishBtn.innerHTML = 'Finish Setup';
+    }
+  }
+}
+
 // ========================================
-// EVENT LISTENERS SETUP (YOUR ORIGINAL CODE)
+// EVENT LISTENERS SETUP
 // ========================================
 function setupEventListeners() {
     document.getElementById('loginBtn')?.addEventListener('click', showLoginModal);
@@ -920,7 +1101,7 @@ function setupEventListeners() {
 }
 
 // ========================================
-// MODAL FUNCTIONS (YOUR ORIGINAL CODE)
+// MODAL FUNCTIONS
 // ========================================
 function showSignupModal() {
     hideAllModals();
@@ -993,7 +1174,7 @@ function hideButtonLoading(button) {
 }
 
 // ========================================
-// NOTIFICATION SYSTEM (YOUR ORIGINAL CODE)
+// NOTIFICATION SYSTEM
 // ========================================
 function setupNotification() {
     const notification = document.getElementById('notification');
@@ -1047,7 +1228,7 @@ function hideNotification() {
 }
 
 // ========================================
-// AUTH HANDLERS (YOUR ORIGINAL CODE)
+// AUTH HANDLERS
 // ========================================
 async function handleLogin(e) {
     const button = e.target.querySelector('button[type="submit"]');
@@ -1075,6 +1256,7 @@ async function handleLogin(e) {
             showUserMenu(currentUser);
             updateEmailTracking();
 
+            // Use improved redirect handling
             handlePostAuthRedirect();
         } else {
             throw new Error(data.error || 'Login failed');
@@ -1111,7 +1293,7 @@ function handleGetStarted() {
 }
 
 // ========================================
-// EMAIL GENERATION WITH TONE MATCHING (UPDATED CODE)
+// EMAIL GENERATION WITH TONE MATCHING
 // ========================================
 async function generateEmailWithTone() {
   if (!currentUser || !authToken) {
@@ -1119,35 +1301,28 @@ async function generateEmailWithTone() {
     showLoginModal();
     return;
   }
-
   // Check email limits for free users
   if (currentUser.plan === 'free' && currentUser.emails_used >= 5) {
     showUpgradePrompt();
     return;
   }
-
   const business = document.getElementById('businessDesc')?.value;
   const context = document.getElementById('context')?.value;
   const tone = document.getElementById('tone')?.value;
   const emailLength = document.getElementById('emailLength')?.value || 'medium';
-
   if (!business || !context) {
     showNotification('Error', 'Please fill in all fields', 'error');
     return;
   }
-
   const generateBtn = document.getElementById('generateBtn');
   const outputDiv = document.getElementById('output');
   const actionButtons = document.getElementById('actionButtons');
-
   if (!generateBtn || !outputDiv) return;
-
   generateBtn.disabled = true;
   generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Generating...';
   outputDiv.innerHTML = '<div class="output-placeholder"><div class="placeholder-animation"><div class="animation-ring"></div><div class="placeholder-icon">✉️</div></div><p>Analyzing your writing style...</p><small>Generating personalized email</small></div>';
 
   if (actionButtons) actionButtons.style.display = 'none';
-
   try {
     const stylePrompt = ToneProfileManager.generateStylePrompt();
 
@@ -1165,7 +1340,6 @@ async function generateEmailWithTone() {
         stylePrompt: stylePrompt
       })
     });
-
     const data = await response.json();
 
     if (response.ok) {
@@ -1201,7 +1375,7 @@ async function generateEmailWithTone() {
 }
 
 // ========================================
-// APP FUNCTIONS (COPY, EDIT, SEND) - UPDATED CODE
+// APP FUNCTIONS (COPY, EDIT, SEND)
 // ========================================
 function setupEnhancedAppFunctions() {
   const copyBtn = document.getElementById('copyBtn');
@@ -1209,7 +1383,7 @@ function setupEnhancedAppFunctions() {
   const sendBtn = document.getElementById('sendBtn');
 
   if (copyBtn) {
-    copyBtn.addEventListener('click', function() {
+    copyBtn.onclick = function() {
       const outputDiv = document.getElementById('output');
       const text = outputDiv.innerText;
 
@@ -1218,82 +1392,68 @@ function setupEnhancedAppFunctions() {
       }).catch(err => {
         showNotification('Error', 'Failed to copy email', 'error');
       });
-    });
+    };
   }
 
   if (editBtn) {
-    editBtn.addEventListener('click', function() {
+    editBtn.onclick = function() {
       const outputDiv = document.getElementById('output');
-      const currentText = outputDiv.innerText;
-      const originalEmail = outputDiv.getAttribute('data-original-email') || currentText;
+      if (!outputDiv) return;
 
-      // Store the original HTML
-      const originalHTML = outputDiv.innerHTML;
+      // Store the original content
+      const originalContent = outputDiv.innerHTML;
 
-      // Make the output div editable directly
+      // Make the output editable
       outputDiv.contentEditable = true;
       outputDiv.focus();
-      outputDiv.style.outline = "2px solid var(--accent-primary)";
+      outputDiv.style.outline = "2px solid #6366F1";
       outputDiv.style.minHeight = "200px";
       outputDiv.style.padding = "8px";
 
       // Add a save button
       const saveBtn = document.createElement('button');
       saveBtn.id = 'saveEditBtn';
-      saveBtn.className = 'save-edit-button';
       saveBtn.innerHTML = '<i class="fas fa-save"></i> Save';
       saveBtn.style.position = 'fixed';
       saveBtn.style.bottom = '20px';
       saveBtn.style.right = '20px';
       saveBtn.style.zIndex = '1000';
       saveBtn.style.padding = '10px 20px';
-      saveBtn.style.backgroundColor = 'var(--accent-primary)';
+      saveBtn.style.backgroundColor = '#6366F1';
       saveBtn.style.color = 'white';
       saveBtn.style.border = 'none';
       saveBtn.style.borderRadius = '6px';
       saveBtn.style.cursor = 'pointer';
 
-      saveBtn.addEventListener('click', function() {
-        const editedText = outputDiv.innerText;
-        if (!editedText.trim()) {
-          showNotification('Error', 'Email content cannot be empty', 'error');
-          return;
-        }
-
-        // Save the edited content
+      saveBtn.onclick = function() {
         outputDiv.contentEditable = false;
         outputDiv.style.outline = "none";
         outputDiv.style.padding = "0";
-        outputDiv.setAttribute('data-original-email', editedText);
-
-        // Save to edited emails for learning
-        ToneProfileManager.saveEditedEmail(originalEmail, editedText);
-
         document.body.removeChild(saveBtn);
         showNotification('Saved', 'Changes saved successfully', 'success');
-      });
+      };
 
       document.body.appendChild(saveBtn);
 
       // Cancel on Escape key
-      document.addEventListener('keydown', function handleKeyDown(e) {
+      document.onkeydown = function(e) {
         if (e.key === 'Escape') {
           outputDiv.contentEditable = false;
           outputDiv.style.outline = "none";
           outputDiv.style.padding = "0";
-          outputDiv.innerHTML = originalHTML;
+          outputDiv.innerHTML = originalContent;
           document.body.removeChild(saveBtn);
-          document.removeEventListener('keydown', handleKeyDown);
+          document.onkeydown = null;
           showNotification('Cancelled', 'Edit cancelled', 'info');
         }
-      });
-    });
+      };
+    };
   }
 
   if (sendBtn) {
-    sendBtn.addEventListener('click', function() {
+    sendBtn.onclick = function() {
       showSendEmailModal();
-    });
+    };
   }
 }
 
@@ -1398,7 +1558,7 @@ async function confirmSendEmail() {
 }
 
 // ========================================
-// SETTINGS PAGE (YOUR ORIGINAL CODE)
+// SETTINGS PAGE
 // ========================================
 function setupSettingsPage() {
     if (!document.getElementById('settings-panels')) return;
@@ -1447,14 +1607,91 @@ function switchSettingsTab(tabName) {
     // Load tone management immediately when switching to tone tab
     if (tabName === 'tone') {
         console.log('🔄 Switching to tone tab, loading UI...');
+        // Small delay to ensure DOM is ready
         setTimeout(() => {
             loadToneManagementUI();
         }, 50);
     }
 }
 
+async function handleProfileUpdate(e) {
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
+
+    const name = document.getElementById('profileName').value;
+
+    try {
+        if (currentUser) {
+            currentUser.name = name;
+            showNotification('Success', 'Profile updated successfully', 'success');
+            updateUserInfo(currentUser);
+            updateSettingsPage();
+        }
+    } catch (error) {
+        showNotification('Error', 'Failed to update profile', 'error');
+    } finally {
+        hideButtonLoading(button);
+    }
+}
+
+async function handlePreferencesUpdate(e) {
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
+
+    try {
+        const defaultTone = document.getElementById('defaultTone').value;
+        const emailLength = document.getElementById('emailLength').value;
+        const autoSave = document.getElementById('autoSave').checked;
+        const spellCheck = document.getElementById('spellCheck').checked;
+
+        const preferences = {
+            defaultTone,
+            emailLength,
+            autoSave,
+            spellCheck
+        };
+
+        localStorage.setItem('letimail_preferences', JSON.stringify(preferences));
+        showNotification('Success', 'Preferences saved successfully', 'success');
+    } catch (error) {
+        showNotification('Error', 'Failed to save preferences', 'error');
+    } finally {
+        hideButtonLoading(button);
+    }
+}
+
+async function handlePasswordChange(e) {
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
+
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (newPassword !== confirmPassword) {
+        showNotification('Error', 'New passwords do not match', 'error');
+        hideButtonLoading(button);
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showNotification('Error', 'Password must be at least 6 characters', 'error');
+        hideButtonLoading(button);
+        return;
+    }
+
+    try {
+        showNotification('Success', 'Password updated successfully', 'success');
+        e.target.reset();
+    } catch (error) {
+        showNotification('Error', 'Failed to update password', 'error');
+    } finally {
+        hideButtonLoading(button);
+    }
+}
+
 // ========================================
-// TONE MANAGEMENT IN SETTINGS (YOUR ORIGINAL CODE)
+// TONE MANAGEMENT IN SETTINGS
 // ========================================
 function loadToneManagementUI() {
   console.log('🔄 Loading tone management UI data...');
@@ -1570,15 +1807,187 @@ function loadToneManagementUI() {
   document.getElementById('addToneEmailBtn').addEventListener('click', showAddToneEmailModal);
 }
 
+// Show modal to add a new training email
+function showAddToneEmailModal() {
+  const profile = ToneProfileManager.getReferenceEmails();
+
+  if (profile.training.length >= 10) {
+    showNotification('Limit Reached', 'You can have up to 10 training emails', 'warning');
+    return;
+  }
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'addToneModal';
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('addToneModal')">
+        <i class="fas fa-times"></i>
+      </button>
+      <h3>Add Training Email</h3>
+      <p class="modal-description">Paste a complete email you've written before (including subject line).</p>
+
+      <textarea id="newToneEmail" class="tone-email-textarea" rows="12" placeholder="Subject: Example subject
+Hi [Name],
+Your email content here...
+Best regards,
+[Your Name]"></textarea>
+
+      <div class="modal-actions">
+        <button class="settings-btn secondary" onclick="closeModal('addToneModal')">Cancel</button>
+        <button class="settings-btn primary" onclick="saveToneEmail()">
+          <i class="fas fa-check"></i> Add Email
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+}
+
+// Save a new training email
+function saveToneEmail() {
+  const content = document.getElementById('newToneEmail').value.trim();
+
+  if (!content || content.length < 50) {
+    showNotification('Error', 'Please provide a complete email (at least 50 characters)', 'error');
+    return;
+  }
+
+  ToneProfileManager.addTrainingEmail(content);
+  closeModal('addToneModal');
+  loadToneManagementUI();
+  showNotification('Success', 'Training email added successfully!', 'success');
+}
+
+// Edit a training email
+function editToneEmail(id) {
+  const data = localStorage.getItem('letimail_tone_training');
+  if (!data) return;
+
+  const profile = JSON.parse(data);
+  const email = profile.emails.find(e => e.id === id);
+
+  if (!email) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'editToneModal';
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('editToneModal')">
+        <i class="fas fa-times"></i>
+      </button>
+      <h3>Edit Training Email</h3>
+
+      <textarea id="editToneEmail" class="tone-email-textarea" rows="12">${email.content}</textarea>
+
+      <div class="modal-actions">
+        <button class="settings-btn secondary" onclick="closeModal('editToneModal')">Cancel</button>
+        <button class="settings-btn primary" onclick="updateToneEmail(${id})">
+          <i class="fas fa-save"></i> Save Changes
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+}
+
+// Update a training email
+function updateToneEmail(id) {
+  const content = document.getElementById('editToneEmail').value.trim();
+
+  if (!content) {
+    showNotification('Error', 'Email content cannot be empty', 'error');
+    return;
+  }
+
+  ToneProfileManager.updateTrainingEmail(id, content);
+  closeModal('editToneModal');
+  loadToneManagementUI();
+  showNotification('Success', 'Training email updated!', 'success');
+}
+
+// Delete a training email
+function deleteToneEmail(id) {
+  if (confirm('Are you sure you want to delete this training email?')) {
+    ToneProfileManager.deleteTrainingEmail(id);
+    loadToneManagementUI();
+    showNotification('Deleted', 'Training email removed', 'info');
+  }
+}
+
+// Delete an edited email
+function deleteEditedEmail(id) {
+  const data = localStorage.getItem('letimail_edited_emails');
+  if (!data) return;
+
+  let emails = JSON.parse(data);
+  emails = emails.filter(e => e.id !== id);
+  localStorage.setItem('letimail_edited_emails', JSON.stringify(emails));
+
+  loadToneManagementUI();
+  showNotification('Removed', 'Edited email removed from learning', 'info');
+}
+
+// View full email
+function viewFullEmail(id, type) {
+  let email;
+
+  if (type === 'training') {
+    const data = localStorage.getItem('letimail_tone_training');
+    if (!data) return;
+    const profile = JSON.parse(data);
+    email = profile.emails.find(e => e.id === id);
+  }
+
+  if (!email) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'viewEmailModal';
+
+  modal.innerHTML = `
+    <div class="modal-content view-email-modal">
+      <button class="modal-close" onclick="closeModal('viewEmailModal')">
+        <i class="fas fa-times"></i>
+      </button>
+      <h3>Full Email</h3>
+      <div class="full-email-content">${email.content.replace(/\n/g, '<br>')}</div>
+      <div class="modal-actions">
+        <button class="settings-btn primary" onclick="closeModal('viewEmailModal')">Close</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+}
+
+// Close modal
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    document.body.removeChild(modal);
+  }
+}
+
 // ========================================
-// FIX LOADING INDICATOR IN APP.HTML (YOUR ORIGINAL CODE)
+// FIX LOADING INDICATOR IN APP.HTML
 // ========================================
 function fixLoadingIndicator() {
   const outputDiv = document.getElementById('output');
   if (outputDiv) {
+    // Remove any existing problematic styles
     outputDiv.style.overflow = 'visible';
     outputDiv.style.minHeight = '400px';
 
+    // Ensure proper placeholder display
     if (!outputDiv.querySelector('.output-placeholder')) {
       outputDiv.innerHTML = `
         <div class="output-placeholder">
@@ -1595,7 +2004,7 @@ function fixLoadingIndicator() {
 }
 
 // ========================================
-// GLOBAL FUNCTION EXPORTS (YOUR ORIGINAL CODE)
+// GLOBAL FUNCTION EXPORTS
 // ========================================
 window.showLoginModal = showLoginModal;
 window.showSignupModal = showSignupModal;
@@ -1627,7 +2036,7 @@ window.startPremiumUpgrade = startPremiumUpgrade;
 window.loadToneManagementUI = loadToneManagementUI;
 
 // ========================================
-// AUTO-INITIALIZATION (YOUR ORIGINAL CODE)
+// AUTO-INITIALIZATION
 // ========================================
 // Auto-initialize for app.html
 if (document.getElementById('generateBtn')) {
