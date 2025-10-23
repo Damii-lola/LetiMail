@@ -1381,6 +1381,7 @@ function setupEnhancedAppFunctions() {
   const copyBtn = document.getElementById('copyBtn');
   const editBtn = document.getElementById('editBtn');
   const sendBtn = document.getElementById('sendBtn');
+
   if (copyBtn) {
     copyBtn.addEventListener('click', function() {
       const outputDiv = document.getElementById('output');
@@ -1393,64 +1394,74 @@ function setupEnhancedAppFunctions() {
       });
     });
   }
+
   if (editBtn) {
     editBtn.addEventListener('click', function() {
       const outputDiv = document.getElementById('output');
       const currentText = outputDiv.innerText;
       const originalEmail = outputDiv.getAttribute('data-original-email') || currentText;
 
-      // Clear and set up editing interface
-      outputDiv.innerHTML = '';
-      outputDiv.classList.add('edit-mode');
+      // Store the original HTML
+      const originalHTML = outputDiv.innerHTML;
 
-      const editContainer = document.createElement('div');
-      editContainer.className = 'edit-container';
-      editContainer.innerHTML = `
-        <div class="edit-mode-header">
-          <h4>Edit Your Email</h4>
-          <p class="edit-description">Make your changes below.</p>
-        </div>
-        <textarea class="email-editor" id="emailEditor">\${currentText}</textarea>
-        <div class="edit-actions">
-          <button class="submit-edit-btn" id="submitEdit">
-            <i class="fas fa-save"></i> Save Edits
-          </button>
-          <button class="cancel-edit-btn" id="cancelEdit">
-            <i class="fas fa-times"></i> Cancel
-          </button>
-        </div>
-      `;
+      // Make the output div editable directly
+      outputDiv.contentEditable = true;
+      outputDiv.focus();
 
-      outputDiv.appendChild(editContainer);
+      // Add a class to indicate edit mode (for styling if needed)
+      outputDiv.classList.add('direct-edit-mode');
 
-      // Focus the textarea
-      const editor = document.getElementById('emailEditor');
-      editor.focus();
+      // Add event listener for when editing is done (click outside or press Enter)
+      function finishEditing() {
+        outputDiv.contentEditable = false;
+        outputDiv.classList.remove('direct-edit-mode');
+        document.removeEventListener('click', handleOutsideClick);
+        document.removeEventListener('keydown', handleKeyDown);
+      }
 
-      // Add event listeners
-      document.getElementById('submitEdit').addEventListener('click', function() {
-        const editedText = editor.value;
-
-        if (!editedText.trim()) {
-          showNotification('Error', 'Email content cannot be empty', 'error');
-          return;
+      function handleOutsideClick(e) {
+        if (!outputDiv.contains(e.target)) {
+          finishEditing();
         }
+      }
 
-        // Restore normal output display
-        outputDiv.classList.remove('edit-mode');
-        outputDiv.innerText = editedText;
+      function handleKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          finishEditing();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          outputDiv.innerHTML = originalHTML;
+          finishEditing();
+        }
+      }
+
+      document.addEventListener('click', handleOutsideClick);
+      document.addEventListener('keydown', handleKeyDown);
+
+      // Add a save button (optional)
+      const saveButton = document.createElement('button');
+      saveButton.id = 'saveEditButton';
+      saveButton.className = 'save-edit-button';
+      saveButton.innerHTML = '<i class="fas fa-save"></i> Save';
+      saveButton.style.position = 'fixed';
+      saveButton.style.bottom = '20px';
+      saveButton.style.right = '20px';
+      saveButton.style.zIndex = '1000';
+
+      saveButton.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const editedText = outputDiv.innerText;
         outputDiv.setAttribute('data-original-email', editedText);
-
         showNotification('Saved', 'Changes saved successfully', 'success');
+        finishEditing();
+        saveButton.remove();
       });
 
-      document.getElementById('cancelEdit').addEventListener('click', function() {
-        outputDiv.classList.remove('edit-mode');
-        outputDiv.innerText = currentText;
-        outputDiv.setAttribute('data-original-email', originalEmail);
-      });
+      document.body.appendChild(saveButton);
     });
   }
+
   if (sendBtn) {
     sendBtn.addEventListener('click', function() {
       showSendEmailModal();
