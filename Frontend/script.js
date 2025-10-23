@@ -184,7 +184,7 @@ WRITING CHARACTERISTICS:
 - Formality level: ${style.formalityScore > 2 ? 'Formal' : style.formalityScore > 1 ? 'Professional' : 'Casual'}
 `;
     if (style.commonPhrases.length > 0) {
-      prompt += `- Common phrases to incorporate: "${style.commonPhrases.slice(0, 5).join('", "')}"
+      prompt += `- Common phrases to incorporate: "\${style.commonPhrases.slice(0, 5).join('", "')}"
 `;
     }
     // Add sample sentences
@@ -427,7 +427,7 @@ function showUpgradePrompt() {
             <div class="upgrade-actions">
                 <button class="upgrade-btn primary" onclick="startPremiumUpgrade()">
                     <i class="fas fa-crown"></i>
-                    Upgrade to Premium - $9.99/month
+                    Upgrade to Premium - \$9.99/month
                 </button>
                 <button class="upgrade-btn secondary" onclick="closeModal('upgradeModal')">
                     Maybe Later
@@ -632,7 +632,7 @@ async function sendOTP() {
 
 async function verifyOTPAndRegister() {
     const otp = document.getElementById('otpCode').value;
-    if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
+    if (!otp || otp.length !== 6 || !/^\d+\$/.test(otp)) {
         showNotification('Error', 'Please enter a valid 6-digit code', 'error');
         return;
     }
@@ -971,7 +971,7 @@ function updateAddedEmailsList() {
           <i class="fas fa-times"></i>
         </button>
       </div>
-      <div class="email-preview">${preview}</div>
+      <div class="email-preview">\${preview}</div>
     `;
 
     list.appendChild(emailCard);
@@ -1408,25 +1408,17 @@ function setupEnhancedAppFunctions() {
       editContainer.innerHTML = `
         <div class="edit-mode-header">
           <h4>Edit Your Email</h4>
-          <p class="edit-description">Make your changes below. AI will only refine the parts you edit to match the email's formatting.</p>
+          <p class="edit-description">Make your changes below.</p>
         </div>
-        <textarea class="email-editor" id="emailEditor">${currentText}</textarea>
-        <div class="edit-options">
-          <label class="checkbox-label">
-            <input type="checkbox" id="aiImprovement" checked>
-            <span class="checkmark"></span>
-            Use AI to refine my edits (only modifies changed parts)
-          </label>
-        </div>
+        <textarea class="email-editor" id="emailEditor">\${currentText}</textarea>
         <div class="edit-actions">
           <button class="submit-edit-btn" id="submitEdit">
-            <i class="fas fa-magic"></i> Save & Refine Edits
+            <i class="fas fa-save"></i> Save Edits
           </button>
           <button class="cancel-edit-btn" id="cancelEdit">
             <i class="fas fa-times"></i> Cancel
           </button>
         </div>
-        <p class="edit-hint">💡 AI will only modify the specific parts you change to ensure they match the email's formatting and tone.</p>
       `;
 
       outputDiv.appendChild(editContainer);
@@ -1436,50 +1428,20 @@ function setupEnhancedAppFunctions() {
       editor.focus();
 
       // Add event listeners
-      document.getElementById('submitEdit').addEventListener('click', async function() {
-        const submitBtn = this;
+      document.getElementById('submitEdit').addEventListener('click', function() {
         const editedText = editor.value;
-        const useAI = document.getElementById('aiImprovement').checked;
 
         if (!editedText.trim()) {
           showNotification('Error', 'Email content cannot be empty', 'error');
           return;
         }
 
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="btn-spinner"></span> Refining edits...';
-
-        let finalText = editedText;
-
-        if (useAI) {
-          try {
-            finalText = await improveEditedEmail(originalEmail, editedText);
-            showNotification('Refined!', 'AI has refined your edits to match the email formatting', 'success');
-          } catch (error) {
-            console.error('AI refinement failed:', error);
-            showNotification('Notice', 'Using your original edits (AI refinement unavailable)', 'info');
-          }
-        }
-
-        const saved = ToneProfileManager.saveEditedEmail(originalEmail, finalText);
-
         // Restore normal output display
         outputDiv.classList.remove('edit-mode');
-        outputDiv.innerText = finalText;
-        outputDiv.setAttribute('data-original-email', finalText);
+        outputDiv.innerText = editedText;
+        outputDiv.setAttribute('data-original-email', editedText);
 
-        if (saved) {
-          showNotification(
-            'Saved & Learning!',
-            'Your edits have been saved to improve future emails',
-            'success'
-          );
-        } else {
-          showNotification('Saved', 'Changes saved successfully', 'success');
-        }
-
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fas fa-magic"></i> Save & Refine Edits';
+        showNotification('Saved', 'Changes saved successfully', 'success');
       });
 
       document.getElementById('cancelEdit').addEventListener('click', function() {
@@ -1494,36 +1456,6 @@ function setupEnhancedAppFunctions() {
       showSendEmailModal();
     });
   }
-}
-
-async function improveEditedEmail(originalEmail, editedEmail) {
-    if (!currentUser || !authToken) {
-        showNotification('Authentication Required', 'Please sign in to improve emails', 'error');
-        return editedEmail;
-    }
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/improve-email`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({
-                originalEmail: originalEmail,
-                editedEmail: editedEmail
-            })
-        });
-        if (response.ok) {
-            const data = await response.json();
-            return data.improvedEmail;
-        } else {
-            throw new Error('Failed to improve email');
-        }
-    } catch (error) {
-        console.error('Email improvement error:', error);
-        // Return the original edited email if improvement fails
-        return editedEmail;
-    }
 }
 
 function showSendEmailModal() {
@@ -1579,9 +1511,9 @@ async function confirmSendEmail() {
   const outputDiv = document.getElementById('output');
   const emailContent = outputDiv.innerText;
 
-  const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
+  const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|\$)/i);
   const subject = subjectMatch ? subjectMatch[1].trim() : 'Email from LetiMail';
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+\$/;
   if (!emailRegex.test(to)) {
     showNotification('Error', 'Please enter a valid recipient email', 'error');
     return;
@@ -1828,7 +1760,7 @@ function loadToneManagementUI() {
           </div>
         </div>
         <div class="email-preview">${preview}</div>
-        <button class="view-full-btn" onclick="viewFullEmail(${email.id}, 'training')">
+        <button class="view-full-btn" onclick="viewFullEmail(\${email.id}, 'training')">
           View Full Email <i class="fas fa-chevron-right"></i>
         </button>
       `;
@@ -1856,7 +1788,7 @@ function loadToneManagementUI() {
       emailCard.setAttribute('data-id', email.id);
       emailCard.innerHTML = `
         <div class="email-card-header">
-          <span class="email-date">${new Date(email.dateEdited).toLocaleDateString()}</span>
+          <span class="email-date">\${new Date(email.dateEdited).toLocaleDateString()}</span>
           <div class="email-actions">
             <button class="icon-btn delete" onclick="deleteEditedEmail(${email.id})" title="Remove">
               <i class="fas fa-times"></i>
@@ -1865,7 +1797,7 @@ function loadToneManagementUI() {
         </div>
         <div class="email-preview">${preview}</div>
         <div class="edit-badge">
-          <i class="fas fa-pencil-alt"></i> ${Math.round((1 - email.similarity) * 100)}% edited
+          <i class="fas fa-pencil-alt"></i> \${Math.round((1 - email.similarity) * 100)}% edited
         </div>
       `;
       editedEmailsList.appendChild(emailCard);
@@ -1952,11 +1884,11 @@ function editToneEmail(id) {
       </button>
       <h3>Edit Training Email</h3>
 
-      <textarea id="editToneEmail" class="tone-email-textarea" rows="12">${email.content}</textarea>
+      <textarea id="editToneEmail" class="tone-email-textarea" rows="12">\${email.content}</textarea>
 
       <div class="modal-actions">
         <button class="settings-btn secondary" onclick="closeModal('editToneModal')">Cancel</button>
-        <button class="settings-btn primary" onclick="updateToneEmail(${id})">
+        <button class="settings-btn primary" onclick="updateToneEmail(\${id})">
           <i class="fas fa-save"></i> Save Changes
         </button>
       </div>
