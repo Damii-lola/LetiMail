@@ -1472,25 +1472,25 @@ function setupEnhancedAppFunctions() {
       editContainer.innerHTML = `
         <div class="edit-mode-header">
           <h4>Edit Your Email</h4>
-          <p class="edit-description">Make your changes below. The AI will help improve your edits.</p>
+          <p class="edit-description">Make your changes below. AI will only refine the parts you edit to match the email's formatting.</p>
         </div>
         <textarea class="email-editor" id="emailEditor">${currentText}</textarea>
         <div class="edit-options">
           <label class="checkbox-label">
             <input type="checkbox" id="aiImprovement" checked>
             <span class="checkmark"></span>
-            Use AI to improve my edits
+            Use AI to refine my edits (only modifies changed parts)
           </label>
         </div>
         <div class="edit-actions">
           <button class="submit-edit-btn" id="submitEdit">
-            <i class="fas fa-magic"></i> Save & Improve with AI
+            <i class="fas fa-magic"></i> Save & Refine Edits
           </button>
           <button class="cancel-edit-btn" id="cancelEdit">
             <i class="fas fa-times"></i> Cancel
           </button>
         </div>
-        <p class="edit-hint">💡 Your edits help LetiMail learn your writing style. AI improvement doesn't count toward your email limit.</p>
+        <p class="edit-hint">💡 AI will only modify the specific parts you change to ensure they match the email's formatting and tone.</p>
       `;
       
       outputDiv.appendChild(editContainer);
@@ -1511,17 +1511,17 @@ function setupEnhancedAppFunctions() {
         }
         
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="btn-spinner"></span> Improving...';
+        submitBtn.innerHTML = '<span class="btn-spinner"></span> Refining edits...';
         
         let finalText = editedText;
         
         if (useAI) {
           try {
             finalText = await improveEditedEmail(originalEmail, editedText);
-            showNotification('Improved!', 'AI has enhanced your edited email', 'success');
+            showNotification('Refined!', 'AI has refined your edits to match the email formatting', 'success');
           } catch (error) {
-            console.error('AI improvement failed:', error);
-            showNotification('Notice', 'Using your original edits (AI improvement unavailable)', 'info');
+            console.error('AI refinement failed:', error);
+            showNotification('Notice', 'Using your original edits (AI refinement unavailable)', 'info');
           }
         }
         
@@ -1543,7 +1543,7 @@ function setupEnhancedAppFunctions() {
         }
         
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fas fa-magic"></i> Save & Improve with AI';
+        submitBtn.innerHTML = '<i class="fas fa-magic"></i> Save & Refine Edits';
       });
 
       document.getElementById('cancelEdit').addEventListener('click', function() {
@@ -1753,9 +1753,11 @@ function switchSettingsTab(tabName) {
     
     // Load tone management immediately when switching to tone tab
     if (tabName === 'tone') {
+        console.log('🔄 Switching to tone tab, loading UI...');
+        // Small delay to ensure DOM is ready
         setTimeout(() => {
             loadToneManagementUI();
-        }, 100);
+        }, 50);
     }
 }
 
@@ -1846,161 +1848,177 @@ function setupToneManagement() {
 }
 
 function loadToneManagementUI() {
-  const tonePanel = document.getElementById('tone-panel');
-  if (!tonePanel) {
-    console.error('Tone panel not found');
-    return;
-  }
-
-  const profile = ToneProfileManager.getReferenceEmails();
-  const style = profile.all.length > 0 ? ToneProfileManager.analyzeWritingStyle(profile.all) : null;
-
-  let tonePanelHTML = `
-    <h2>Writing Style & Tone Profile</h2>
-    <p class="panel-description">Manage your reference emails to help LetiMail match your unique writing style.</p>
-  `;
-
-  if (style) {
-    tonePanelHTML += `
-      <div class="style-analysis-card">
-        <h4><i class="fas fa-chart-line"></i> Your Writing Style Analysis</h4>
-        <div class="style-metrics">
-          <div class="metric">
-            <span class="metric-label">Reference Emails</span>
-            <span class="metric-value">${style.totalEmails}</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Avg. Sentence Length</span>
-            <span class="metric-value">${Math.round(style.avgSentenceLength)} words</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Writing Style</span>
-            <span class="metric-value">${style.usesContractions ? 'Conversational' : 'Formal'}</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Formality</span>
-            <span class="metric-value">${style.formalityScore > 2 ? 'High' : style.formalityScore > 1 ? 'Medium' : 'Low'}</span>
-          </div>
-        </div>
-    `;
+    console.log('🔄 Loading tone management UI...');
     
-    if (style.commonPhrases.length > 0) {
-      tonePanelHTML += `
-        <div class="common-phrases">
-          <strong>Your signature phrases:</strong>
-          <div class="phrase-tags">
-            ${style.commonPhrases.slice(0, 5).map(phrase => `<span class="phrase-tag">${phrase}</span>`).join('')}
-          </div>
-        </div>
-      `;
+    const tonePanel = document.getElementById('tone-panel');
+    if (!tonePanel) {
+        console.error('❌ Tone panel not found');
+        return;
     }
-    
-    tonePanelHTML += `</div>`;
-  } else {
-    tonePanelHTML += `
-      <div class="style-analysis-card">
-        <h4><i class="fas fa-chart-line"></i> Your Writing Style Analysis</h4>
-        <p style="text-align: center; color: var(--text-muted); padding: 20px;">
-          No writing style data yet. Add some training emails to see your style analysis here.
-        </p>
-      </div>
-    `;
-  }
 
-  // Training emails section
-  tonePanelHTML += `
-    <div class="tone-section">
-      <div class="section-header-inline">
-        <h3>Training Emails (${profile.training.length}/10)</h3>
-        <button class="add-tone-email-btn" onclick="showAddToneEmailModal()">
-          <i class="fas fa-plus"></i> Add Email
-        </button>
-      </div>
-      <p class="section-description">These emails are used to train the AI on your writing style.</p>
-      
-      <div class="tone-emails-list" id="trainingEmailsList">
-  `;
+    // Clear existing content
+    tonePanel.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">Loading writing styles...</div>';
 
-  if (profile.training.length === 0) {
-    tonePanelHTML += `
-      <div class="empty-state">
-        <i class="fas fa-inbox"></i>
-        <p>No training emails yet</p>
-        <small>Add examples of your writing to personalize your tone</small>
-      </div>
-    `;
-  } else {
-    profile.training.forEach(email => {
-      tonePanelHTML += `
-        <div class="tone-email-card" data-id="${email.id}">
-          <div class="email-card-header">
-            <span class="email-date">${new Date(email.dateAdded).toLocaleDateString()}</span>
-            <div class="email-actions">
-              <button class="icon-btn edit" onclick="editToneEmail(${email.id})" title="Edit">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="icon-btn delete" onclick="deleteToneEmail(${email.id})" title="Delete">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </div>
-          <div class="email-preview">${email.content.substring(0, 150)}...</div>
-          <button class="view-full-btn" onclick="viewFullEmail(${email.id}, 'training')">
-            View Full Email <i class="fas fa-chevron-right"></i>
-          </button>
-        </div>
-      `;
-    });
-  }
+    // Force a small delay to ensure DOM is ready
+    setTimeout(() => {
+        const profile = ToneProfileManager.getReferenceEmails();
+        console.log('📧 Profile data:', profile);
+        
+        const style = profile.all.length > 0 ? ToneProfileManager.analyzeWritingStyle(profile.all) : null;
+        console.log('🎨 Style analysis:', style);
 
-  tonePanelHTML += `</div></div>`;
+        let tonePanelHTML = `
+            <h2>Writing Style & Tone Profile</h2>
+            <p class="panel-description">Manage your reference emails to help LetiMail match your unique writing style.</p>
+        `;
 
-  // Edited emails section
-  tonePanelHTML += `
-    <div class="tone-section">
-      <div class="section-header-inline">
-        <h3>Learned from Edits (${profile.edited.length}/20)</h3>
-        <span class="info-badge" title="These are emails you edited significantly">
-          <i class="fas fa-info-circle"></i>
-        </span>
-      </div>
-      <p class="section-description">AI learns from your edits to better match your style.</p>
-      
-      <div class="tone-emails-list" id="editedEmailsList">
-  `;
+        if (style && style.totalEmails > 0) {
+            tonePanelHTML += `
+                <div class="style-analysis-card">
+                    <h4><i class="fas fa-chart-line"></i> Your Writing Style Analysis</h4>
+                    <div class="style-metrics">
+                        <div class="metric">
+                            <span class="metric-label">Reference Emails</span>
+                            <span class="metric-value">${style.totalEmails}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Avg. Sentence Length</span>
+                            <span class="metric-value">${Math.round(style.avgSentenceLength)} words</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Writing Style</span>
+                            <span class="metric-value">${style.usesContractions ? 'Conversational' : 'Formal'}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Formality</span>
+                            <span class="metric-value">${style.formalityScore > 2 ? 'High' : style.formalityScore > 1 ? 'Medium' : 'Low'}</span>
+                        </div>
+                    </div>
+            `;
+            
+            if (style.commonPhrases && style.commonPhrases.length > 0) {
+                tonePanelHTML += `
+                    <div class="common-phrases">
+                        <strong>Your signature phrases:</strong>
+                        <div class="phrase-tags">
+                            ${style.commonPhrases.slice(0, 5).map(phrase => `<span class="phrase-tag">"${phrase}"</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            tonePanelHTML += `</div>`;
+        } else {
+            tonePanelHTML += `
+                <div class="style-analysis-card">
+                    <h4><i class="fas fa-chart-line"></i> Your Writing Style Analysis</h4>
+                    <p style="text-align: center; color: var(--text-muted); padding: 20px;">
+                        No writing style data yet. Add some training emails to see your style analysis here.
+                    </p>
+                </div>
+            `;
+        }
 
-  if (profile.edited.length === 0) {
-    tonePanelHTML += `
-      <div class="empty-state">
-        <i class="fas fa-edit"></i>
-        <p>No edited emails yet</p>
-        <small>As you edit generated emails, they'll appear here</small>
-      </div>
-    `;
-  } else {
-    profile.edited.forEach(email => {
-      tonePanelHTML += `
-        <div class="tone-email-card edited">
-          <div class="email-card-header">
-            <span class="email-date">${new Date(email.dateEdited).toLocaleDateString()}</span>
-            <div class="email-actions">
-              <button class="icon-btn delete" onclick="deleteEditedEmail(${email.id})" title="Remove">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-          </div>
-          <div class="email-preview">${email.content.substring(0, 150)}...</div>
-          <div class="edit-badge">
-            <i class="fas fa-pencil-alt"></i> ${Math.round((1 - email.similarity) * 100)}% edited
-          </div>
-        </div>
-      `;
-    });
-  }
+        // Training emails section
+        tonePanelHTML += `
+            <div class="tone-section">
+                <div class="section-header-inline">
+                    <h3>Training Emails (${profile.training.length}/10)</h3>
+                    <button class="add-tone-email-btn" onclick="showAddToneEmailModal()">
+                        <i class="fas fa-plus"></i> Add Email
+                    </button>
+                </div>
+                <p class="section-description">These emails are used to train the AI on your writing style.</p>
+                
+                <div class="tone-emails-list" id="trainingEmailsList">
+        `;
 
-  tonePanelHTML += `</div></div>`;
+        if (profile.training.length === 0) {
+            tonePanelHTML += `
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>No training emails yet</p>
+                    <small>Add examples of your writing to personalize your tone</small>
+                </div>
+            `;
+        } else {
+            profile.training.forEach(email => {
+                const preview = email.content.substring(0, 150) + (email.content.length > 150 ? '...' : '');
+                tonePanelHTML += `
+                    <div class="tone-email-card" data-id="${email.id}">
+                        <div class="email-card-header">
+                            <span class="email-date">${new Date(email.dateAdded).toLocaleDateString()}</span>
+                            <div class="email-actions">
+                                <button class="icon-btn edit" onclick="editToneEmail(${email.id})" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="icon-btn delete" onclick="deleteToneEmail(${email.id})" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="email-preview">${preview}</div>
+                        <button class="view-full-btn" onclick="viewFullEmail(${email.id}, 'training')">
+                            View Full Email <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                `;
+            });
+        }
 
-  tonePanel.innerHTML = tonePanelHTML;
+        tonePanelHTML += `</div></div>`;
+
+        // Edited emails section
+        tonePanelHTML += `
+            <div class="tone-section">
+                <div class="section-header-inline">
+                    <h3>Learned from Edits (${profile.edited.length}/20)</h3>
+                    <span class="info-badge" title="These are emails you edited significantly">
+                        <i class="fas fa-info-circle"></i>
+                    </span>
+                </div>
+                <p class="section-description">AI learns from your edits to better match your style.</p>
+                
+                <div class="tone-emails-list" id="editedEmailsList">
+        `;
+
+        if (profile.edited.length === 0) {
+            tonePanelHTML += `
+                <div class="empty-state">
+                    <i class="fas fa-edit"></i>
+                    <p>No edited emails yet</p>
+                    <small>As you edit generated emails, they'll appear here</small>
+                </div>
+            `;
+        } else {
+            profile.edited.forEach(email => {
+                const preview = email.content.substring(0, 150) + (email.content.length > 150 ? '...' : '');
+                tonePanelHTML += `
+                    <div class="tone-email-card edited">
+                        <div class="email-card-header">
+                            <span class="email-date">${new Date(email.dateEdited).toLocaleDateString()}</span>
+                            <div class="email-actions">
+                                <button class="icon-btn delete" onclick="deleteEditedEmail(${email.id})" title="Remove">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="email-preview">${preview}</div>
+                        <div class="edit-badge">
+                            <i class="fas fa-pencil-alt"></i> ${Math.round((1 - email.similarity) * 100)}% edited
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        tonePanelHTML += `</div></div>`;
+
+        // Update the panel
+        tonePanel.innerHTML = tonePanelHTML;
+        console.log('✅ Tone management UI loaded successfully');
+        
+    }, 100);
 }
 
 function showAddToneEmailModal() {
