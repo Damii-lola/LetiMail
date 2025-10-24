@@ -502,7 +502,6 @@ app.post("/api/auth/send-otp", async (req, res) => {
     console.log(`🔑 OTP for ${email}: ${otp}`);
 
     // UNCOMMENT FOR PRODUCTION:
-    /*
     const emailContent = `
       Your LetiMail verification code is: ${otp}
       This code will expire in 15 minutes.
@@ -526,7 +525,6 @@ app.post("/api/auth/send-otp", async (req, res) => {
       console.error('SendGrid error:', await sendGridResponse.text());
       return res.status(500).json({ error: 'Failed to send OTP email' });
     }
-    */
 
     res.json({
       success: true,
