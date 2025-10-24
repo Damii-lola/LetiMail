@@ -1,57 +1,18 @@
-// Global State
+// Global Auth State
 let currentUser = null;
 let authToken = null;
-let signupData = {};
-let emailHistory = [];
-let toneProfile = {};
-let userPreferences = {};
-let isEditing = false;
-let originalEmailContent = '';
-let currentEditMode = null;
-
-// Configuration
+let signupData = {}; // Store signup data between OTP steps
 const BACKEND_URL = 'https://letimail-production.up.railway.app';
-const DEV_MODE = true; // Set to false in production
 
-// DOM Elements Cache
-const elements = {
-  // Auth elements
-  loginBtn: null,
-  signupBtn: null,
-  userMenu: null,
-  authButtons: null,
-  logoutBtn: null,
-
-  // App elements
-  generateBtn: null,
-  copyBtn: null,
-  editBtn: null,
-  sendBtn: null,
-  outputDiv: null,
-  businessDesc: null,
-  context: null,
-  toneSelect: null,
-  emailLength: null,
-  actionButtons: null,
-
-  // Modals
-  authModals: null,
-  signupModal: null,
-  loginModal: null,
-  sendEmailModal: null,
-
-  // Settings elements
-  settingsPanels: null,
-  navItems: null,
-  profileForm: null,
-  preferencesForm: null,
-  toneManagement: null,
-
-  // Notification
-  notification: null
+// Onboarding state management
+let onboardingState = {
+  currentStep: 0,
+  toneEmails: []
 };
 
-// Tone Profile Manager
+// ========================================
+// TONE PROFILE MANAGER
+// ========================================
 const ToneProfileManager = {
   // Get all reference emails
   getReferenceEmails: function() {
@@ -78,7 +39,6 @@ const ToneProfileManager = {
       dateAdded: new Date().toISOString(),
       id: Date.now()
     });
-
     profile.trained = true;
     profile.lastUpdated = new Date().toISOString();
 
@@ -146,7 +106,7 @@ const ToneProfileManager = {
     return false;
   },
 
-  // Calculate text similarity
+  // Calculate text similarity (simple implementation)
   calculateSimilarity: function(text1, text2) {
     const words1 = text1.toLowerCase().split(/\s+/);
     const words2 = text2.toLowerCase().split(/\s+/);
@@ -159,7 +119,7 @@ const ToneProfileManager = {
     return intersection.size / union.size;
   },
 
-  // Analyze writing style
+  // Analyze writing style from reference emails
   analyzeWritingStyle: function(emails) {
     if (!emails || emails.length === 0) return null;
 
@@ -176,45 +136,33 @@ const ToneProfileManager = {
 
     // Formality indicators
     const contractions = (allText.match(/n't|'m|'re|'ve|'ll|'d/g) || []).length;
-    const formalWords = (allText.match(/\b(furthermore|moreover|therefore|consequently|nevertheless|hence|thus)\b/gi) || []).length;
-
-    // Sentiment analysis (simple)
-    const positiveWords = (allText.match(/\b(excellent|great|wonderful|fantastic|amazing|awesome|perfect|outstanding)\b/gi) || []).length;
-    const negativeWords = (allText.match(/\b(poor|bad|terrible|awful|horrible|disappointing)\b/gi) || []).length;
+    const formalWords = (allText.match(/\b(furthermore|moreover|therefore|consequently|nevertheless)\b/gi) || []).length;
 
     return {
-      avgSentenceLength: Math.round(avgSentenceLength),
-      avgWordLength: Math.round(avgWordLength),
+      avgSentenceLength,
+      avgWordLength,
       totalEmails: emails.length,
-      commonPhrases: commonPhrases.slice(0, 5),
+      commonPhrases,
       usesContractions: contractions > 5,
-      formalityScore: Math.min(100, Math.round(formalityWords / (words.length / 100) * 100)),
-      sentimentScore: positiveWords - negativeWords,
-      sentences: sentences.slice(0, 3).map(s => s.trim())
+      formalityScore: formalWords / (words.length / 100), // formal words per 100 words
+      sentences: sentences.slice(0, 10) // Sample sentences
     };
   },
 
-  // Extract common phrases
+  // Extract common phrases (2-3 word combinations)
   extractCommonPhrases: function(text) {
     const words = text.toLowerCase().split(/\s+/);
     const phrases = {};
 
-    // Extract 2-word phrases
-    for (let i = 0; i < words.length - 1; i++) {
+    for (let i = 0; i < words.length - 2; i++) {
       const phrase = `${words[i]} ${words[i + 1]}`;
       phrases[phrase] = (phrases[phrase] || 0) + 1;
     }
 
-    // Extract 3-word phrases
-    for (let i = 0; i < words.length - 2; i++) {
-      const phrase = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
-      phrases[phrase] = (phrases[phrase] || 0) + 1;
-    }
-
     return Object.entries(phrases)
-      .filter(([_, count]) => count > 1) // Only phrases that appear more than once
-      .sort((a, b) => b[1] - a[1]) // Sort by frequency
-      .slice(0, 10) // Take top 10
+      .filter(([_, count]) => count > 2)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
       .map(([phrase]) => phrase);
   },
 
@@ -228,707 +176,1153 @@ const ToneProfileManager = {
 
     const style = this.analyzeWritingStyle(refs.all);
 
-    let prompt = `\n\nWRITING STYLE GUIDELINES:
-The user has provided ${style.totalEmails} reference email${style.totalEmails !== 1 ? 's' : ''}. Adapt to their unique style:
-
+    let prompt = `\n\nIMPORTANT - WRITING STYLE ADAPTATION:
+The user has provided ${style.totalEmails} reference emails. Adapt to their unique style:
 WRITING CHARACTERISTICS:
-- Average sentence length: ${style.avgSentenceLength} words
-- Average word length: ${style.avgWordLength} characters
-- ${style.usesContractions ? 'Uses contractions frequently (e.g., I\'m, don\'t, can\'t)' : 'Prefers full forms (e.g., I am, do not, cannot)'}
-- Formality level: ${style.formalityScore > 70 ? 'High' : style.formalityScore > 40 ? 'Medium' : 'Low'}
-- Sentiment tendency: \${style.sentimentScore > 0 ? 'Positive' : style.sentimentScore < 0 ? 'Negative' : 'Neutral'}`;
-
+- Average sentence length: ${Math.round(style.avgSentenceLength)} words
+- ${style.usesContractions ? 'Uses contractions frequently (I\'m, don\'t, can\'t)' : 'Prefers full forms (I am, do not, cannot)'}
+- Formality level: ${style.formalityScore > 2 ? 'Formal' : style.formalityScore > 1 ? 'Professional' : 'Casual'}
+`;
     if (style.commonPhrases.length > 0) {
-      prompt += `
-COMMON PHRASES TO INCORPORATE:
-- "\${style.commonPhrases.join('"
-- "')}"`;
+      prompt += `- Common phrases to incorporate: "${style.commonPhrases.slice(0, 5).join('", "')}"
+`;
     }
-
+    // Add sample sentences
     if (style.sentences.length > 0) {
-      prompt += `
-EXAMPLE SENTENCES FROM USER:
-\${style.sentences.map((sentence, i) => `${i + 1}. "${sentence}"`).join('\n')}`;
+      prompt += `\nEXAMPLE SENTENCES FROM USER:
+`;
+      style.sentences.slice(0, 3).forEach((sentence, i) => {
+        prompt += `${i + 1}. "${sentence.trim()}"\n`;
+      });
     }
-
-    prompt += `
-MATCH THIS STYLE CLOSELY:
-- Use similar sentence structures and length
-- Maintain the same level of formality
-- Incorporate common phrases where natural
-- Preserve the overall tone and sentiment
-- Make it sound like the user wrote it themselves`;
+    prompt += `\nMATCH THIS STYLE CLOSELY: Use similar sentence structures, vocabulary level, and tone. Make it sound like the user wrote it themselves.`;
 
     return prompt;
   }
 };
 
-// Utility Functions
-function showNotification(title, message, type = 'info', duration = 5000) {
-  const notification = document.getElementById('notification');
-  if (!notification) {
-    console.log(`${type.toUpperCase()}: ${title} - ${message}`);
-    return;
-  }
+// ========================================
+// INITIALIZATION
+// ========================================
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
+});
 
-  const titleEl = notification.querySelector('.notification-title');
-  const messageEl = notification.querySelector('.notification-message');
-  const iconEl = notification.querySelector('.notification-icon');
+async function initializeApp() {
+    console.log('🔄 Initializing LetiMail...');
 
-  if (titleEl) titleEl.textContent = title;
-  if (messageEl) messageEl.textContent = message;
+    // Test backend connection first
+    const backendConnected = await testBackendConnection();
+    if (!backendConnected) {
+        showNotification('Warning', 'Backend connection issues detected. Some features may not work.', 'warning');
+    }
 
-  // Set notification type
-  notification.className = `notification ${type}`;
-  notification.classList.add('show');
+    await checkAuthState();
+    setupEventListeners();
+    setupNotification();
+    createAuthModals();
+    initializePageSpecificFeatures();
+    setupComingSoonButtons();
+    fixLoadingIndicator();
 
-  // Set appropriate icon
-  const icons = {
-    success: 'fas fa-check-circle',
-    error: 'fas fa-exclamation-circle',
-    warning: 'fas fa-exclamation-triangle',
-    info: 'fas fa-info-circle'
-  };
-
-  if (iconEl) {
-    iconEl.className = `notification-icon ${icons[type] || icons.info}`;
-  }
-
-  // Auto-hide after duration
-  setTimeout(() => {
-    notification.classList.remove('show');
-  }, duration);
+    updateEmailTracking();
+    console.log('✅ LetiMail initialized successfully');
 }
 
-function showButtonLoading(button) {
-  if (!button) return;
-
-  const btnText = button.querySelector('.btn-text');
-  const spinner = button.querySelector('.btn-spinner');
-
-  if (btnText) btnText.style.display = 'none';
-  if (spinner) spinner.style.display = 'block';
-  button.disabled = true;
-}
-
-function hideButtonLoading(button) {
-  if (!button) return;
-
-  const btnText = button.querySelector('.btn-text');
-  const spinner = button.querySelector('.btn-spinner');
-
-  if (btnText) btnText.style.display = 'block';
-  if (spinner) spinner.style.display = 'none';
-  button.disabled = false;
-}
-
-function cacheDOMElements() {
-  // Auth elements
-  elements.loginBtn = document.getElementById('loginBtn');
-  elements.signupBtn = document.getElementById('signupBtn');
-  elements.userMenu = document.getElementById('userMenu');
-  elements.authButtons = document.getElementById('authButtons');
-  elements.logoutBtn = document.getElementById('logoutBtn');
-
-  // App elements
-  elements.generateBtn = document.getElementById('generateBtn');
-  elements.copyBtn = document.getElementById('copyBtn');
-  elements.editBtn = document.getElementById('editBtn');
-  elements.sendBtn = document.getElementById('sendBtn');
-  elements.outputDiv = document.getElementById('output');
-  elements.businessDesc = document.getElementById('businessDesc');
-  elements.context = document.getElementById('context');
-  elements.toneSelect = document.getElementById('tone');
-  elements.emailLength = document.getElementById('emailLength');
-  elements.actionButtons = document.getElementById('actionButtons');
-
-  // Modals
-  elements.authModals = document.getElementById('authModals');
-  elements.signupModal = document.getElementById('signupModal');
-  elements.loginModal = document.getElementById('loginModal');
-
-  // Settings elements
-  elements.settingsPanels = document.getElementById('settings-panels');
-  elements.navItems = document.querySelectorAll('.nav-item');
-  elements.profileForm = document.getElementById('profileForm');
-  elements.preferencesForm = document.getElementById('preferencesForm');
-  elements.toneManagement = document.getElementById('toneManagement');
-
-  // Notification
-  elements.notification = document.getElementById('notification');
-}
-
-function setupEventListeners() {
-  // Auth buttons
-  if (elements.loginBtn) {
-    elements.loginBtn.addEventListener('click', showLoginModal);
-  }
-
-  if (elements.signupBtn) {
-    elements.signupBtn.addEventListener('click', showSignupModal);
-  }
-
-  if (elements.logoutBtn) {
-    elements.logoutBtn.addEventListener('click', handleLogout);
-  }
-
-  // User menu dropdown
-  const userAvatar = document.getElementById('userAvatar');
-  if (userAvatar) {
-    userAvatar.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const dropdown = userAvatar.nextElementSibling;
-      if (dropdown) {
-        dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-      }
-    });
-
-    document.addEventListener('click', () => {
-      const dropdowns = document.querySelectorAll('.dropdown-menu');
-      dropdowns.forEach(dropdown => {
-        dropdown.style.display = 'none';
-      });
-    });
-  }
-
-  // Form submissions
-  document.addEventListener('submit', function(e) {
-    if (e.target.id === 'loginForm') {
-      e.preventDefault();
-      handleLogin(e);
+// Test backend connection
+async function testBackendConnection() {
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/health`);
+        if (response.ok) {
+            console.log('✅ Backend connection successful');
+            return true;
+        } else {
+            console.error('❌ Backend connection failed');
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Backend connection error:', error);
+        return false;
     }
-    if (e.target.id === 'profileForm') {
-      e.preventDefault();
-      handleProfileUpdate(e);
-    }
-    if (e.target.id === 'preferencesForm') {
-      e.preventDefault();
-      handlePreferencesUpdate(e);
-    }
-  });
-
-  // Modal close buttons
-  document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('modal-close')) {
-      const modal = e.target.closest('.modal-overlay');
-      if (modal) modal.style.display = 'none';
-    }
-
-    if (e.target.id === 'showLoginFromSignup') {
-      e.preventDefault();
-      showLoginModal();
-    }
-
-    if (e.target.id === 'showSignupFromLogin') {
-      e.preventDefault();
-      showSignupModal();
-    }
-
-    if (e.target.classList.contains('modal-overlay')) {
-      hideAllModals();
-    }
-  });
-
-  // App buttons
-  if (elements.generateBtn) {
-    elements.generateBtn.addEventListener('click', generateEmailWithTone);
-  }
-
-  if (elements.copyBtn) {
-    elements.copyBtn.addEventListener('click', copyEmailToClipboard);
-  }
-
-  if (elements.editBtn) {
-    elements.editBtn.addEventListener('click', startEmailEditing);
-  }
-
-  if (elements.sendBtn) {
-    elements.sendBtn.addEventListener('click', showSendEmailModal);
-  }
-
-  // Settings navigation
-  if (elements.navItems) {
-    elements.navItems.forEach(item => {
-      item.addEventListener('click', function() {
-        const tab = this.getAttribute('data-tab');
-        switchSettingsTab(tab);
-      });
-    });
-  }
 }
 
 function initializePageSpecificFeatures() {
-  const currentPage = window.location.pathname;
+    const currentPage = window.location.pathname;
 
-  if (currentPage.includes('app.html')) {
-    setupEnhancedAppFunctions();
-    loadEmailHistory();
-  } else if (currentPage.includes('settings.html')) {
-    setupSettingsPage();
-    loadToneManagementUI();
-    loadUserPreferences();
-  }
-}
-
-// Auth Functions
-async function checkAuthState() {
-  authToken = localStorage.getItem('authToken');
-
-  if (!authToken) {
-    showAuthButtons();
-    return;
-  }
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      currentUser = data.user;
-
-      // Store user data in global state
-      toneProfile = currentUser.tone_profile || {};
-      userPreferences = currentUser.preferences || {};
-      emailHistory = [];
-
-      showUserMenu(currentUser);
-      updateEmailTracking();
-
-      // Update settings page if we're on settings.html
-      if (window.location.pathname.includes('settings.html')) {
-        updateSettingsPage();
-      }
-
-      // Check if user needs upgrade
-      if (currentUser.plan === 'free' && currentUser.emails_used >= 5) {
-        setTimeout(showUpgradePrompt, 2000);
-      }
-    } else {
-      // Token is invalid, clear it and show auth buttons
-      localStorage.removeItem('authToken');
-      authToken = null;
-      currentUser = null;
-      showAuthButtons();
-
-      // If we're on a protected page, redirect to index
-      if (window.location.pathname.includes('settings.html') ||
-          window.location.pathname.includes('app.html')) {
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 1000);
-      }
+    if (currentPage.includes('settings.html')) {
+        setupSettingsPage();
+        loadToneManagementUI(); // Load tone management immediately
+    } else if (currentPage.includes('app.html')) {
+        setupEnhancedAppFunctions();
+        // Add event listener for generate button
+        const generateBtn = document.getElementById('generateBtn');
+        if (generateBtn) {
+            generateBtn.addEventListener('click', generateEmailWithTone);
+        }
     }
-  } catch (error) {
-    console.error('Auth check error:', error);
-    localStorage.removeItem('authToken');
-    authToken = null;
-    currentUser = null;
-    showAuthButtons();
-  }
 }
 
-function showUserMenu(user) {
-  if (elements.userMenu) elements.userMenu.style.display = 'flex';
-  if (elements.authButtons) elements.authButtons.style.display = 'none';
+// ========================================
+// AUTH STATE MANAGEMENT
+// ========================================
+async function checkAuthState() {
+    authToken = localStorage.getItem('authToken');
 
-  updateUserAvatar(user.name || user.email);
-  updateUserInfo(user);
+    if (!authToken) {
+        showAuthButtons();
+        return;
+    }
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            currentUser = data.user;
+            showUserMenu(currentUser);
+
+            // Update settings page if we're on settings.html
+            if (window.location.pathname.includes('settings.html')) {
+                updateSettingsPage();
+            }
+
+            updateEmailTracking();
+
+            // Check if user needs upgrade
+            if (currentUser.plan === 'free' && currentUser.emails_used >= 5) {
+                setTimeout(() => {
+                    showUpgradePrompt();
+                }, 2000);
+            }
+        } else {
+            // Token is invalid, clear it and show auth buttons
+            localStorage.removeItem('authToken');
+            authToken = null;
+            currentUser = null;
+            showAuthButtons();
+
+            // If we're on a protected page, redirect to index
+            if (window.location.pathname.includes('settings.html') ||
+                window.location.pathname.includes('app.html')) {
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1000);
+            }
+        }
+    } catch (error) {
+        console.error('Auth check error:', error);
+        localStorage.removeItem('authToken');
+        authToken = null;
+        currentUser = null;
+        showAuthButtons();
+    }
+}
+
+// ========================================
+// UI MANAGEMENT
+// ========================================
+function showUserMenu(user) {
+    const userMenu = document.getElementById('userMenu');
+    const authButtons = document.getElementById('authButtons');
+
+    if (userMenu) userMenu.style.display = 'flex';
+    if (authButtons) authButtons.style.display = 'none';
+
+    updateUserAvatar(user.name || user.email);
+    updateUserInfo(user);
 }
 
 function showAuthButtons() {
-  if (elements.userMenu) elements.userMenu.style.display = 'none';
-  if (elements.authButtons) elements.authButtons.style.display = 'flex';
+    const userMenu = document.getElementById('userMenu');
+    const authButtons = document.getElementById('authButtons');
+
+    if (userMenu) userMenu.style.display = 'none';
+    if (authButtons) authButtons.style.display = 'flex';
 }
 
 function updateUserAvatar(userName) {
-  const avatarElements = document.querySelectorAll('#avatarText');
-  avatarElements.forEach(element => {
-    if (userName) {
-      element.textContent = userName.charAt(0).toUpperCase();
-    }
-  });
+    const avatarElements = document.querySelectorAll('#avatarText');
+    avatarElements.forEach(element => {
+        if (userName) {
+            element.textContent = userName.charAt(0).toUpperCase();
+        }
+    });
 }
 
 function updateUserInfo(user) {
-  const planElement = document.getElementById('planType');
-  if (planElement) {
-    planElement.textContent = user.plan ?
-      `${user.plan.charAt(0).toUpperCase() + user.plan.slice(1)} Plan` :
-      'Free Plan';
-  }
+    const planElement = document.getElementById('planType');
+    const emailCountElement = document.getElementById('emailCount');
 
-  updateEmailTracking();
+    if (planElement) {
+        planElement.textContent = user.plan ? `${user.plan.charAt(0).toUpperCase() + user.plan.slice(1)} Plan` : 'Free Plan';
+    }
+
+    updateEmailTracking();
 }
 
+// ========================================
+// EMAIL TRACKING & UPGRADE SYSTEM
+// ========================================
 function updateEmailTracking() {
-  if (!currentUser) return;
+    if (!currentUser) return;
+    const emailCountElement = document.getElementById('emailCount');
+    const emailsUsedElement = document.getElementById('emailsUsed');
 
-  const emailCountElement = document.getElementById('emailCount');
-  const emailsUsedElement = document.getElementById('emailsUsed');
-
-  if (emailCountElement) {
-    if (currentUser.plan === 'free') {
-      const emailsLeft = Math.max(0, 10 - (currentUser.emails_used || 0));
-      emailCountElement.textContent = `${emailsLeft} emails left`;
-    } else {
-      emailCountElement.textContent = 'Unlimited emails';
-    }
-  }
-
-  if (emailsUsedElement) {
-    emailsUsedElement.textContent = `${currentUser.emails_used || 0}/10`;
-  }
-}
-
-function handleLogout() {
-  authToken = null;
-  currentUser = null;
-  localStorage.removeItem('authToken');
-
-  showAuthButtons();
-  showNotification('Signed Out', 'You have been successfully signed out', 'info');
-
-  if (window.location.pathname.includes('app.html') ||
-      window.location.pathname.includes('settings.html')) {
-    setTimeout(() => {
-      window.location.href = 'index.html';
-    }, 1500);
-  }
-}
-
-function setupEnhancedAppFunctions() {
-  // Only run if we're on the app page
-  if (!document.getElementById('generateBtn')) return;
-
-  const copyBtn = document.getElementById('copyBtn');
-  const editBtn = document.getElementById('editBtn');
-  const sendBtn = document.getElementById('sendBtn');
-
-  // Copy button
-  if (copyBtn) {
-    copyBtn.onclick = function() {
-      const outputDiv = document.getElementById('output');
-      const text = outputDiv.innerText;
-      navigator.clipboard.writeText(text)
-        .then(() => showNotification('Copied!', 'Email copied to clipboard', 'success'))
-        .catch(() => showNotification('Error', 'Failed to copy email', 'error'));
-    };
-  }
-
-  // Edit button - SIMPLE VERSION
-  if (editBtn) {
-    editBtn.onclick = function() {
-      const outputDiv = document.getElementById('output');
-
-      // Store original content
-      const originalContent = outputDiv.innerHTML;
-
-      // Make editable
-      outputDiv.contentEditable = true;
-      outputDiv.focus();
-      outputDiv.style.outline = '2px solid #6366F1';
-      outputDiv.style.padding = '8px';
-
-      // Add save/cancel buttons
-      const actionButtons = document.getElementById('actionButtons');
-      if (actionButtons) {
-        // Change Edit to Save
-        editBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
-        editBtn.onclick = function() { saveEmailEdit(outputDiv, originalContent); };
-
-        // Add cancel button if not exists
-        if (!document.getElementById('cancelEditBtn')) {
-          const cancelBtn = document.createElement('button');
-          cancelBtn.id = 'cancelEditBtn';
-          cancelBtn.className = 'action-btn';
-          cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
-          cancelBtn.onclick = function() { cancelEmailEdit(outputDiv, originalContent); };
-          actionButtons.prepend(cancelBtn);
+    if (emailCountElement) {
+        if (currentUser.plan === 'free') {
+            const emailsLeft = Math.max(0, 5 - (currentUser.emails_used || 0));
+            emailCountElement.textContent = `${emailsLeft} emails left`;
+        } else {
+            emailCountElement.textContent = 'Unlimited emails';
         }
-      }
-    };
-  }
-
-  // Save function
-  function saveEmailEdit(outputDiv, originalContent) {
-    const editedText = outputDiv.innerText;
-    outputDiv.contentEditable = false;
-    outputDiv.style.outline = 'none';
-    outputDiv.style.padding = '0';
-
-    // Remove cancel button
-    const cancelBtn = document.getElementById('cancelEditBtn');
-    if (cancelBtn) cancelBtn.remove();
-
-    // Reset edit button
-    const editBtn = document.getElementById('editBtn');
-    if (editBtn) {
-      editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
-      editBtn.onclick = setupEnhancedAppFunctions;
     }
 
-    // Save the edited content
-    outputDiv.setAttribute('data-original-email', editedText);
-    showNotification('Saved', 'Your changes have been saved', 'success');
-  }
-
-  // Cancel function
-  function cancelEmailEdit(outputDiv, originalContent) {
-    outputDiv.contentEditable = false;
-    outputDiv.style.outline = 'none';
-    outputDiv.style.padding = '0';
-    outputDiv.innerHTML = originalContent;
-
-    // Remove cancel button
-    const cancelBtn = document.getElementById('cancelEditBtn');
-    if (cancelBtn) cancelBtn.remove();
-
-    // Reset edit button
-    const editBtn = document.getElementById('editBtn');
-    if (editBtn) {
-      editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
-      editBtn.onclick = setupEnhancedAppFunctions;
+    if (emailsUsedElement) {
+        emailsUsedElement.textContent = `${currentUser.emails_used || 0}/5`;
     }
-  }
-
-  // Send button
-  if (sendBtn) {
-    sendBtn.onclick = function() { showSendEmailModal(); };
-  }
 }
 
-// Updated sendOTP function
+function showUpgradePrompt() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'upgradeModal';
+
+    modal.innerHTML = `
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('upgradeModal')">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="upgrade-header">
+                <div class="upgrade-icon">🚀</div>
+                <h3>Upgrade to Premium</h3>
+                <p>You've used all your free emails. Upgrade to continue using LetiMail!</p>
+            </div>
+
+            <div class="upgrade-features">
+                <div class="upgrade-feature">
+                    <i class="fas fa-infinity"></i>
+                    <div>
+                        <strong>Unlimited Email Generation</strong>
+                        <span>No more limits on how many emails you can create</span>
+                    </div>
+                </div>
+                <div class="upgrade-feature">
+                    <i class="fas fa-bolt"></i>
+                    <div>
+                        <strong>Priority Generation</strong>
+                        <span>Faster email generation with premium priority</span>
+                    </div>
+                </div>
+                <div class="upgrade-feature">
+                    <i class="fas fa-star"></i>
+                    <div>
+                        <strong>Advanced Tone Matching</strong>
+                        <span>Enhanced AI that better matches your writing style</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="upgrade-actions">
+                <button class="upgrade-btn primary" onclick="startPremiumUpgrade()">
+                    <i class="fas fa-crown"></i>
+                    Upgrade to Premium - $9.99/month
+                </button>
+                <button class="upgrade-btn secondary" onclick="closeModal('upgradeModal')">
+                    Maybe Later
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+}
+
+function startPremiumUpgrade() {
+    showNotification('Coming Soon', 'Premium upgrade functionality will be available soon!', 'info');
+    closeModal('upgradeModal');
+}
+
+// ========================================
+// DELETE ACCOUNT FUNCTIONALITY
+// ========================================
+async function handleDeleteAccount() {
+    if (!confirm('Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.')) {
+        return;
+    }
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/delete-account`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        if (response.ok) {
+            showNotification('Account Deleted', 'Your account has been successfully deleted.', 'success');
+            handleLogout();
+        } else {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to delete account');
+        }
+    } catch (error) {
+        showNotification('Error', error.message, 'error');
+    }
+}
+
+// ========================================
+// COMING SOON BUTTONS
+// ========================================
+function setupComingSoonButtons() {
+    // Add coming soon functionality to all buttons without specific functions
+    const comingSoonButtons = [
+        '#upgradePremiumBtn',
+        '.plan-button:not([onclick])',
+        '.secondary-cta',
+        '.footer a:not([href^="#"])',
+        '.social-links a'
+    ];
+    comingSoonButtons.forEach(selector => {
+        document.querySelectorAll(selector).forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                showNotification('Coming Soon', 'This feature is under development and will be available soon!', 'info');
+            });
+        });
+    });
+    // Add delete account button listener
+    const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+    if (deleteAccountBtn) {
+        deleteAccountBtn.addEventListener('click', handleDeleteAccount);
+    }
+}
+
+// ========================================
+// AUTH MODALS CREATION
+// ========================================
+function createAuthModals() {
+    const authModals = document.getElementById('authModals');
+    if (!authModals) return;
+    authModals.innerHTML = `
+        <!-- Signup Modal -->
+        <div id="signupModal" class="modal-overlay" style="display: none;">
+            <div class="modal-content auth-modal">
+                <button class="modal-close" onclick="hideAuthModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="auth-header">
+                    <h3>Create Your Account</h3>
+                    <p>Join thousands of professionals using LetiMail</p>
+                </div>
+
+                <!-- Step 1: Basic Info -->
+                <form id="signupForm" class="auth-form" style="display: block;">
+                    <div class="input-group">
+                        <label for="signupName">Full Name</label>
+                        <input type="text" id="signupName" required class="auth-input" placeholder="Enter your full name">
+                    </div>
+                    <div class="input-group">
+                        <label for="signupEmail">Email</label>
+                        <input type="email" id="signupEmail" required class="auth-input" placeholder="Enter your email">
+                    </div>
+                    <div class="input-group">
+                        <label for="signupPassword">Password</label>
+                        <input type="password" id="signupPassword" required class="auth-input" placeholder="Create a password (min. 6 characters)" minlength="6">
+                    </div>
+                    <button type="button" class="auth-btn primary" onclick="sendOTP()">
+                        <span class="btn-text">Send Verification Code</span>
+                        <div class="btn-spinner"></div>
+                    </button>
+                </form>
+                <!-- Step 2: OTP Verification -->
+                <form id="otpForm" class="auth-form" style="display: none;">
+                    <div class="input-group">
+                        <label for="otpCode">Verification Code</label>
+                        <div class="otp-input-container">
+                            <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="Enter 6-digit code" maxlength="6" pattern="[0-9]{6}">
+                            <button type="button" class="otp-resend" id="resendOtp" onclick="sendOTP()">Resend</button>
+                        </div>
+                        <span class="otp-hint">Check your email for the verification code</span>
+                    </div>
+                    <button type="button" class="auth-btn primary" onclick="verifyOTPAndRegister()">
+                        <span class="btn-text">Verify & Create Account</span>
+                        <div class="btn-spinner"></div>
+                    </button>
+                </form>
+                <div class="auth-footer">
+                    <p>Already have an account? <a href="#" id="showLoginFromSignup">Sign in</a></p>
+                </div>
+            </div>
+        </div>
+        <!-- Login Modal -->
+        <div id="loginModal" class="modal-overlay" style="display: none;">
+            <div class="modal-content auth-modal">
+                <button class="modal-close" onclick="hideAuthModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="auth-header">
+                    <h3>Welcome Back</h3>
+                    <p>Sign in to your LetiMail account</p>
+                </div>
+                <form id="loginForm" class="auth-form">
+                    <div class="input-group">
+                        <label for="loginEmail">Email</label>
+                        <input type="email" id="loginEmail" required class="auth-input" placeholder="Enter your email">
+                    </div>
+                    <div class="input-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" required class="auth-input" placeholder="Enter your password">
+                    </div>
+                    <button type="submit" class="auth-btn primary">
+                        <span class="btn-text">Sign In</span>
+                        <div class="btn-spinner"></div>
+                    </button>
+                </form>
+                <div class="auth-footer">
+                    <p>Don't have an account? <a href="#" id="showSignupFromLogin">Sign up</a></p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// ========================================
+// OTP VERIFICATION
+// ========================================
 async function sendOTP() {
-  const email = document.getElementById('signupEmail').value;
-  const name = document.getElementById('signupName').value;
-  const password = document.getElementById('signupPassword').value;
-
-  if (!name || !email || !password) {
-    showNotification('Error', 'Please fill in all fields', 'error');
-    return;
-  }
-
-  if (password.length < 6) {
-    showNotification('Error', 'Password must be at least 6 characters', 'error');
-    return;
-  }
-
-  const sendOtpBtn = document.querySelector('#signupForm .auth-btn');
-  showButtonLoading(sendOtpBtn);
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/auth/send-otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      // Store signup data for next step
-      signupData = { name, email, password };
-
-      // Switch to OTP form
-      document.getElementById('signupForm').style.display = 'none';
-      document.getElementById('otpForm').style.display = 'block';
-
-      showNotification('Success', `Verification code sent to ${email}`, 'success');
-      startResendTimer();
-
-    } else {
-      throw new Error(data.error || 'Failed to send verification code');
+    const email = document.getElementById('signupEmail').value;
+    const name = document.getElementById('signupName').value;
+    const password = document.getElementById('signupPassword').value;
+    if (!name || !email || !password) {
+        showNotification('Error', 'Please fill in all fields', 'error');
+        return;
     }
-
-  } catch (error) {
-    showNotification('Error', error.message, 'error');
-    console.error('OTP Error:', error);
-  } finally {
-    hideButtonLoading(sendOtpBtn);
-  }
-}
-
-// Updated OTP verification
-async function verifyOTPAndRegister() {
-  const otp = document.getElementById('otpCode').value;
-  if (!otp || otp.length !== 6) {
-    showNotification('Error', 'Please enter a valid 6-digit code', 'error');
-    return;
-  }
-
-  const verifyBtn = document.querySelector('#otpForm .auth-btn');
-  showButtonLoading(verifyBtn);
-
-  try {
-    // First verify the OTP
-    const verifyResponse = await fetch(`${BACKEND_URL}/api/auth/verify-otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: signupData.email,
-        otp: otp
-      })
-    });
-
-    const verifyData = await verifyResponse.json();
-
-    if (!verifyResponse.ok) {
-      throw new Error(verifyData.error || 'OTP verification failed');
+    if (password.length < 6) {
+        showNotification('Error', 'Password must be at least 6 characters', 'error');
+        return;
     }
+    const sendOtpBtn = document.querySelector('#signupForm .auth-btn');
+    showButtonLoading(sendOtpBtn);
+    signupData = { name, email, password };
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/send-otp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+        if (response.ok) {
+            document.getElementById('signupForm').style.display = 'none';
+            document.getElementById('otpForm').style.display = 'block';
 
-    // Then register the user
-    const registerResponse = await fetch(`${BACKEND_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...signupData,
-        otp: otp
-      })
-    });
-
-    const registerData = await registerResponse.json();
-
-    if (registerResponse.ok) {
-      authToken = registerData.token;
-      localStorage.setItem('authToken', authToken);
-      currentUser = registerData.user;
-
-      showNotification('Success', 'Account created successfully!', 'success');
-      hideAuthModal();
-      showUserMenu(currentUser);
-      updateEmailTracking();
-
-      // Redirect or show onboarding
-      handlePostAuthRedirect();
-
-    } else {
-      throw new Error(registerData.error || 'Registration failed');
+            showNotification('Success', `Verification code sent to ${email}`, 'success');
+            startResendTimer();
+        } else {
+            throw new Error(data.error || 'Failed to send verification code');
+        }
+    } catch (error) {
+        showNotification('Error', error.message, 'error');
+    } finally {
+        hideButtonLoading(sendOtpBtn);
     }
-
-  } catch (error) {
-    showNotification('Error', error.message, 'error');
-    console.error('Registration Error:', error);
-  } finally {
-    hideButtonLoading(verifyBtn);
-  }
 }
 
 async function verifyOTPAndRegister() {
-  const otp = document.getElementById('otpCode').value;
-  if (!otp || otp.length !== 6) {
-    showNotification('Error', 'Please enter a valid 6-digit code', 'error');
-    return;
-  }
-
-  const verifyBtn = document.querySelector('#otpForm .auth-btn');
-  showButtonLoading(verifyBtn);
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: signupData.name,
-        email: signupData.email,
-        password: signupData.password,
-        otp: otp
-      })
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      authToken = data.token;
-      localStorage.setItem('authToken', authToken);
-      currentUser = data.user;
-
-      showNotification('Success', 'Account created successfully!', 'success');
-      hideAuthModal();
-      showUserMenu(currentUser);
-      updateEmailTracking();
-
-      // Redirect to app
-      window.location.href = 'app.html';
-    } else {
-      throw new Error(data.error || 'Registration failed');
+    const otp = document.getElementById('otpCode').value;
+    if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
+        showNotification('Error', 'Please enter a valid 6-digit code', 'error');
+        return;
     }
-  } catch (error) {
-    showNotification('Error', error.message, 'error');
-  } finally {
-    hideButtonLoading(verifyBtn);
-  }
+    const verifyBtn = document.querySelector('#otpForm .auth-btn');
+    showButtonLoading(verifyBtn);
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ...signupData,
+                otp: otp
+            })
+        });
+        const data = await response.json();
+        if (response.ok) {
+            authToken = data.token;
+            localStorage.setItem('authToken', authToken);
+            currentUser = data.user;
+
+            showNotification('Success', 'Account created successfully!', 'success');
+            hideAuthModal();
+            showUserMenu(currentUser);
+            updateEmailTracking();
+
+            signupData = {};
+
+            // Use improved redirect handling
+            handlePostAuthRedirect();
+
+        } else {
+            throw new Error(data.error || 'Registration failed');
+        }
+    } catch (error) {
+        showNotification('Error', error.message, 'error');
+    } finally {
+        hideButtonLoading(verifyBtn);
+    }
 }
 
 function startResendTimer() {
-  const resendBtn = document.getElementById('resendOtp');
-  if (!resendBtn) return;
+    const resendBtn = document.getElementById('resendOtp');
+    if (!resendBtn) return;
 
-  let timeLeft = 60;
+    let timeLeft = 60;
 
-  resendBtn.disabled = true;
-  resendBtn.textContent = `Resend in ${timeLeft}s`;
-
-  const timer = setInterval(() => {
-    timeLeft--;
+    resendBtn.disabled = true;
     resendBtn.textContent = `Resend in ${timeLeft}s`;
 
-    if (timeLeft <= 0) {
-      clearInterval(timer);
-      resendBtn.disabled = false;
-      resendBtn.textContent = 'Resend';
-    }
-  }, 1000);
+    const timer = setInterval(() => {
+        timeLeft--;
+        resendBtn.textContent = `Resend in ${timeLeft}s`;
+
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            resendBtn.disabled = false;
+            resendBtn.textContent = 'Resend';
+        }
+    }, 1000);
 }
 
-// Email Generation Functions
+// ========================================
+// IMPROVED ONBOARDING REDIRECT
+// ========================================
+function handlePostAuthRedirect() {
+    const onboardingComplete = localStorage.getItem('letimail_onboarding_complete');
+
+    if (!onboardingComplete) {
+        // Show onboarding modal instead of redirecting immediately
+        setTimeout(() => {
+            showOnboardingModal();
+        }, 1000);
+    } else {
+        // If onboarding is complete, show success and let user choose where to go
+        showNotification('Welcome!', 'Successfully signed in. You can start generating emails or manage your settings.', 'success');
+    }
+}
+
+// ========================================
+// ONBOARDING SYSTEM
+// ========================================
+function createOnboardingModal() {
+  const modal = document.createElement('div');
+  modal.id = 'onboardingModal';
+  modal.className = 'modal-overlay onboarding-modal';
+  modal.style.display = 'none';
+
+  modal.innerHTML = `
+    <div class="modal-content onboarding-content">
+      <div class="onboarding-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" id="onboardingProgress"></div>
+        </div>
+        <span class="progress-text" id="progressText">Step 1 of 3</span>
+      </div>
+
+      <!-- Step 1: Data Usage & Privacy -->
+      <div class="onboarding-step active" id="step1">
+        <div class="onboarding-header">
+          <div class="onboarding-icon">🔒</div>
+          <h2>Welcome to LetiMail! Let's Get Started.</h2>
+          <h3>Your Privacy is Our Priority</h3>
+        </div>
+
+        <div class="onboarding-body">
+          <p>To help LetiMail generate emails that sound authentically like you, we use the emails you provide to learn your unique writing style, including your tone, phrasing, and formality.</p>
+
+          <div class="info-box">
+            <h4>We want to be perfectly clear about how we handle your data:</h4>
+            <ul class="info-list">
+              <li>
+                <span class="check-icon">✓</span>
+                <div>
+                  <strong>Your emails are secure and private.</strong> They are used solely to create your personal tone profile.
+                </div>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <div>
+                  <strong>We do not train our general AI models</strong> on your personal data.
+                </div>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <div>
+                  <strong>You are in control.</strong> You can view, manage, or permanently delete your data at any time in your account settings.
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <p class="agreement-text">By clicking 'I Understand,' you agree to this use of your data to personalize your experience.</p>
+        </div>
+
+        <div class="onboarding-actions">
+          <button class="onboarding-btn primary" onclick="nextOnboardingStep()">
+            I Understand & Next
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: AI Generation Disclaimer -->
+      <div class="onboarding-step" id="step2">
+        <div class="onboarding-header">
+          <div class="onboarding-icon">🤖</div>
+          <h2>AI as Your Assistant</h2>
+        </div>
+
+        <div class="onboarding-body">
+          <p>LetiMail is a powerful AI tool, but it's not perfect.</p>
+
+          <div class="warning-box">
+            <div class="warning-item">
+              <strong>⚠️ Please Review Before Sending:</strong>
+              <p>Always proofread and edit generated emails. You are responsible for the final content of all messages you send.</p>
+            </div>
+
+            <div class="warning-item">
+              <strong>🔍 Check for Accuracy:</strong>
+              <p>AI can make mistakes. Ensure all names, dates, facts, and links are correct.</p>
+            </div>
+
+            <div class="warning-item">
+              <strong>🎯 Use Your Judgment:</strong>
+              <p>The AI provides suggestions. It is your responsibility to ensure the content is appropriate, professional, and free of sensitive information.</p>
+            </div>
+          </div>
+
+          <p class="disclaimer-footer">LetiMail is designed to assist you, not to replace your critical oversight.</p>
+        </div>
+
+        <div class="onboarding-actions">
+          <button class="onboarding-btn secondary" onclick="previousOnboardingStep()">
+            Back
+          </button>
+          <button class="onboarding-btn primary" onclick="nextOnboardingStep()">
+            I Agree & Continue
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Tone System Setup -->
+      <div class="onboarding-step" id="step3">
+        <div class="onboarding-header">
+          <div class="onboarding-icon">✍️</div>
+          <h2>Train Your Personal Writing Style</h2>
+          <p class="step-description">Help LetiMail learn your unique voice by providing examples of emails you've written before.</p>
+        </div>
+
+        <div class="onboarding-body">
+          <div class="tone-input-section">
+            <label for="toneEmailInput">
+              <strong>Paste a previous email you've sent</strong>
+              <span class="label-hint">Include the full email content (you can provide up to 5 examples)</span>
+            </label>
+            <textarea
+              id="toneEmailInput"
+              class="tone-email-textarea"
+              placeholder="Paste your email here... (Include subject line and body)"
+              rows="8"
+            ></textarea>
+
+            <button class="add-email-btn" onclick="addToneEmail()" id="addEmailBtn">
+              <span class="btn-icon">➕</span>
+              Add Email (<span id="emailCount">0</span>/5)
+            </button>
+          </div>
+
+          <div class="added-emails" id="addedEmailsList">
+            <!-- Added emails will appear here -->
+          </div>
+
+          <div class="info-note">
+            <span class="info-icon">💡</span>
+            <p><strong>Tip:</strong> The more diverse examples you provide, the better LetiMail can adapt to your style. You can add more examples later in Settings.</p>
+          </div>
+        </div>
+
+        <div class="onboarding-actions">
+          <button class="onboarding-btn secondary" onclick="previousOnboardingStep()">
+            Back
+          </button>
+          <button class="onboarding-btn tertiary" onclick="skipToneSetup()">
+            Skip for Now
+          </button>
+          <button class="onboarding-btn primary" onclick="finishOnboarding()" id="finishBtn" disabled>
+            Finish Setup
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+}
+
+function showOnboardingModal() {
+  let modal = document.getElementById('onboardingModal');
+  if (!modal) {
+    createOnboardingModal();
+    modal = document.getElementById('onboardingModal');
+  }
+
+  onboardingState = {
+    currentStep: 0,
+    toneEmails: []
+  };
+
+  updateOnboardingProgress();
+  document.querySelectorAll('.onboarding-step').forEach(step => {
+    step.classList.remove('active');
+  });
+  document.getElementById('step1').classList.add('active');
+
+  modal.style.display = 'flex';
+}
+
+function updateOnboardingProgress() {
+  const progress = ((onboardingState.currentStep + 1) / 3) * 100;
+  const progressFill = document.getElementById('onboardingProgress');
+  const progressText = document.getElementById('progressText');
+
+  if (progressFill) progressFill.style.width = `${progress}%`;
+  if (progressText) progressText.textContent = `Step ${onboardingState.currentStep + 1} of 3`;
+}
+
+function nextOnboardingStep() {
+  if (onboardingState.currentStep < 2) {
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.remove('active');
+    onboardingState.currentStep++;
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.add('active');
+    updateOnboardingProgress();
+  }
+}
+
+function previousOnboardingStep() {
+  if (onboardingState.currentStep > 0) {
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.remove('active');
+    onboardingState.currentStep--;
+    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.add('active');
+    updateOnboardingProgress();
+  }
+}
+
+function addToneEmail() {
+  const textarea = document.getElementById('toneEmailInput');
+  const emailContent = textarea.value.trim();
+
+  if (!emailContent) {
+    showNotification('Error', 'Please paste an email before adding', 'error');
+    return;
+  }
+
+  if (onboardingState.toneEmails.length >= 5) {
+    showNotification('Limit Reached', 'You can add up to 5 email examples', 'warning');
+    return;
+  }
+
+  onboardingState.toneEmails.push(emailContent);
+  updateAddedEmailsList();
+  textarea.value = '';
+
+  document.getElementById('emailCount').textContent = onboardingState.toneEmails.length;
+  document.getElementById('finishBtn').disabled = false;
+
+  if (onboardingState.toneEmails.length >= 5) {
+    document.getElementById('addEmailBtn').disabled = true;
+    document.getElementById('toneEmailInput').disabled = true;
+  }
+
+  showNotification('Added', `Email ${onboardingState.toneEmails.length} added successfully`, 'success');
+}
+
+function updateAddedEmailsList() {
+  const list = document.getElementById('addedEmailsList');
+  if (!list) return;
+
+  if (onboardingState.toneEmails.length === 0) {
+    list.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = '<h4 class="added-emails-title">Added Emails:</h4>';
+
+  onboardingState.toneEmails.forEach((email, index) => {
+    const preview = email.substring(0, 100) + (email.length > 100 ? '...' : '');
+
+    const emailCard = document.createElement('div');
+    emailCard.className = 'added-email-card';
+    emailCard.innerHTML = `
+      <div class="email-card-header">
+        <span class="email-number">Email ${index + 1}</span>
+        <button class="remove-email-btn" onclick="removeToneEmail(${index})">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="email-preview">${preview}</div>
+    `;
+
+    list.appendChild(emailCard);
+  });
+}
+
+function removeToneEmail(index) {
+  onboardingState.toneEmails.splice(index, 1);
+  updateAddedEmailsList();
+
+  document.getElementById('emailCount').textContent = onboardingState.toneEmails.length;
+  document.getElementById('addEmailBtn').disabled = false;
+  document.getElementById('toneEmailInput').disabled = false;
+
+  if (onboardingState.toneEmails.length === 0) {
+    document.getElementById('finishBtn').disabled = true;
+  }
+}
+
+function skipToneSetup() {
+  if (confirm('Are you sure you want to skip? You can add email examples later in Settings to improve your personalized tone.')) {
+    completeOnboarding(false);
+  }
+}
+
+async function finishOnboarding() {
+  if (onboardingState.toneEmails.length === 0) {
+    showNotification('No Emails Added', 'Please add at least one email example or click "Skip for Now"', 'warning');
+    return;
+  }
+
+  completeOnboarding(true);
+}
+
+async function completeOnboarding(withToneData) {
+  const finishBtn = document.getElementById('finishBtn');
+  if (finishBtn) {
+    finishBtn.disabled = true;
+    finishBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
+  }
+
+  try {
+    if (withToneData && onboardingState.toneEmails.length > 0) {
+      // Save to ToneProfileManager
+      onboardingState.toneEmails.forEach(email => {
+        ToneProfileManager.addTrainingEmail(email);
+      });
+
+      showNotification('Success', `${onboardingState.toneEmails.length} email examples saved! Your personalized tone is ready.`, 'success');
+    } else {
+      showNotification('Setup Complete', 'You can add email examples later in Settings to personalize your tone.', 'info');
+    }
+
+    localStorage.setItem('letimail_onboarding_complete', 'true');
+
+    setTimeout(() => {
+      const modal = document.getElementById('onboardingModal');
+      if (modal) modal.style.display = 'none';
+
+      // Don't force redirect, let user stay where they are
+      showNotification('Ready!', 'Your LetiMail account is now fully set up.', 'success');
+    }, 1500);
+
+  } catch (error) {
+    console.error('Onboarding completion error:', error);
+    showNotification('Error', 'Failed to complete setup. Please try again.', 'error');
+
+    if (finishBtn) {
+      finishBtn.disabled = false;
+      finishBtn.innerHTML = 'Finish Setup';
+    }
+  }
+}
+
+// ========================================
+// EVENT LISTENERS SETUP
+// ========================================
+function setupEventListeners() {
+    document.getElementById('loginBtn')?.addEventListener('click', showLoginModal);
+    document.getElementById('signupBtn')?.addEventListener('click', showSignupModal);
+
+    document.addEventListener('submit', function(e) {
+        if (e.target.id === 'loginForm') {
+            e.preventDefault();
+            handleLogin(e);
+        }
+        if (e.target.id === 'profileForm') {
+            e.preventDefault();
+            handleProfileUpdate(e);
+        }
+        if (e.target.id === 'preferencesForm') {
+            e.preventDefault();
+            handlePreferencesUpdate(e);
+        }
+        if (e.target.id === 'passwordForm') {
+            e.preventDefault();
+            handlePasswordChange(e);
+        }
+    });
+    document.addEventListener('click', function(e) {
+        if (e.target.id === 'showLoginFromSignup' || e.target.id === 'showSignupFromLogin') {
+            e.preventDefault();
+            if (e.target.id === 'showLoginFromSignup') showLoginModal();
+            if (e.target.id === 'showSignupFromLogin') showSignupModal();
+        }
+        if (e.target.classList.contains('modal-overlay')) {
+            hideAuthModal();
+        }
+    });
+    document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
+    const userAvatar = document.getElementById('userAvatar');
+    if (userAvatar) {
+        userAvatar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dropdown = userAvatar.nextElementSibling;
+            if (dropdown) {
+                dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+            }
+        });
+        document.addEventListener('click', () => {
+            const dropdowns = document.querySelectorAll('.dropdown-menu');
+            dropdowns.forEach(dropdown => {
+                dropdown.style.display = 'none';
+            });
+        });
+    }
+}
+
+// ========================================
+// MODAL FUNCTIONS
+// ========================================
+function showSignupModal() {
+    hideAllModals();
+    const signupModal = document.getElementById('signupModal');
+    if (signupModal) {
+        signupModal.style.display = 'flex';
+    }
+    resetForms();
+}
+
+function showLoginModal() {
+    hideAllModals();
+    const loginModal = document.getElementById('loginModal');
+    if (loginModal) {
+        loginModal.style.display = 'flex';
+    }
+    resetForms();
+}
+
+function hideAuthModal() {
+    hideAllModals();
+    resetForms();
+}
+
+function hideAllModals() {
+    const modals = document.querySelectorAll('.modal-overlay');
+    modals.forEach(modal => {
+        if (modal) modal.style.display = 'none';
+    });
+}
+
+function resetForms() {
+    const forms = document.querySelectorAll('.auth-form');
+    forms.forEach(form => {
+        if (form) {
+            form.reset();
+            const button = form.querySelector('.auth-btn');
+            if (button) {
+                hideButtonLoading(button);
+            }
+        }
+    });
+
+    const signupForm = document.getElementById('signupForm');
+    const otpForm = document.getElementById('otpForm');
+    if (signupForm) signupForm.style.display = 'block';
+    if (otpForm) otpForm.style.display = 'none';
+
+    signupData = {};
+}
+
+function showButtonLoading(button) {
+    if (!button) return;
+    const btnText = button.querySelector('.btn-text');
+    const spinner = button.querySelector('.btn-spinner');
+
+    if (btnText) btnText.style.display = 'none';
+    if (spinner) spinner.style.display = 'block';
+    button.disabled = true;
+}
+
+function hideButtonLoading(button) {
+    if (!button) return;
+    const btnText = button.querySelector('.btn-text');
+    const spinner = button.querySelector('.btn-spinner');
+
+    if (btnText) btnText.style.display = 'block';
+    if (spinner) spinner.style.display = 'none';
+    button.disabled = false;
+}
+
+// ========================================
+// NOTIFICATION SYSTEM
+// ========================================
+function setupNotification() {
+    const notification = document.getElementById('notification');
+    if (!notification) return;
+
+    const closeBtn = notification.querySelector('.notification-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideNotification);
+    }
+    notification.addEventListener('animationend', (e) => {
+        if (e.animationName === 'notificationSlideIn' && notification.classList.contains('show')) {
+            setTimeout(hideNotification, 5000);
+        }
+    });
+}
+
+function showNotification(title, message, type = 'info') {
+    const notification = document.getElementById('notification');
+    if (!notification) {
+        console.log(`${type.toUpperCase()}: ${title} - ${message}`);
+        return;
+    }
+
+    const titleEl = notification.querySelector('.notification-title');
+    const messageEl = notification.querySelector('.notification-message');
+    const iconEl = notification.querySelector('.notification-icon');
+
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    notification.className = `notification show ${type}`;
+
+    const icons = {
+        success: 'fas fa-check-circle',
+        error: 'fas fa-exclamation-circle',
+        warning: 'fas fa-exclamation-triangle',
+        info: 'fas fa-info-circle'
+    };
+
+    if (iconEl) {
+        iconEl.className = `notification-icon ${icons[type] || icons.info}`;
+    }
+
+    setTimeout(hideNotification, 5000);
+}
+
+function hideNotification() {
+    const notification = document.getElementById('notification');
+    if (notification) {
+        notification.classList.remove('show');
+    }
+}
+
+// ========================================
+// AUTH HANDLERS
+// ========================================
+async function handleLogin(e) {
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
+
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await response.json();
+        if (response.ok) {
+            authToken = data.token;
+            localStorage.setItem('authToken', authToken);
+            currentUser = data.user;
+
+            showNotification('Welcome Back!', 'Successfully signed in', 'success');
+            hideAuthModal();
+            showUserMenu(currentUser);
+            updateEmailTracking();
+
+            // Use improved redirect handling
+            handlePostAuthRedirect();
+        } else {
+            throw new Error(data.error || 'Login failed');
+        }
+
+    } catch (error) {
+        showNotification('Login Failed', error.message, 'error');
+    } finally {
+        hideButtonLoading(button);
+    }
+}
+
+function handleLogout() {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('authToken');
+
+    showAuthButtons();
+    showNotification('Signed Out', 'You have been successfully signed out', 'info');
+
+    if (window.location.pathname.includes('app.html') || window.location.pathname.includes('settings.html')) {
+        setTimeout(() => {
+            window.location.href = 'index.html';
+        }, 1500);
+    }
+}
+
+function handleGetStarted() {
+    if (currentUser) {
+        window.location.href = 'app.html';
+    } else {
+        showSignupModal();
+    }
+}
+
+// ========================================
+// EMAIL GENERATION WITH TONE MATCHING
+// ========================================
 async function generateEmailWithTone() {
   if (!currentUser || !authToken) {
     showNotification('Authentication Required', 'Please sign in to generate emails', 'error');
     showLoginModal();
     return;
   }
-
   // Check email limits for free users
-  if (currentUser.plan === 'free' && currentUser.emails_used >= 10) {
+  if (currentUser.plan === 'free' && currentUser.emails_used >= 5) {
     showUpgradePrompt();
     return;
   }
-
-  const business = elements.businessDesc?.value;
-  const context = elements.context?.value;
-  const tone = elements.toneSelect?.value;
-  const emailLength = elements.emailLength?.value || 'medium';
-
+  const business = document.getElementById('businessDesc')?.value;
+  const context = document.getElementById('context')?.value;
+  const tone = document.getElementById('tone')?.value;
+  const emailLength = document.getElementById('emailLength')?.value || 'medium';
   if (!business || !context) {
     showNotification('Error', 'Please fill in all fields', 'error');
     return;
   }
+  const generateBtn = document.getElementById('generateBtn');
+  const outputDiv = document.getElementById('output');
+  const actionButtons = document.getElementById('actionButtons');
+  if (!generateBtn || !outputDiv) return;
+  generateBtn.disabled = true;
+  generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Generating...';
+  outputDiv.innerHTML = '<div class="output-placeholder"><div class="placeholder-animation"><div class="animation-ring"></div><div class="placeholder-icon">✉️</div></div><p>Analyzing your writing style...</p><small>Generating personalized email</small></div>';
 
-  if (elements.generateBtn && elements.outputDiv) {
-    elements.generateBtn.disabled = true;
-    elements.generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Generating...';
-    elements.outputDiv.innerHTML = `
-      <div class="output-placeholder">
-        <div class="placeholder-animation">
-          <div class="animation-ring"></div>
-          <div class="placeholder-icon">✉️</div>
-        </div>
-        <p>Generating your personalized email...</p>
-        <small>Analyzing your input and writing style</small>
-      </div>
-    `;
-
-    if (elements.actionButtons) {
-      elements.actionButtons.style.display = 'none';
-    }
-  }
-
+  if (actionButtons) actionButtons.style.display = 'none';
   try {
     const stylePrompt = ToneProfileManager.generateStylePrompt();
 
@@ -946,18 +1340,13 @@ async function generateEmailWithTone() {
         stylePrompt: stylePrompt
       })
     });
-
     const data = await response.json();
 
     if (response.ok) {
-      if (elements.outputDiv) {
-        elements.outputDiv.innerText = data.email;
-        elements.outputDiv.setAttribute('data-original-email', data.email);
-      }
+      outputDiv.innerText = data.email;
+      outputDiv.setAttribute('data-original-email', data.email);
 
-      if (elements.actionButtons) {
-        elements.actionButtons.style.display = 'flex';
-      }
+      if (actionButtons) actionButtons.style.display = 'flex';
 
       const refs = ToneProfileManager.getReferenceEmails();
       const refCount = refs.all.length;
@@ -965,206 +1354,149 @@ async function generateEmailWithTone() {
       showNotification(
         'Success',
         refCount > 0
-          ? `Email generated using ${refCount} reference example${refCount !== 1 ? 's' : ''}!`
+          ? `Email generated using ${refCount} reference example${refCount > 1 ? 's' : ''}!`
           : 'Email generated successfully!',
         'success'
       );
 
       // Update email count
       await checkAuthState();
-      loadEmailHistory();
     } else {
-      throw new Error(data.error || 'Failed to generate email');
+      throw new Error(data.email || 'Failed to generate email');
     }
   } catch (error) {
     console.error('Generation error:', error);
-    if (elements.outputDiv) {
-      elements.outputDiv.innerHTML = `
-        <div class="error-message">
-          <i class="fas fa-exclamation-triangle"></i>
-          <p>Failed to generate email</p>
-          <small>\${error.message}</small>
-        </div>
-      `;
-    }
+    outputDiv.innerText = '❌ ' + error.message;
     showNotification('Error', error.message, 'error');
   } finally {
-    if (elements.generateBtn) {
-      elements.generateBtn.disabled = false;
-      elements.generateBtn.innerHTML = '<span class="btn-icon">✨</span> Generate My Email';
-    }
+    generateBtn.disabled = false;
+    generateBtn.innerHTML = '<span class="btn-icon">✨</span> Generate My Email';
   }
 }
 
-// Email Editing Functions - COMPLETELY REWRITTEN
-function startEmailEditing() {
-  if (!elements.outputDiv) return;
+// ========================================
+// APP FUNCTIONS (COPY, EDIT, SEND) - FIXED VERSION
+// ========================================
+function setupEnhancedAppFunctions() {
+  const copyBtn = document.getElementById('copyBtn');
+  const editBtn = document.getElementById('editBtn');
+  const sendBtn = document.getElementById('sendBtn');
 
-  // Store original content
-  originalEmailContent = elements.outputDiv.innerText;
-  currentEditMode = 'direct';
-
-  // Make the output directly editable
-  elements.outputDiv.contentEditable = true;
-  elements.outputDiv.focus();
-  elements.outputDiv.style.outline = "2px solid #6366F1";
-  elements.outputDiv.style.minHeight = "200px";
-  elements.outputDiv.style.padding = "8px";
-  elements.outputDiv.style.whiteSpace = "pre-wrap";
-  elements.outputDiv.style.wordBreak = "break-word";
-
-  // Add save button
-  const saveBtn = document.createElement('button');
-  saveBtn.id = 'saveEditBtn';
-  saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
-  saveBtn.style.position = 'fixed';
-  saveBtn.style.bottom = '20px';
-  saveBtn.style.right = '20px';
-  saveBtn.style.zIndex = '1000';
-  saveBtn.style.padding = '10px 20px';
-  saveBtn.style.backgroundColor = '#6366F1';
-  saveBtn.style.color = 'white';
-  saveBtn.style.border = 'none';
-  saveBtn.style.borderRadius = '6px';
-  saveBtn.style.cursor = 'pointer';
-  saveBtn.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.3)';
-  saveBtn.style.transition = 'all 0.2s ease';
-
-  saveBtn.addEventListener('mouseover', () => {
-    saveBtn.style.transform = 'translateY(-2px)';
-    saveBtn.style.boxShadow = '0 6px 16px rgba(99, 102, 241, 0.4)';
-  });
-
-  saveBtn.addEventListener('mouseout', () => {
-    saveBtn.style.transform = 'translateY(0)';
-    saveBtn.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.3)';
-  });
-
-  saveBtn.onclick = saveEmailEdits;
-
-  document.body.appendChild(saveBtn);
-
-  // Cancel on Escape key
-  document.onkeydown = function(e) {
-    if (e.key === 'Escape') {
-      cancelEmailEditing();
-    }
-  };
-
-  // Add visual indicator
-  const editIndicator = document.createElement('div');
-  editIndicator.id = 'editIndicator';
-  editIndicator.innerHTML = `
-    <div class="edit-indicator-bar">
-      <span>Editing Mode</span>
-      <button id="cancelEditBtn" class="cancel-edit-btn">
-        <i class="fas fa-times"></i> Cancel
-      </button>
-    </div>
-  `;
-  editIndicator.style.position = 'fixed';
-  editIndicator.style.top = '0';
-  editIndicator.style.left = '0';
-  editIndicator.style.right = '0';
-  editIndicator.style.zIndex = '999';
-  editIndicator.style.backgroundColor = '#6366F1';
-  editIndicator.style.color = 'white';
-  editIndicator.style.padding = '8px 20px';
-  editIndicator.style.display = 'flex';
-  editIndicator.style.justifyContent = 'space-between';
-  editIndicator.style.alignItems = 'center';
-
-  document.body.appendChild(editIndicator);
-
-  // Cancel button handler
-  document.getElementById('cancelEditBtn').onclick = cancelEmailEditing;
-
-  isEditing = true;
-}
-
-function saveEmailEdits() {
-  if (!elements.outputDiv) return;
-
-  const editedText = elements.outputDiv.innerText.trim();
-
-  if (!editedText) {
-    showNotification('Error', 'Email content cannot be empty', 'error');
-    return;
+  if (copyBtn) {
+    copyBtn.onclick = function() {
+      const outputDiv = document.getElementById('output');
+      const text = outputDiv.innerText;
+      navigator.clipboard.writeText(text)
+        .then(() => showNotification('Copied!', 'Email copied to clipboard', 'success'))
+        .catch(() => showNotification('Error', 'Failed to copy email', 'error'));
+    };
   }
 
-  // Save to local storage for tone learning
-  ToneProfileManager.saveEditedEmail(originalEmailContent, editedText);
+  if (editBtn) {
+    editBtn.onclick = function() {
+      const outputDiv = document.getElementById('output');
+      const originalContent = outputDiv.innerHTML;
 
-  // Update the displayed email
-  elements.outputDiv.contentEditable = false;
-  elements.outputDiv.style.outline = "none";
-  elements.outputDiv.style.padding = "0";
-  elements.outputDiv.setAttribute('data-original-email', editedText);
+      // Store original content for cancel
+      outputDiv.setAttribute('data-original-content', originalContent);
 
-  // Remove edit UI elements
-  const saveBtn = document.getElementById('saveEditBtn');
-  const editIndicator = document.getElementById('editIndicator');
+      // Make directly editable with visual feedback
+      outputDiv.contentEditable = true;
+      outputDiv.focus();
+      outputDiv.style.outline = '2px solid #6366F1';
+      outputDiv.style.minHeight = '200px';
 
-  if (saveBtn) document.body.removeChild(saveBtn);
-  if (editIndicator) document.body.removeChild(editIndicator);
+      // Change edit button to save
+      editBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+      editBtn.onclick = function() { saveEmailEdit(outputDiv); };
 
-  // Reset event listeners
-  document.onkeydown = null;
+      // Add cancel button if not exists
+      if (!document.getElementById('cancelEditBtn')) {
+        const cancelBtn = document.createElement('button');
+        cancelBtn.id = 'cancelEditBtn';
+        cancelBtn.className = 'action-btn';
+        cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+        cancelBtn.onclick = function() { cancelEmailEdit(outputDiv); };
+        document.getElementById('actionButtons').prepend(cancelBtn);
+      }
 
-  showNotification('Saved', 'Changes saved successfully', 'success');
-  isEditing = false;
+      // Handle Enter/Esc keys
+      document.addEventListener('keydown', handleEditKeyDown);
+
+      function handleEditKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          saveEmailEdit(outputDiv);
+          document.removeEventListener('keydown', handleEditKeyDown);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelEmailEdit(outputDiv);
+          document.removeEventListener('keydown', handleEditKeyDown);
+        }
+      }
+    };
+  }
+
+  if (sendBtn) {
+    sendBtn.onclick = function() { showSendEmailModal(); };
+  }
 }
 
-function cancelEmailEditing() {
-  if (!elements.outputDiv) return;
+function saveEmailEdit(outputDiv) {
+  const editedText = outputDiv.innerText;
 
-  elements.outputDiv.contentEditable = false;
-  elements.outputDiv.style.outline = "none";
-  elements.outputDiv.style.padding = "0";
-  elements.outputDiv.innerText = originalEmailContent;
+  // Remove edit mode
+  outputDiv.contentEditable = false;
+  outputDiv.style.outline = 'none';
 
-  // Remove edit UI elements
-  const saveBtn = document.getElementById('saveEditBtn');
-  const editIndicator = document.getElementById('editIndicator');
+  // Remove cancel button
+  document.getElementById('cancelEditBtn')?.remove();
 
-  if (saveBtn) document.body.removeChild(saveBtn);
-  if (editIndicator) document.body.removeChild(editIndicator);
+  // Reset edit button
+  const editBtn = document.getElementById('editBtn');
+  if (editBtn) {
+    editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
+    editBtn.onclick = setupEnhancedAppFunctions;
+  }
 
-  // Reset event listeners
-  document.onkeydown = null;
+  // Save changes
+  outputDiv.setAttribute('data-original-email', editedText);
+  showNotification('Saved', 'Your changes have been saved', 'success');
 
-  showNotification('Cancelled', 'Edit cancelled - original email restored', 'info');
-  isEditing = false;
+  // Save to tone profile if significantly edited
+  const originalEmail = outputDiv.getAttribute('data-original-email');
+  if (originalEmail) {
+    ToneProfileManager.saveEditedEmail(originalEmail, editedText);
+  }
 }
 
-function copyEmailToClipboard() {
-  if (!elements.outputDiv) return;
+function cancelEmailEdit(outputDiv) {
+  const originalContent = outputDiv.getAttribute('data-original-content');
 
-  const text = elements.outputDiv.innerText;
+  // Restore original content
+  outputDiv.contentEditable = false;
+  outputDiv.style.outline = 'none';
+  outputDiv.innerHTML = originalContent || '';
 
-  navigator.clipboard.writeText(text).then(() => {
-    showNotification('Copied!', 'Email copied to clipboard', 'success');
-  }).catch(err => {
-    console.error('Copy failed:', err);
-    showNotification('Error', 'Failed to copy email', 'error');
-  });
+  // Remove cancel button
+  document.getElementById('cancelEditBtn')?.remove();
+
+  // Reset edit button
+  const editBtn = document.getElementById('editBtn');
+  if (editBtn) {
+    editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
+    editBtn.onclick = setupEnhancedAppFunctions;
+  }
 }
 
-// Email Sending Functions
 function showSendEmailModal() {
-  if (!elements.outputDiv) return;
-
-  const emailContent = elements.outputDiv.innerText;
-  const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
-  const subject = subjectMatch ? subjectMatch[1].trim() : 'Professional Communication';
-
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
   modal.id = 'sendEmailModal';
 
   modal.innerHTML = `
     <div class="modal-content">
-      <button class="modal-close" onclick="closeSendEmailModal()">
+      <button class="modal-close" onclick="closeModal('sendEmailModal')">
         <i class="fas fa-times"></i>
       </button>
       <h3>Send Email</h3>
@@ -1174,25 +1506,16 @@ function showSendEmailModal() {
         <label for="recipientEmail">Recipient Email</label>
         <input type="email" id="recipientEmail" class="auth-input" placeholder="recipient@example.com" required>
       </div>
-
       <div class="input-group">
-        <label for="businessName">Your Name/Business</label>
-        <input type="text" id="businessName" class="auth-input" placeholder="Your Name or Business Name" value="${currentUser?.name || ''}" required>
+        <label for="businessName">Your Name</label>
+        <input type="text" id="businessName" class="auth-input" placeholder="Your name" value="${currentUser?.name || ''}" required>
       </div>
-
       <div class="input-group">
-        <label for="replyToEmail">Reply-To Email</label>
-        <input type="email" id="replyToEmail" class="auth-input" placeholder="your-email@example.com" value="${currentUser?.email || ''}" required>
-        <span class="input-hint">Replies will be sent directly to this email</span>
+        <label for="replyToEmail">Your Email</label>
+        <input type="email" id="replyToEmail" class="auth-input" placeholder="your@email.com" value="${currentUser?.email || ''}" required>
       </div>
-
-      <div class="email-preview">
-        <h4>Email Preview</h4>
-        <div class="preview-content">${emailContent.replace(/\n/g, '<br>')}</div>
-      </div>
-
       <div class="modal-actions">
-        <button class="settings-btn secondary" onclick="closeSendEmailModal()">Cancel</button>
+        <button class="settings-btn secondary" onclick="closeModal('sendEmailModal')">Cancel</button>
         <button class="settings-btn primary" onclick="confirmSendEmail()">
           <i class="fas fa-paper-plane"></i> Send Email
         </button>
@@ -1204,11 +1527,8 @@ function showSendEmailModal() {
   modal.style.display = 'flex';
 }
 
-function closeSendEmailModal() {
-  const modal = document.getElementById('sendEmailModal');
-  if (modal) {
-    document.body.removeChild(modal);
-  }
+function closeModal(modalId) {
+  document.getElementById(modalId)?.remove();
 }
 
 async function confirmSendEmail() {
@@ -1216,20 +1536,18 @@ async function confirmSendEmail() {
   const businessName = document.getElementById('businessName').value;
   const replyToEmail = document.getElementById('replyToEmail').value;
   const outputDiv = document.getElementById('output');
-
-  if (!outputDiv) return;
-
   const emailContent = outputDiv.innerText;
-  const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|\$)/i);
-  const subject = subjectMatch ? subjectMatch[1].trim() : 'Professional Communication';
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+\$/;
+  const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
+  const subject = subjectMatch ? subjectMatch[1].trim() : 'Professional Communication';
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   if (!emailRegex.test(to)) {
     showNotification('Error', 'Please enter a valid recipient email', 'error');
     return;
   }
 
-  if (replyToEmail && !emailRegex.test(replyToEmail)) {
+  if (!emailRegex.test(replyToEmail)) {
     showNotification('Error', 'Please enter a valid reply-to email', 'error');
     return;
   }
@@ -1251,49 +1569,16 @@ async function confirmSendEmail() {
         to,
         subject,
         content: emailContent,
-        businessName: businessName || currentUser.name,
-        replyToEmail: replyToEmail || currentUser.email
+        businessName,
+        replyToEmail
       })
     });
 
     const data = await response.json();
 
     if (response.ok) {
-      showNotification('Sent!', data.message, 'success');
-
-      // Save to history
-      const historyItem = {
-        content: emailContent,
-        subject: subject,
-        sentTo: to,
-        sentAt: new Date().toISOString(),
-        businessContext: elements.businessDesc.value,
-        emailContext: elements.context.value
-      };
-
-      emailHistory.unshift(historyItem);
-      if (emailHistory.length > 20) {
-        emailHistory.pop();
-      }
-      localStorage.setItem('letimail_email_history', JSON.stringify(emailHistory));
-
-      closeSendEmailModal();
-
-      // Show success message in output
-      if (outputDiv) {
-        const successMessage = document.createElement('div');
-        successMessage.className = 'email-sent-message';
-        successMessage.innerHTML = `
-          <div class="success-icon">
-            <i class="fas fa-paper-plane"></i>
-          </div>
-          <h4>Email Sent Successfully!</h4>
-          <p>Your email has been sent to <strong>\${to}</strong></p>
-          <button class="new-email-btn" onclick="generateNewEmail()">Generate Another Email</button>
-        `;
-        outputDiv.innerHTML = '';
-        outputDiv.appendChild(successMessage);
-      }
+      showNotification('Sent!', `Email sent to ${to}`, 'success');
+      closeModal('sendEmailModal');
     } else {
       throw new Error(data.error || 'Failed to send email');
     }
@@ -1307,305 +1592,150 @@ async function confirmSendEmail() {
   }
 }
 
-function generateNewEmail() {
-  if (elements.outputDiv) {
-    elements.outputDiv.innerHTML = '';
-  }
-  if (elements.actionButtons) {
-    elements.actionButtons.style.display = 'none';
-  }
-}
-
-// Email History Functions
-async function loadEmailHistory() {
-  if (!currentUser || !authToken) return;
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/email-history?limit=10`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      emailHistory = data.emails;
-
-      // Update UI if on history page
-      if (document.getElementById('emailHistoryList')) {
-        renderEmailHistory();
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load email history:', error);
-  }
-}
-
-function renderEmailHistory() {
-  const historyList = document.getElementById('emailHistoryList');
-  if (!historyList) return;
-
-  if (emailHistory.length === 0) {
-    historyList.innerHTML = `
-      <div class="empty-state">
-        <i class="fas fa-history"></i>
-        <h4>No Email History Yet</h4>
-        <p>Your generated emails will appear here</p>
-      </div>
-    `;
-    return;
-  }
-
-  historyList.innerHTML = '';
-
-  emailHistory.forEach((email, index) => {
-    const preview = email.generated_email.replace(/^Subject:.*\n\n/, '').substring(0, 150) + '...';
-
-    const emailCard = document.createElement('div');
-    emailCard.className = 'email-history-card';
-    emailCard.innerHTML = `
-      <div class="email-card-header">
-        <div class="email-meta">
-          <span class="email-subject">\${email.subject || 'No Subject'}</span>
-          <span class="email-date">${new Date(email.created_at).toLocaleString()}</span>
-        </div>
-        <div class="email-actions">
-          <button class="icon-btn" title="View Email" onclick="viewHistoryEmail(${index})">
-            <i class="fas fa-eye"></i>
-          </button>
-          \${email.sent_at ? `
-            <button class="icon-btn sent-indicator" title="Sent to \${email.sent_to}">
-              <i class="fas fa-paper-plane"></i>
-            </button>
-          ` : `
-            <button class="icon-btn" title="Use as Template" onclick="useAsTemplate(\${index})">
-              <i class="fas fa-copy"></i>
-            </button>
-          `}
-        </div>
-      </div>
-      <div class="email-preview">\${preview}</div>
-      <div class="email-context">
-        <span class="context-tag">Business:</span> ${email.business_context || 'Not specified'}
-        <span class="context-tag">Purpose:</span> ${email.email_context || 'Not specified'}
-      </div>
-    `;
-
-    historyList.appendChild(emailCard);
-  });
-}
-
-function viewHistoryEmail(index) {
-  const email = emailHistory[index];
-  if (!email) return;
-
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.id = 'viewHistoryModal';
-
-  modal.innerHTML = `
-    <div class="modal-content history-email-modal">
-      <button class="modal-close" onclick="closeModal('viewHistoryModal')">
-        <i class="fas fa-times"></i>
-      </button>
-
-      <div class="email-header">
-        <h3>${email.subject || 'No Subject'}</h3>
-        <div class="email-meta">
-          <span class="email-date">${new Date(email.created_at).toLocaleString()}</span>
-          \${email.sent_at ? `
-            <span class="sent-status">
-              <i class="fas fa-paper-plane"></i> Sent to \${email.sent_to} on \${new Date(email.sent_at).toLocaleString()}
-            </span>
-          ` : ''}
-        </div>
-      </div>
-
-      <div class="email-content">
-        <div class="email-section">
-          <h4>Business Context</h4>
-          <p>\${email.business_context || 'Not specified'}</p>
-        </div>
-
-        <div class="email-section">
-          <h4>Purpose</h4>
-          <p>${email.email_context || 'Not specified'}</p>
-        </div>
-
-        <div class="email-section">
-          <h4>Email Content</h4>
-          <div class="email-body">${email.generated_email.replace(/\n/g, '<br>')}</div>
-        </div>
-      </div>
-
-      <div class="modal-actions">
-        <button class="settings-btn secondary" onclick="closeModal('viewHistoryModal')">Close</button>
-        \${!email.sent_at ? `
-          <button class="settings-btn primary" onclick="useAsTemplate(\${index}, true)">
-            <i class="fas fa-copy"></i> Use as Template
-          </button>
-        ` : ''}
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-  modal.style.display = 'flex';
-}
-
-function useAsTemplate(index, closeModalAfter = false) {
-  const email = emailHistory[index];
-  if (!email || !elements.businessDesc || !elements.context) return;
-
-  // Fill the form with the template data
-  elements.businessDesc.value = email.business_context || '';
-  elements.context.value = email.email_context || '';
-
-  // Show success message
-  showNotification('Template Loaded', 'Email template loaded successfully', 'success');
-
-  // Generate a new email with the same context
-  if (closeModalAfter) {
-    closeModal('viewHistoryModal');
-    setTimeout(() => {
-      if (elements.generateBtn) {
-        elements.generateBtn.click();
-      }
-    }, 500);
-  }
-}
-
-function generateNewEmail() {
-  if (elements.outputDiv) {
-    elements.outputDiv.innerHTML = '';
-  }
-  if (elements.actionButtons) {
-    elements.actionButtons.style.display = 'none';
-  }
-}
-
-// Settings Page Functions
+// ========================================
+// SETTINGS PAGE
+// ========================================
 function setupSettingsPage() {
-  if (!elements.settingsPanels) return;
+    if (!document.getElementById('settings-panels')) return;
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const tab = this.getAttribute('data-tab');
+            switchSettingsTab(tab);
+        });
+    });
+    updateSettingsPage();
+}
 
-  // Initialize the first tab
-  switchSettingsTab('profile');
+function updateSettingsPage() {
+    if (!currentUser || !document.getElementById('settings-panels')) return;
+    const profileName = document.getElementById('profileName');
+    const profileEmail = document.getElementById('profileEmail');
 
-  // Load user preferences
-  loadUserPreferences();
-  loadToneManagementUI();
+    if (profileName) profileName.value = currentUser.name || '';
+    if (profileEmail) profileEmail.value = currentUser.email || '';
+    const currentPlanName = document.getElementById('currentPlanName');
+
+    if (currentPlanName) {
+        currentPlanName.textContent = currentUser.plan ? `${currentUser.plan.charAt(0).toUpperCase() + currentUser.plan.slice(1)} Plan` : 'Free Plan';
+    }
+
+    updateEmailTracking();
 }
 
 function switchSettingsTab(tabName) {
-  if (!elements.navItems || !elements.settingsPanels) return;
-
-  elements.navItems.forEach(item => {
-    item.classList.remove('active');
-    if (item.getAttribute('data-tab') === tabName) {
-      item.classList.add('active');
-    }
-  });
-
-  const panels = document.querySelectorAll('.settings-panel');
-  panels.forEach(panel => {
-    panel.classList.remove('active');
-    if (panel.id === `${tabName}-panel`) {
-      panel.classList.add('active');
-    }
-  });
-
-  // Load tone management when switching to tone tab
-  if (tabName === 'tone') {
-    loadToneManagementUI();
-  }
-}
-
-async function loadUserPreferences() {
-  if (!currentUser || !authToken) return;
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/preferences`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('data-tab') === tabName) {
+            item.classList.add('active');
+        }
+    });
+    const panels = document.querySelectorAll('.settings-panel');
+    panels.forEach(panel => {
+        panel.classList.remove('active');
+        if (panel.id === `${tabName}-panel`) {
+            panel.classList.add('active');
+        }
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      userPreferences = data.preferences || {};
-
-      // Populate preferences form
-      if (elements.preferencesForm) {
-        for (const [key, value] of Object.entries(userPreferences)) {
-          const element = elements.preferencesForm.querySelector(`[name="${key}"]`);
-          if (element) {
-            if (element.type === 'checkbox') {
-              element.checked = value;
-            } else {
-              element.value = value;
-            }
-          }
-        }
-      }
+    // Load tone management immediately when switching to tone tab
+    if (tabName === 'tone') {
+        console.log('🔄 Switching to tone tab, loading UI...');
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+            loadToneManagementUI();
+        }, 50);
     }
-  } catch (error) {
-    console.error('Failed to load preferences:', error);
-    showNotification('Error', 'Failed to load preferences', 'error');
-  }
+}
+
+async function handleProfileUpdate(e) {
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
+
+    const name = document.getElementById('profileName').value;
+
+    try {
+        if (currentUser) {
+            currentUser.name = name;
+            showNotification('Success', 'Profile updated successfully', 'success');
+            updateUserInfo(currentUser);
+            updateSettingsPage();
+        }
+    } catch (error) {
+        showNotification('Error', 'Failed to update profile', 'error');
+    } finally {
+        hideButtonLoading(button);
+    }
 }
 
 async function handlePreferencesUpdate(e) {
-  const button = e.target.querySelector('button[type="submit"]');
-  showButtonLoading(button);
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
 
-  try {
-    const formData = new FormData(e.target);
-    const preferences = {};
+    try {
+        const defaultTone = document.getElementById('defaultTone').value;
+        const emailLength = document.getElementById('emailLength').value;
+        const autoSave = document.getElementById('autoSave').checked;
+        const spellCheck = document.getElementById('spellCheck').checked;
 
-    for (const [key, value] of formData.entries()) {
-      // Handle checkboxes
-      if (formData.getAll(key).length > 1) {
-        preferences[key] = formData.getAll(key);
-      }
-      // Handle checkbox
-      else if (value === 'on') {
-        preferences[key] = true;
-      }
-      // Handle other inputs
-      else {
-        preferences[key] = value;
-      }
+        const preferences = {
+            defaultTone,
+            emailLength,
+            autoSave,
+            spellCheck
+        };
+
+        localStorage.setItem('letimail_preferences', JSON.stringify(preferences));
+        showNotification('Success', 'Preferences saved successfully', 'success');
+    } catch (error) {
+        showNotification('Error', 'Failed to save preferences', 'error');
+    } finally {
+        hideButtonLoading(button);
     }
-
-    const response = await fetch(`${BACKEND_URL}/api/preferences`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({ preferences })
-    });
-
-    if (response.ok) {
-      showNotification('Success', 'Preferences saved successfully', 'success');
-      userPreferences = preferences;
-    } else {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to save preferences');
-    }
-  } catch (error) {
-    showNotification('Error', error.message, 'error');
-  } finally {
-    hideButtonLoading(button);
-  }
 }
 
-// Tone Management Functions
+async function handlePasswordChange(e) {
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
+
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (newPassword !== confirmPassword) {
+        showNotification('Error', 'New passwords do not match', 'error');
+        hideButtonLoading(button);
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showNotification('Error', 'Password must be at least 6 characters', 'error');
+        hideButtonLoading(button);
+        return;
+    }
+
+    try {
+        showNotification('Success', 'Password updated successfully', 'success');
+        e.target.reset();
+    } catch (error) {
+        showNotification('Error', 'Failed to update password', 'error');
+    } finally {
+        hideButtonLoading(button);
+    }
+}
+
+// ========================================
+// TONE MANAGEMENT IN SETTINGS
+// ========================================
 function loadToneManagementUI() {
-  if (!elements.toneManagement) return;
+  console.log('🔄 Loading tone management UI data...');
 
   const profile = ToneProfileManager.getReferenceEmails();
+  console.log('📧 Profile data:', profile);
+
   const style = profile.all.length > 0 ? ToneProfileManager.analyzeWritingStyle(profile.all) : null;
+  console.log('🎨 Style analysis:', style);
 
   // Update style metrics
   document.getElementById('referenceEmailsCount').textContent = profile.all.length;
@@ -1613,137 +1743,106 @@ function loadToneManagementUI() {
   document.getElementById('editedEmailsCount').textContent = profile.edited.length;
 
   if (style) {
-    document.getElementById('avgSentenceLength').textContent = `${style.avgSentenceLength} words`;
-    document.getElementById('writingStyle').textContent =
-      style.usesContractions ? 'Conversational' : 'Formal';
-    document.getElementById('formalityLevel').textContent =
-      style.formalityScore > 70 ? 'High' :
-      style.formalityScore > 40 ? 'Medium' : 'Low';
-    document.getElementById('sentimentLevel').textContent =
-      style.sentimentScore > 0 ? 'Positive' :
-      style.sentimentScore < 0 ? 'Negative' : 'Neutral';
+    document.getElementById('avgSentenceLength').textContent = `${Math.round(style.avgSentenceLength)} words`;
+    document.getElementById('writingStyle').textContent = style.usesContractions ? 'Conversational' : 'Formal';
+    document.getElementById('formalityLevel').textContent = style.formalityScore > 2 ? 'High' : style.formalityScore > 1 ? 'Medium' : 'Low';
 
     // Add common phrases
     const commonPhrasesContainer = document.getElementById('commonPhrasesContainer');
-    if (commonPhrasesContainer) {
-      commonPhrasesContainer.innerHTML = '';
-      if (style.commonPhrases.length > 0) {
-        style.commonPhrases.forEach(phrase => {
-          const phraseTag = document.createElement('span');
-          phraseTag.className = 'phrase-tag';
-          phraseTag.textContent = `"${phrase}"`;
-          commonPhrasesContainer.appendChild(phraseTag);
-        });
-      } else {
-        commonPhrasesContainer.innerHTML = '<span class="no-phrases">No common phrases yet</span>';
-      }
-    }
+    commonPhrasesContainer.innerHTML = '';
 
-    // Add example sentences
-    const exampleSentencesContainer = document.getElementById('exampleSentencesContainer');
-    if (exampleSentencesContainer) {
-      exampleSentencesContainer.innerHTML = '';
-      if (style.sentences.length > 0) {
-        style.sentences.forEach((sentence, index) => {
-          const sentenceEl = document.createElement('div');
-          sentenceEl.className = 'example-sentence';
-          sentenceEl.innerHTML = `
-            <span class="sentence-number">${index + 1}.</span>
-            <span class="sentence-text">${sentence}</span>
-          `;
-          exampleSentencesContainer.appendChild(sentenceEl);
-        });
-      } else {
-        exampleSentencesContainer.innerHTML = '<span class="no-sentences">No example sentences yet</span>';
-      }
+    if (style.commonPhrases && style.commonPhrases.length > 0) {
+      style.commonPhrases.slice(0, 5).forEach(phrase => {
+        const phraseTag = document.createElement('span');
+        phraseTag.className = 'phrase-tag';
+        phraseTag.textContent = `"${phrase}"`;
+        commonPhrasesContainer.appendChild(phraseTag);
+      });
+    } else {
+      commonPhrasesContainer.innerHTML = '<span style="color: var(--text-muted);">No common phrases yet</span>';
     }
   }
 
-  // Populate training emails list
+  // Populate training emails
   const trainingEmailsList = document.getElementById('trainingEmailsList');
-  if (trainingEmailsList) {
-    trainingEmailsList.innerHTML = '';
+  trainingEmailsList.innerHTML = '';
 
-    if (profile.training.length === 0) {
-      trainingEmailsList.innerHTML = `
-        <div class="empty-state">
-          <i class="fas fa-inbox"></i>
-          <h4>No Training Emails Yet</h4>
-          <p>Add examples of your writing to personalize your tone</p>
-          <button class="add-first-email-btn" onclick="showAddToneEmailModal()">
-            <i class="fas fa-plus"></i> Add First Email
-          </button>
-        </div>
-      `;
-    } else {
-      profile.training.forEach(email => {
-        const preview = email.content.substring(0, 150) + (email.content.length > 150 ? '...' : '');
-        const emailCard = document.createElement('div');
-        emailCard.className = 'tone-email-card';
-        emailCard.setAttribute('data-id', email.id);
-        emailCard.innerHTML = `
-          <div class="email-card-header">
-            <span class="email-date">${new Date(email.dateAdded).toLocaleDateString()}</span>
-            <div class="email-actions">
-              <button class="icon-btn edit" onclick="editToneEmail(${email.id})" title="Edit">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="icon-btn delete" onclick="deleteToneEmail(${email.id})" title="Delete">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
+  if (profile.training.length === 0) {
+    trainingEmailsList.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <p>No training emails yet</p>
+        <small>Add examples of your writing to personalize your tone</small>
+      </div>
+    `;
+  } else {
+    profile.training.forEach(email => {
+      const preview = email.content.substring(0, 150) + (email.content.length > 150 ? '...' : '');
+      const emailCard = document.createElement('div');
+      emailCard.className = 'tone-email-card';
+      emailCard.setAttribute('data-id', email.id);
+      emailCard.innerHTML = `
+        <div class="email-card-header">
+          <span class="email-date">${new Date(email.dateAdded).toLocaleDateString()}</span>
+          <div class="email-actions">
+            <button class="icon-btn edit" onclick="editToneEmail(${email.id})" title="Edit">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="icon-btn delete" onclick="deleteToneEmail(${email.id})" title="Delete">
+              <i class="fas fa-trash"></i>
+            </button>
           </div>
-          <div class="email-preview">${preview}</div>
-          <button class="view-full-btn" onclick="viewFullEmail(\${email.id}, 'training')">
-            View Full Email <i class="fas fa-chevron-right"></i>
-          </button>
-        `;
-        trainingEmailsList.appendChild(emailCard);
-      });
-    }
+        </div>
+        <div class="email-preview">${preview}</div>
+        <button class="view-full-btn" onclick="viewFullEmail(${email.id}, 'training')">
+          View Full Email <i class="fas fa-chevron-right"></i>
+        </button>
+      `;
+      trainingEmailsList.appendChild(emailCard);
+    });
   }
 
-  // Populate edited emails list
+  // Populate edited emails
   const editedEmailsList = document.getElementById('editedEmailsList');
-  if (editedEmailsList) {
-    editedEmailsList.innerHTML = '';
+  editedEmailsList.innerHTML = '';
 
-    if (profile.edited.length === 0) {
-      editedEmailsList.innerHTML = `
-        <div class="empty-state">
-          <i class="fas fa-edit"></i>
-          <h4>No Edited Emails Yet</h4>
-          <p>As you edit generated emails, they'll appear here</p>
+  if (profile.edited.length === 0) {
+    editedEmailsList.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-edit"></i>
+        <p>No edited emails yet</p>
+        <small>As you edit generated emails, they'll appear here</small>
+      </div>
+    `;
+  } else {
+    profile.edited.forEach(email => {
+      const preview = email.content.substring(0, 150) + (email.content.length > 150 ? '...' : '');
+      const emailCard = document.createElement('div');
+      emailCard.className = 'tone-email-card edited';
+      emailCard.setAttribute('data-id', email.id);
+      emailCard.innerHTML = `
+        <div class="email-card-header">
+          <span class="email-date">${new Date(email.dateEdited).toLocaleDateString()}</span>
+          <div class="email-actions">
+            <button class="icon-btn delete" onclick="deleteEditedEmail(${email.id})" title="Remove">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        <div class="email-preview">${preview}</div>
+        <div class="edit-badge">
+          <i class="fas fa-pencil-alt"></i> ${Math.round((1 - email.similarity) * 100)}% edited
         </div>
       `;
-    } else {
-      profile.edited.forEach(email => {
-        const preview = email.content.substring(0, 150) + (email.content.length > 150 ? '...' : '');
-        const editPercentage = Math.round((1 - email.similarity) * 100);
-
-        const emailCard = document.createElement('div');
-        emailCard.className = 'tone-email-card edited';
-        emailCard.setAttribute('data-id', email.id);
-        emailCard.innerHTML = `
-          <div class="email-card-header">
-            <span class="email-date">\${new Date(email.dateEdited).toLocaleDateString()}</span>
-            <div class="email-actions">
-              <button class="icon-btn delete" onclick="deleteEditedEmail(${email.id})" title="Remove">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-          </div>
-          <div class="email-preview">${preview}</div>
-          <div class="edit-badge">
-            <i class="fas fa-pencil-alt"></i> \${editPercentage}% edited
-          </div>
-        `;
-        editedEmailsList.appendChild(emailCard);
-      });
-    }
+      editedEmailsList.appendChild(emailCard);
+    });
   }
+
+  // Add event listener for the "Add Email" button
+  document.getElementById('addToneEmailBtn').addEventListener('click', showAddToneEmailModal);
 }
 
+// Show modal to add a new training email
 function showAddToneEmailModal() {
   const profile = ToneProfileManager.getReferenceEmails();
 
@@ -1762,35 +1861,16 @@ function showAddToneEmailModal() {
         <i class="fas fa-times"></i>
       </button>
       <h3>Add Training Email</h3>
-      <p class="modal-description">
-        Paste a complete email you've written before (including subject line).
-        The more diverse examples you provide, the better LetiMail can match your style.
-      </p>
+      <p class="modal-description">Paste a complete email you've written before (including subject line).</p>
 
-      <div class="tone-email-help">
-        <h4>Tips for Good Examples:</h4>
-        <ul>
-          <li>Include the full email (subject line and body)</li>
-          <li>Use emails that represent your typical writing style</li>
-          <li>Provide diverse examples (different tones, lengths, purposes)</li>
-          <li>Remove any sensitive or private information</li>
-        </ul>
-      </div>
-
-      <textarea id="newToneEmail" class="tone-email-textarea" rows="12"
-                placeholder="Subject: Example subject line
-
-Hi [Recipient's Name],
-
-This is the body of your email. Include as much as you can to help LetiMail learn your style.
-
+      <textarea id="newToneEmail" class="tone-email-textarea" rows="12" placeholder="Subject: Example subject
+Hi [Name],
+Your email content here...
 Best regards,
 [Your Name]"></textarea>
 
       <div class="modal-actions">
-        <button class="settings-btn secondary" onclick="closeModal('addToneModal')">
-          Cancel
-        </button>
+        <button class="settings-btn secondary" onclick="closeModal('addToneModal')">Cancel</button>
         <button class="settings-btn primary" onclick="saveToneEmail()">
           <i class="fas fa-check"></i> Add Email
         </button>
@@ -1800,16 +1880,9 @@ Best regards,
 
   document.body.appendChild(modal);
   modal.style.display = 'flex';
-
-  // Focus the textarea
-  setTimeout(() => {
-    const textarea = document.getElementById('newToneEmail');
-    if (textarea) {
-      textarea.focus();
-    }
-  }, 100);
 }
 
+// Save a new training email
 function saveToneEmail() {
   const content = document.getElementById('newToneEmail').value.trim();
 
@@ -1818,31 +1891,13 @@ function saveToneEmail() {
     return;
   }
 
-  // Validate it looks like an email
-  if (!content.match(/^Subject:/i)) {
-    showNotification('Error', 'Please include a Subject: line at the beginning of your email', 'error');
-    return;
-  }
-
   ToneProfileManager.addTrainingEmail(content);
   closeModal('addToneModal');
   loadToneManagementUI();
   showNotification('Success', 'Training email added successfully!', 'success');
-
-  // Show a tip after adding the first email
-  const profile = ToneProfileManager.getReferenceEmails();
-  if (profile.training.length === 1) {
-    setTimeout(() => {
-      showNotification(
-        'Tip',
-        'Add 2-3 more email examples for better personalization!',
-        'info',
-        8000
-      );
-    }, 1000);
-  }
 }
 
+// Edit a training email
 function editToneEmail(id) {
   const data = localStorage.getItem('letimail_tone_training');
   if (!data) return;
@@ -1862,16 +1917,11 @@ function editToneEmail(id) {
         <i class="fas fa-times"></i>
       </button>
       <h3>Edit Training Email</h3>
-      <p class="modal-description">
-        Edit this email example to refine your tone profile.
-      </p>
 
       <textarea id="editToneEmail" class="tone-email-textarea" rows="12">${email.content}</textarea>
 
       <div class="modal-actions">
-        <button class="settings-btn secondary" onclick="closeModal('editToneModal')">
-          Cancel
-        </button>
+        <button class="settings-btn secondary" onclick="closeModal('editToneModal')">Cancel</button>
         <button class="settings-btn primary" onclick="updateToneEmail(${id})">
           <i class="fas fa-save"></i> Save Changes
         </button>
@@ -1881,17 +1931,9 @@ function editToneEmail(id) {
 
   document.body.appendChild(modal);
   modal.style.display = 'flex';
-
-  // Focus the textarea
-  setTimeout(() => {
-    const textarea = document.getElementById('editToneEmail');
-    if (textarea) {
-      textarea.focus();
-      textarea.setSelectionRange(0, 0);
-    }
-  }, 100);
 }
 
+// Update a training email
 function updateToneEmail(id) {
   const content = document.getElementById('editToneEmail').value.trim();
 
@@ -1900,39 +1942,35 @@ function updateToneEmail(id) {
     return;
   }
 
-  if (!content.match(/^Subject:/i)) {
-    showNotification('Error', 'Please include a Subject: line at the beginning', 'error');
-    return;
-  }
-
   ToneProfileManager.updateTrainingEmail(id, content);
   closeModal('editToneModal');
   loadToneManagementUI();
-  showNotification('Success', 'Training email updated successfully!', 'success');
+  showNotification('Success', 'Training email updated!', 'success');
 }
 
+// Delete a training email
 function deleteToneEmail(id) {
-  if (confirm('Are you sure you want to delete this training email? This will affect your personalized tone.')) {
+  if (confirm('Are you sure you want to delete this training email?')) {
     ToneProfileManager.deleteTrainingEmail(id);
     loadToneManagementUI();
-    showNotification('Deleted', 'Training email removed from your tone profile', 'info');
+    showNotification('Deleted', 'Training email removed', 'info');
   }
 }
 
+// Delete an edited email
 function deleteEditedEmail(id) {
-  if (confirm('Are you sure you want to remove this edited email from your learning profile?')) {
-    const data = localStorage.getItem('letimail_edited_emails');
-    if (!data) return;
+  const data = localStorage.getItem('letimail_edited_emails');
+  if (!data) return;
 
-    let emails = JSON.parse(data);
-    emails = emails.filter(e => e.id !== id);
-    localStorage.setItem('letimail_edited_emails', JSON.stringify(emails));
+  let emails = JSON.parse(data);
+  emails = emails.filter(e => e.id !== id);
+  localStorage.setItem('letimail_edited_emails', JSON.stringify(emails));
 
-    loadToneManagementUI();
-    showNotification('Removed', 'Edited email removed from learning profile', 'info');
-  }
+  loadToneManagementUI();
+  showNotification('Removed', 'Edited email removed from learning', 'info');
 }
 
+// View full email
 function viewFullEmail(id, type) {
   let email;
 
@@ -1949,38 +1987,15 @@ function viewFullEmail(id, type) {
   modal.className = 'modal-overlay';
   modal.id = 'viewEmailModal';
 
-  // Format the email content with proper line breaks
-  const formattedContent = email.content
-    .replace(/^Subject:.*$/gm, match => `<div class="email-subject">${match}</div>`)
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br>');
-
   modal.innerHTML = `
     <div class="modal-content view-email-modal">
       <button class="modal-close" onclick="closeModal('viewEmailModal')">
         <i class="fas fa-times"></i>
       </button>
-
-      <div class="email-header">
-        <h3>Full Email Example</h3>
-        <div class="email-meta">
-          <span class="email-date">Added: ${new Date(email.dateAdded).toLocaleString()}</span>
-        </div>
-      </div>
-
-      <div class="full-email-content">
-        ${formattedContent}
-      </div>
-
+      <h3>Full Email</h3>
+      <div class="full-email-content">${email.content.replace(/\n/g, '<br>')}</div>
       <div class="modal-actions">
-        <button class="settings-btn secondary" onclick="closeModal('viewEmailModal')">
-          Close
-        </button>
-        ${type === 'training' ? `
-          <button class="settings-btn primary" onclick="editToneEmail(${email.id}); closeModal('viewEmailModal')">
-            <i class="fas fa-edit"></i> Edit This Email
-          </button>
-        ` : ''}
+        <button class="settings-btn primary" onclick="closeModal('viewEmailModal')">Close</button>
       </div>
     </div>
   `;
@@ -1989,511 +2004,25 @@ function viewFullEmail(id, type) {
   modal.style.display = 'flex';
 }
 
-// Modal Functions
+// Close modal
 function closeModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     document.body.removeChild(modal);
-
-    // Restore scroll position if needed
-    if (modalId === 'viewEmailModal' || modalId === 'editToneModal') {
-      window.scrollTo(0, 0);
-    }
   }
 }
 
-// Upgrade Prompt
-function showUpgradePrompt() {
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.id = 'upgradeModal';
-
-  modal.innerHTML = `
-    <div class="modal-content upgrade-modal">
-      <button class="modal-close" onclick="closeModal('upgradeModal')">
-        <i class="fas fa-times"></i>
-      </button>
-
-      <div class="upgrade-header">
-        <div class="upgrade-icon">🚀</div>
-        <h3>Upgrade to Premium</h3>
-        <p>You've reached your free email limit. Upgrade to continue using LetiMail!</p>
-      </div>
-
-      <div class="upgrade-features">
-        <div class="upgrade-feature">
-          <div class="feature-icon">✉️</div>
-          <div class="feature-details">
-            <h4>Unlimited Emails</h4>
-            <p>Generate as many emails as you need without restrictions</p>
-          </div>
-        </div>
-
-        <div class="upgrade-feature">
-          <div class="feature-icon">⚡</div>
-          <div class="feature-details">
-            <h4>Priority Generation</h4>
-            <p>Faster email generation with premium priority</p>
-          </div>
-        </div>
-
-        <div class="upgrade-feature">
-          <div class="feature-icon">🎨</div>
-          <div class="feature-details">
-            <h4>Advanced Tone Matching</h4>
-            <p>Enhanced AI that better matches your writing style</p>
-          </div>
-        </div>
-
-        <div class="upgrade-feature">
-          <div class="feature-icon">📊</div>
-          <div class="feature-details">
-            <h4>Analytics Dashboard</h4>
-            <p>Track your email performance and improvements</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="upgrade-actions">
-        <button class="upgrade-btn primary" onclick="startPremiumUpgrade()">
-          <i class="fas fa-crown"></i>
-          Upgrade to Premium - $9.99/month
-        </button>
-        <button class="upgrade-btn secondary" onclick="closeModal('upgradeModal')">
-          Maybe Later
-        </button>
-      </div>
-
-      <div class="upgrade-guarantee">
-        <i class="fas fa-shield-alt"></i>
-        <p>30-day money back guarantee</p>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-  modal.style.display = 'flex';
-}
-
-function startPremiumUpgrade() {
-  showNotification('Coming Soon', 'Premium upgrade functionality will be available soon!', 'info');
-  closeModal('upgradeModal');
-}
-
-// Delete Account Function
-async function handleDeleteAccount() {
-  if (!confirm('Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.')) {
-    return;
-  }
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/auth/delete-account`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
-
-    if (response.ok) {
-      showNotification('Account Deleted', 'Your account has been successfully deleted.', 'success');
-      handleLogout();
-
-      // Redirect to homepage
-      setTimeout(() => {
-        window.location.href = 'index.html';
-      }, 2000);
-    } else {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to delete account');
-    }
-  } catch (error) {
-    showNotification('Error', error.message, 'error');
-  }
-}
-
-// Coming Soon Functions
-function setupComingSoonButtons() {
-  const comingSoonSelectors = [
-    '#upgradePremiumBtn',
-    '.plan-button:not([onclick])',
-    '.secondary-cta',
-    '.footer a:not([href^="#"])',
-    '.social-links a',
-    '.feature-coming-soon'
-  ];
-
-  comingSoonSelectors.forEach(selector => {
-    document.querySelectorAll(selector).forEach(element => {
-      element.addEventListener('click', (e) => {
-        e.preventDefault();
-        showNotification('Coming Soon', 'This feature is under development and will be available soon!', 'info');
-      });
-    });
-  });
-}
-
-// Initialization
-function initializeApp() {
-  console.log('🔄 Initializing LetiMail application...');
-
-  // Cache DOM elements
-  cacheDOMElements();
-
-  // Set up event listeners
-  setupEventListeners();
-
-  // Check auth state
-  checkAuthState();
-
-  // Initialize page-specific features
-  initializePageSpecificFeatures();
-
-  // Set up notifications
-  setupNotificationSystem();
-
-  // Set up coming soon buttons
-  setupComingSoonButtons();
-
-  // Set up onboarding if needed
-  setupOnboarding();
-
-  console.log('✅ LetiMail initialized successfully');
-}
-
-function setupNotificationSystem() {
-  if (!elements.notification) return;
-
-  // Close button
-  const closeBtn = elements.notification.querySelector('.notification-close');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-      elements.notification.classList.remove('show');
-    });
-  }
-
-  // Auto-hide
-  elements.notification.addEventListener('animationend', (e) => {
-    if (e.animationName === 'notificationSlideIn' && elements.notification.classList.contains('show')) {
-      setTimeout(() => {
-        elements.notification.classList.remove('show');
-      }, 5000);
-    }
-  });
-}
-
-function setupOnboarding() {
-  const onboardingComplete = localStorage.getItem('letimail_onboarding_complete');
-
-  if (!onboardingComplete && currentUser) {
-    // Show onboarding after a short delay
-    setTimeout(() => {
-      if (!document.getElementById('onboardingModal')) {
-        createOnboardingModal();
-        showOnboardingModal();
-      }
-    }, 1500);
-  }
-}
-
-// Onboarding System
-function createOnboardingModal() {
-  if (document.getElementById('onboardingModal')) return;
-
-  const modal = document.createElement('div');
-  modal.id = 'onboardingModal';
-  modal.className = 'modal-overlay onboarding-modal';
-  modal.style.display = 'none';
-
-  modal.innerHTML = `
-    <div class="modal-content onboarding-content">
-      <div class="onboarding-progress">
-        <div class="progress-bar">
-          <div class="progress-fill" id="onboardingProgress"></div>
-        </div>
-        <span class="progress-text" id="progressText">Step 1 of 4</span>
-      </div>
-
-      <!-- Step 1: Welcome -->
-      <div class="onboarding-step active" id="step1">
-        <div class="onboarding-header">
-          <div class="onboarding-icon">👋</div>
-          <h2>Welcome to LetiMail!</h2>
-          <p class="step-description">Let's get you set up in just a few minutes</p>
-        </div>
-
-        <div class="onboarding-body">
-          <p>LetiMail helps you write professional emails in seconds using AI that adapts to <strong>your</strong> unique writing style.</p>
-
-          <div class="feature-highlights">
-            <div class="feature-highlight">
-              <div class="feature-icon">✨</div>
-              <h4>AI-Powered</h4>
-              <p>Generate high-quality emails instantly</p>
-            </div>
-            <div class="feature-highlight">
-              <div class="feature-icon">🎨</div>
-              <h4>Personalized</h4>
-              <p>Adapts to your unique writing style</p>
-            </div>
-            <div class="feature-highlight">
-              <div class="feature-icon">🔒</div>
-              <h4>Private</h4>
-              <p>Your data stays yours - we don't train on it</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="onboarding-actions">
-          <button class="onboarding-btn primary" onclick="nextOnboardingStep()">
-            Get Started
-          </button>
-        </div>
-      </div>
-
-      <!-- Step 2: Privacy -->
-      <div class="onboarding-step" id="step2">
-        <div class="onboarding-header">
-          <div class="onboarding-icon">🔒</div>
-          <h2>Your Privacy Matters</h2>
-          <p class="step-description">We take your privacy seriously</p>
-        </div>
-
-        <div class="onboarding-body">
-          <p>To personalize your experience, LetiMail learns from emails you provide. Here's what you need to know:</p>
-
-          <div class="privacy-points">
-            <div class="privacy-point">
-              <i class="fas fa-check-circle"></i>
-              <div>
-                <strong>Your data is private</strong>
-                <p>We never share your emails with third parties</p>
-              </div>
-            </div>
-            <div class="privacy-point">
-              <i class="fas fa-check-circle"></i>
-              <div>
-                <strong>You're in control</strong>
-                <p>You can view, edit, or delete your data anytime</p>
-              </div>
-            </div>
-            <div class="privacy-point">
-              <i class="fas fa-check-circle"></i>
-              <div>
-                <strong>We don't train on your data</strong>
-                <p>Your emails are only used to personalize your experience</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="privacy-assurance">
-            <p>By continuing, you agree to our <a href="#" onclick="event.preventDefault(); showNotification('Coming Soon', 'Privacy policy will be available soon', 'info')">Privacy Policy</a> and <a href="#" onclick="event.preventDefault(); showNotification('Coming Soon', 'Terms of service will be available soon', 'info')">Terms of Service</a>.</p>
-          </div>
-        </div>
-
-        <div class="onboarding-actions">
-          <button class="onboarding-btn secondary" onclick="previousOnboardingStep()">
-            Back
-          </button>
-          <button class="onboarding-btn primary" onclick="nextOnboardingStep()">
-            I Understand
-          </button>
-        </div>
-      </div>
-
-      <!-- Step 3: How It Works -->
-      <div class="onboarding-step" id="step3">
-        <div class="onboarding-header">
-          <div class="onboarding-icon">⚙️</div>
-          <h2>How LetiMail Works</h2>
-          <p class="step-description">Simple, powerful email generation</p>
-        </div>
-
-        <div class="onboarding-body">
-          <div class="how-it-works">
-            <div class="work-step">
-              <div class="step-number">1</div>
-              <div class="step-content">
-                <h4>Describe Your Need</h4>
-                <p>Tell us about your business and what the email is for</p>
-              </div>
-            </div>
-
-            <div class="work-step">
-              <div class="step-number">2</div>
-              <div class="step-content">
-                <h4>Select Your Tone</h4>
-                <p>Choose from professional tones or let AI match your style</p>
-              </div>
-            </div>
-
-            <div class="work-step">
-              <div class="step-number">3</div>
-              <div class="step-content">
-                <h4>Generate & Edit</h4>
-                <p>Get a draft in seconds, then edit as needed</p>
-              </div>
-            </div>
-
-            <div class="work-step">
-              <div class="step-number">4</div>
-              <div class="step-content">
-                <h4>Send or Copy</h4>
-                <p>Send directly or copy to your email client</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="pro-tip">
-            <i class="fas fa-lightbulb"></i>
-            <p><strong>Pro Tip:</strong> The more you use LetiMail, the better it gets at matching your personal writing style!</p>
-          </div>
-        </div>
-
-        <div class="onboarding-actions">
-          <button class="onboarding-btn secondary" onclick="previousOnboardingStep()">
-            Back
-          </button>
-          <button class="onboarding-btn primary" onclick="nextOnboardingStep()">
-            Got It
-          </button>
-        </div>
-      </div>
-
-      <!-- Step 4: Tone Personalization -->
-      <div class="onboarding-step" id="step4">
-        <div class="onboarding-header">
-          <div class="onboarding-icon">🎨</div>
-          <h2>Personalize Your Tone</h2>
-          <p class="step-description">Help LetiMail sound like you</p>
-        </div>
-
-        <div class="onboarding-body">
-          <p>For the best results, provide 2-3 examples of emails you've written before. This helps LetiMail match your unique style.</p>
-
-          <div class="tone-examples">
-            <div class="example-card">
-              <div class="example-header">
-                <i class="fas fa-envelope"></i>
-                <h4>Example Email</h4>
-              </div>
-              <div class="example-content">
-                <p>Subject: Following Up on Our Meeting</p>
-                <p>Hi [Name],</p>
-                <p>I hope you're doing well! I wanted to follow up on our meeting last week about [topic]. As discussed, I'll [action item] by [date].</p>
-                <p>Please let me know if you have any questions or need further information.</p>
-                <p>Best regards,<br>[Your Name]</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="tone-options">
-            <h4>You can:</h4>
-            <ul>
-              <li>Add examples now (recommended)</li>
-              <li>Skip and add them later in Settings</li>
-              <li>Let LetiMail use a standard professional tone</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="onboarding-actions">
-          <button class="onboarding-btn secondary" onclick="previousOnboardingStep()">
-            Back
-          </button>
-          <button class="onboarding-btn tertiary" onclick="skipToneSetup()">
-            Skip for Now
-          </button>
-          <button class="onboarding-btn primary" onclick="showAddToneEmailModal(); completeOnboarding()">
-            Add Email Examples
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-}
-
-let onboardingState = {
-  currentStep: 0,
-  toneEmails: []
-};
-
-function showOnboardingModal() {
-  const modal = document.getElementById('onboardingModal');
-  if (!modal) return;
-
-  onboardingState.currentStep = 0;
-  updateOnboardingProgress();
-  modal.style.display = 'flex';
-}
-
-function updateOnboardingProgress() {
-  const progress = ((onboardingState.currentStep + 1) / 4) * 100;
-  const progressFill = document.getElementById('onboardingProgress');
-  const progressText = document.getElementById('progressText');
-
-  if (progressFill) progressFill.style.width = `${progress}%`;
-  if (progressText) progressText.textContent = `Step ${onboardingState.currentStep + 1} of 4`;
-}
-
-function nextOnboardingStep() {
-  if (onboardingState.currentStep < 3) {
-    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.remove('active');
-    onboardingState.currentStep++;
-    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.add('active');
-    updateOnboardingProgress();
-  }
-}
-
-function previousOnboardingStep() {
-  if (onboardingState.currentStep > 0) {
-    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.remove('active');
-    onboardingState.currentStep--;
-    document.getElementById(`step${onboardingState.currentStep + 1}`).classList.add('active');
-    updateOnboardingProgress();
-  }
-}
-
-function skipToneSetup() {
-  completeOnboarding(false);
-}
-
-function completeOnboarding(withToneData = true) {
-  const modal = document.getElementById('onboardingModal');
-  if (!modal) return;
-
-  modal.style.display = 'none';
-  localStorage.setItem('letimail_onboarding_complete', 'true');
-
-  if (withToneData && onboardingState.toneEmails.length > 0) {
-    showNotification(
-      'Setup Complete',
-      `${onboardingState.toneEmails.length} email example${onboardingState.toneEmails.length !== 1 ? 's' : ''} added to your profile!`,
-      'success'
-    );
-  } else {
-    showNotification(
-      'Welcome!',
-      'Your account is ready. You can add email examples later in Settings to personalize your tone.',
-      'success'
-    );
-  }
-}
-
-// Utility Functions
-function closeAllModals() {
-  document.querySelectorAll('.modal-overlay').forEach(modal => {
-    modal.style.display = 'none';
-  });
-}
-
+// ========================================
+// FIX LOADING INDICATOR IN APP.HTML
+// ========================================
 function fixLoadingIndicator() {
   const outputDiv = document.getElementById('output');
   if (outputDiv) {
-    outputDiv.style.minHeight = '400px';
+    // Remove any existing problematic styles
     outputDiv.style.overflow = 'visible';
+    outputDiv.style.minHeight = '400px';
 
+    // Ensure proper placeholder display
     if (!outputDiv.querySelector('.output-placeholder')) {
       outputDiv.innerHTML = `
         <div class="output-placeholder">
@@ -2502,53 +2031,20 @@ function fixLoadingIndicator() {
             <div class="placeholder-icon">✉️</div>
           </div>
           <p>Your personalized email will appear here</p>
-          <small>Powered by AI that adapts to your writing style</small>
+          <small>Powered by adaptable AI that learns your unique style</small>
         </div>
       `;
     }
   }
 }
 
-// Initialize the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  // Create auth modals if they don't exist
-  if (!document.getElementById('authModals')) {
-    const authModals = document.createElement('div');
-    authModals.id = 'authModals';
-    document.body.appendChild(authModals);
-  }
-
-  // Initialize the app
-  initializeApp();
-
-  // Fix loading indicator
-  fixLoadingIndicator();
-});
-
-// Export functions to window for global access
-window.showLoginModal = function() {
-  hideAllModals();
-  const loginModal = document.getElementById('loginModal');
-  if (loginModal) loginModal.style.display = 'flex';
-  resetForms();
-};
-
-window.showSignupModal = function() {
-  hideAllModals();
-  const signupModal = document.getElementById('signupModal');
-  if (signupModal) signupModal.style.display = 'flex';
-  resetForms();
-};
-
-window.hideAuthModal = hideAllModals;
-window.handleGetStarted = function() {
-  if (currentUser) {
-    window.location.href = 'app.html';
-  } else {
-    showSignupModal();
-  }
-};
-
+// ========================================
+// GLOBAL FUNCTION EXPORTS
+// ========================================
+window.showLoginModal = showLoginModal;
+window.showSignupModal = showSignupModal;
+window.hideAuthModal = hideAuthModal;
+window.handleGetStarted = handleGetStarted;
 window.generateEmailWithTone = generateEmailWithTone;
 window.sendOTP = sendOTP;
 window.verifyOTPAndRegister = verifyOTPAndRegister;
@@ -2556,39 +2052,10 @@ window.switchSettingsTab = switchSettingsTab;
 window.showOnboardingModal = showOnboardingModal;
 window.nextOnboardingStep = nextOnboardingStep;
 window.previousOnboardingStep = previousOnboardingStep;
-window.addToneEmail = function() {
-  const textarea = document.getElementById('toneEmailInput');
-  const emailContent = textarea.value.trim();
-
-  if (!emailContent) {
-    showNotification('Error', 'Please paste an email before adding', 'error');
-    return;
-  }
-
-  onboardingState.toneEmails.push(emailContent);
-  document.getElementById('emailCount').textContent = onboardingState.toneEmails.length;
-  document.getElementById('finishBtn').disabled = false;
-  textarea.value = '';
-
-  if (onboardingState.toneEmails.length >= 5) {
-    document.getElementById('addEmailBtn').disabled = true;
-    document.getElementById('toneEmailInput').disabled = true;
-  }
-
-  showNotification('Added', `Email ${onboardingState.toneEmails.length} added`, 'success');
-};
-
-window.removeToneEmail = function(index) {
-  onboardingState.toneEmails.splice(index, 1);
-  document.getElementById('emailCount').textContent = onboardingState.toneEmails.length;
-
-  if (onboardingState.toneEmails.length === 0) {
-    document.getElementById('finishBtn').disabled = true;
-  }
-};
-
+window.addToneEmail = addToneEmail;
+window.removeToneEmail = removeToneEmail;
 window.skipToneSetup = skipToneSetup;
-window.finishOnboarding = completeOnboarding;
+window.finishOnboarding = finishOnboarding;
 window.showAddToneEmailModal = showAddToneEmailModal;
 window.saveToneEmail = saveToneEmail;
 window.editToneEmail = editToneEmail;
@@ -2597,15 +2064,23 @@ window.deleteToneEmail = deleteToneEmail;
 window.deleteEditedEmail = deleteEditedEmail;
 window.viewFullEmail = viewFullEmail;
 window.closeModal = closeModal;
-window.closeSendEmailModal = closeSendEmailModal;
+window.closeSendModal = closeModal;
 window.confirmSendEmail = confirmSendEmail;
 window.handleDeleteAccount = handleDeleteAccount;
 window.startPremiumUpgrade = startPremiumUpgrade;
 window.loadToneManagementUI = loadToneManagementUI;
-window.copyEmailToClipboard = copyEmailToClipboard;
-window.startEmailEditing = startEmailEditing;
-window.saveEmailEdits = saveEmailEdits;
-window.cancelEmailEditing = cancelEmailEditing;
 
-// Final initialization check
-console.log('✅ LetiMail script loaded and ready');
+// ========================================
+// AUTO-INITIALIZATION
+// ========================================
+// Auto-initialize for app.html
+if (document.getElementById('generateBtn')) {
+    document.getElementById('generateBtn').addEventListener('click', generateEmailWithTone);
+    setupEnhancedAppFunctions();
+}
+// Auto-initialize for settings.html
+if (document.getElementById('settings-panels')) {
+    setupSettingsPage();
+}
+
+console.log('✅ LetiMail Enhanced System Loaded Successfully!');
