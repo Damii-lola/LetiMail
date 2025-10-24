@@ -600,7 +600,108 @@ function handleLogout() {
   }
 }
 
-// OTP Functions - COMPLETELY REWRITTEN
+function setupEnhancedAppFunctions() {
+  // Only run if we're on the app page
+  if (!document.getElementById('generateBtn')) return;
+
+  const copyBtn = document.getElementById('copyBtn');
+  const editBtn = document.getElementById('editBtn');
+  const sendBtn = document.getElementById('sendBtn');
+
+  // Copy button
+  if (copyBtn) {
+    copyBtn.onclick = function() {
+      const outputDiv = document.getElementById('output');
+      const text = outputDiv.innerText;
+      navigator.clipboard.writeText(text)
+        .then(() => showNotification('Copied!', 'Email copied to clipboard', 'success'))
+        .catch(() => showNotification('Error', 'Failed to copy email', 'error'));
+    };
+  }
+
+  // Edit button - SIMPLE VERSION
+  if (editBtn) {
+    editBtn.onclick = function() {
+      const outputDiv = document.getElementById('output');
+
+      // Store original content
+      const originalContent = outputDiv.innerHTML;
+
+      // Make editable
+      outputDiv.contentEditable = true;
+      outputDiv.focus();
+      outputDiv.style.outline = '2px solid #6366F1';
+      outputDiv.style.padding = '8px';
+
+      // Add save/cancel buttons
+      const actionButtons = document.getElementById('actionButtons');
+      if (actionButtons) {
+        // Change Edit to Save
+        editBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+        editBtn.onclick = function() { saveEmailEdit(outputDiv, originalContent); };
+
+        // Add cancel button if not exists
+        if (!document.getElementById('cancelEditBtn')) {
+          const cancelBtn = document.createElement('button');
+          cancelBtn.id = 'cancelEditBtn';
+          cancelBtn.className = 'action-btn';
+          cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+          cancelBtn.onclick = function() { cancelEmailEdit(outputDiv, originalContent); };
+          actionButtons.prepend(cancelBtn);
+        }
+      }
+    };
+  }
+
+  // Save function
+  function saveEmailEdit(outputDiv, originalContent) {
+    const editedText = outputDiv.innerText;
+    outputDiv.contentEditable = false;
+    outputDiv.style.outline = 'none';
+    outputDiv.style.padding = '0';
+
+    // Remove cancel button
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    if (cancelBtn) cancelBtn.remove();
+
+    // Reset edit button
+    const editBtn = document.getElementById('editBtn');
+    if (editBtn) {
+      editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
+      editBtn.onclick = setupEnhancedAppFunctions;
+    }
+
+    // Save the edited content
+    outputDiv.setAttribute('data-original-email', editedText);
+    showNotification('Saved', 'Your changes have been saved', 'success');
+  }
+
+  // Cancel function
+  function cancelEmailEdit(outputDiv, originalContent) {
+    outputDiv.contentEditable = false;
+    outputDiv.style.outline = 'none';
+    outputDiv.style.padding = '0';
+    outputDiv.innerHTML = originalContent;
+
+    // Remove cancel button
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    if (cancelBtn) cancelBtn.remove();
+
+    // Reset edit button
+    const editBtn = document.getElementById('editBtn');
+    if (editBtn) {
+      editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
+      editBtn.onclick = setupEnhancedAppFunctions;
+    }
+  }
+
+  // Send button
+  if (sendBtn) {
+    sendBtn.onclick = function() { showSendEmailModal(); };
+  }
+}
+
+// Updated sendOTP function
 async function sendOTP() {
   const email = document.getElementById('signupEmail').value;
   const name = document.getElementById('signupName').value;
@@ -619,43 +720,100 @@ async function sendOTP() {
   const sendOtpBtn = document.querySelector('#signupForm .auth-btn');
   showButtonLoading(sendOtpBtn);
 
-  signupData = { name, email, password };
-
   try {
     const response = await fetch(`${BACKEND_URL}/api/auth/send-otp`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
 
     const data = await response.json();
 
     if (response.ok) {
-      // Show the OTP in console for development
-      if (DEV_MODE && data.otp) {
-        console.log(`🔑 Your OTP is: ${data.otp}`);
-        showNotification(
-          'OTP Sent',
-          `Verification code sent to ${email}. For development, your OTP is: ${data.otp}`,
-          'success',
-          10000
-        );
-      } else {
-        showNotification('OTP Sent', `Verification code sent to ${email}`, 'success');
-      }
+      // Store signup data for next step
+      signupData = { name, email, password };
 
+      // Switch to OTP form
       document.getElementById('signupForm').style.display = 'none';
       document.getElementById('otpForm').style.display = 'block';
+
+      showNotification('Success', `Verification code sent to ${email}`, 'success');
       startResendTimer();
+
     } else {
       throw new Error(data.error || 'Failed to send verification code');
     }
+
   } catch (error) {
     showNotification('Error', error.message, 'error');
+    console.error('OTP Error:', error);
   } finally {
     hideButtonLoading(sendOtpBtn);
+  }
+}
+
+// Updated OTP verification
+async function verifyOTPAndRegister() {
+  const otp = document.getElementById('otpCode').value;
+  if (!otp || otp.length !== 6) {
+    showNotification('Error', 'Please enter a valid 6-digit code', 'error');
+    return;
+  }
+
+  const verifyBtn = document.querySelector('#otpForm .auth-btn');
+  showButtonLoading(verifyBtn);
+
+  try {
+    // First verify the OTP
+    const verifyResponse = await fetch(`${BACKEND_URL}/api/auth/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: signupData.email,
+        otp: otp
+      })
+    });
+
+    const verifyData = await verifyResponse.json();
+
+    if (!verifyResponse.ok) {
+      throw new Error(verifyData.error || 'OTP verification failed');
+    }
+
+    // Then register the user
+    const registerResponse = await fetch(`${BACKEND_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...signupData,
+        otp: otp
+      })
+    });
+
+    const registerData = await registerResponse.json();
+
+    if (registerResponse.ok) {
+      authToken = registerData.token;
+      localStorage.setItem('authToken', authToken);
+      currentUser = registerData.user;
+
+      showNotification('Success', 'Account created successfully!', 'success');
+      hideAuthModal();
+      showUserMenu(currentUser);
+      updateEmailTracking();
+
+      // Redirect or show onboarding
+      handlePostAuthRedirect();
+
+    } else {
+      throw new Error(registerData.error || 'Registration failed');
+    }
+
+  } catch (error) {
+    showNotification('Error', error.message, 'error');
+    console.error('Registration Error:', error);
+  } finally {
+    hideButtonLoading(verifyBtn);
   }
 }
 
