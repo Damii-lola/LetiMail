@@ -1393,6 +1393,7 @@ function setupEnhancedAppFunctions() {
       });
     });
   }
+  
   if (editBtn) {
     editBtn.addEventListener('click', function() {
       const outputDiv = document.getElementById('output');
