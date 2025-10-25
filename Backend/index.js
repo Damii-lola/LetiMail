@@ -298,106 +298,119 @@ The LetiMail Team
 app.post("/api/auth/register", async (req, res) => {
   const { name, email, password, otp } = req.body;
 
+  console.log('\n========================================');
+  console.log('🔍 REGISTRATION ATTEMPT');
+  console.log('========================================');
+  console.log('📧 Email:', email);
+  console.log('👤 Name:', name);
+  console.log('🔐 Raw OTP from request:', JSON.stringify(otp));
+  console.log('🔐 OTP type:', typeof otp);
+
+  // Basic validation
   if (!name || !email || !password || !otp) {
+    console.log('❌ Missing fields');
     return res.status(400).json({ error: 'All fields are required' });
   }
 
   if (password.length < 6) {
+    console.log('❌ Password too short');
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
 
   try {
-    console.log('\n========================================');
-    console.log('🔍 REGISTRATION ATTEMPT');
-    console.log('========================================');
-    console.log('📧 Email:', email);
-    console.log('👤 Name:', name);
-    
-    // Convert OTP to string to ensure consistency
-    const otpString = String(otp).trim();
-    console.log('🔐 OTP provided (original):', otp);
-    console.log('🔐 OTP provided (as string):', otpString);
-    console.log('🔐 OTP type:', typeof otpString);
-    console.log('🔐 OTP length:', otpString.length);
-
     // Check if user already exists
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       console.log('❌ Email already registered');
-      console.log('========================================\n');
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // First, let's see what OTPs exist for this email
-    const allOtps = await pool.query(
-      'SELECT *, (expires_at > NOW()) as is_valid, NOW() as current_db_time FROM otp_verifications WHERE email = $1',
+    // Get ALL info about stored OTP
+    console.log('\n--- DATABASE QUERY ---');
+    const dbCheck = await pool.query(
+      'SELECT email, otp, expires_at, NOW() as db_time FROM otp_verifications WHERE email = $1',
       [email]
     );
     
-    console.log('📊 All OTPs for this email:', allOtps.rows);
-    console.log('📊 Number of OTPs found:', allOtps.rows.length);
+    console.log('📊 DB Query Results:', JSON.stringify(dbCheck.rows, null, 2));
 
-    if (allOtps.rows.length > 0) {
-      const storedOtp = allOtps.rows[0];
-      const storedOtpString = String(storedOtp.otp).trim();
-      
-      console.log('🔍 Stored OTP (raw):', storedOtp.otp);
-      console.log('🔍 Stored OTP (as string):', storedOtpString);
-      console.log('🔍 Stored OTP type:', typeof storedOtp.otp);
-      console.log('🔍 Provided OTP:', otpString);
-      console.log('🔍 String comparison:', storedOtpString === otpString);
-      console.log('🔍 Loose comparison:', storedOtp.otp == otp);
-      console.log('⏰ Expires at:', storedOtp.expires_at);
-      console.log('⏰ Current DB time:', storedOtp.current_db_time);
-      console.log('⏰ Is valid?:', storedOtp.is_valid);
+    if (dbCheck.rows.length === 0) {
+      console.log('❌ NO OTP FOUND IN DATABASE FOR THIS EMAIL');
+      return res.status(400).json({ 
+        error: 'No verification code found. Please request a new one.',
+        debug: { email, otp_in_request: otp, otp_count: 0 }
+      });
     }
 
-    // Do the actual verification query with explicit string casting
-    const otpResult = await pool.query(
-      'SELECT * FROM otp_verifications WHERE email = $1 AND otp::text = $2::text AND expires_at > NOW()',
-      [email, otpString]
+    const dbRecord = dbCheck.rows[0];
+    const dbOtp = dbRecord.otp;
+    const dbExpiry = new Date(dbRecord.expires_at);
+    const dbCurrentTime = new Date(dbRecord.db_time);
+    
+    console.log('\n--- COMPARISON ---');
+    console.log('DB OTP:', JSON.stringify(dbOtp));
+    console.log('User OTP:', JSON.stringify(otp));
+    console.log('DB OTP type:', typeof dbOtp);
+    console.log('User OTP type:', typeof otp);
+    
+    // Try EVERY possible comparison
+    console.log('\n--- EVERY COMPARISON METHOD ---');
+    console.log('Direct ===:', dbOtp === otp);
+    console.log('Direct ==:', dbOtp == otp);
+    console.log('String() ===:', String(dbOtp) === String(otp));
+    console.log('trim() ===:', String(dbOtp).trim() === String(otp).trim());
+    console.log('toLowerCase() ===:', String(dbOtp).toLowerCase() === String(otp).toLowerCase());
+    
+    // Check expiry
+    console.log('\n--- EXPIRY CHECK ---');
+    console.log('Expires at:', dbExpiry.toISOString());
+    console.log('Current DB time:', dbCurrentTime.toISOString());
+    console.log('Is expired?:', dbExpiry < dbCurrentTime);
+    console.log('Time left (ms):', dbExpiry - dbCurrentTime);
+    console.log('Time left (min):', Math.round((dbExpiry - dbCurrentTime) / 60000));
+    
+    // SIMPLE VALIDATION - if ANY comparison works, accept it
+    const otpMatches = (
+      dbOtp === otp ||
+      dbOtp == otp ||
+      String(dbOtp) === String(otp) ||
+      String(dbOtp).trim() === String(otp).trim()
     );
-
-    console.log('📊 OTP verification query returned:', otpResult.rows.length, 'rows');
-
-    if (otpResult.rows.length === 0) {
-      console.log('❌ OTP VERIFICATION FAILED');
-      
-      if (allOtps.rows.length === 0) {
-        console.log('❌ Reason: No OTP found for this email');
-        console.log('========================================\n');
-        return res.status(400).json({ 
-          error: 'No verification code found. Please request a new one.'
-        });
-      }
-
-      const storedOtp = allOtps.rows[0];
-      const storedOtpString = String(storedOtp.otp).trim();
-      
-      if (storedOtpString !== otpString) {
-        console.log('❌ Reason: OTP mismatch');
-        console.log('   Expected:', storedOtpString);
-        console.log('   Got:', otpString);
-        console.log('========================================\n');
-        return res.status(400).json({ 
-          error: `Invalid verification code. Please check the code and try again.`
-        });
-      }
-
-      if (new Date(storedOtp.expires_at) < new Date()) {
-        console.log('❌ Reason: OTP expired');
-        console.log('========================================\n');
-        return res.status(400).json({ 
-          error: 'Verification code expired. Please request a new one.'
-        });
-      }
-
-      console.log('❌ Reason: Unknown - check query logic');
+    
+    const notExpired = dbExpiry > dbCurrentTime;
+    
+    console.log('\n--- FINAL DECISION ---');
+    console.log('OTP Matches:', otpMatches);
+    console.log('Not Expired:', notExpired);
+    console.log('SHOULD PASS:', otpMatches && notExpired);
+    
+    if (!otpMatches) {
+      console.log('❌ FAILED: OTP does not match');
       console.log('========================================\n');
-      return res.status(400).json({ error: 'Invalid verification code' });
+      return res.status(400).json({ 
+        error: 'Invalid verification code',
+        debug: {
+          stored: dbOtp,
+          provided: otp,
+          tried_all_comparisons: true
+        }
+      });
+    }
+    
+    if (!notExpired) {
+      console.log('❌ FAILED: OTP expired');
+      console.log('========================================\n');
+      return res.status(400).json({ 
+        error: 'Verification code expired. Please request a new one.',
+        debug: {
+          expired_at: dbExpiry,
+          current_time: dbCurrentTime,
+          time_left_minutes: Math.round((dbExpiry - dbCurrentTime) / 60000)
+        }
+      });
     }
 
-    console.log('✅ OTP VERIFIED SUCCESSFULLY!');
+    console.log('✅ ✅ ✅ OTP VALIDATION PASSED! ✅ ✅ ✅');
 
     // Create user
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -409,7 +422,7 @@ app.post("/api/auth/register", async (req, res) => {
     );
 
     const user = result.rows[0];
-    console.log('✅ User created:', user);
+    console.log('✅ User created:', user.id);
 
     // Delete used OTP
     await pool.query('DELETE FROM otp_verifications WHERE email = $1', [email]);
@@ -418,7 +431,7 @@ app.post("/api/auth/register", async (req, res) => {
     // Generate JWT
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
-    console.log('✅ USER REGISTERED SUCCESSFULLY!');
+    console.log('✅ ✅ ✅ USER REGISTERED SUCCESSFULLY! ✅ ✅ ✅');
     console.log('========================================\n');
 
     res.json({
@@ -436,6 +449,7 @@ app.post("/api/auth/register", async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Registration error:', error);
+    console.log('Full error:', JSON.stringify(error, null, 2));
     console.log('========================================\n');
     res.status(500).json({ error: 'Registration failed: ' + error.message });
   }
