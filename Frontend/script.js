@@ -184,7 +184,7 @@ WRITING CHARACTERISTICS:
 - Formality level: ${style.formalityScore > 2 ? 'Formal' : style.formalityScore > 1 ? 'Professional' : 'Casual'}
 `;
     if (style.commonPhrases.length > 0) {
-      prompt += `- Common phrases to incorporate: "${style.commonPhrases.slice(0, 5).join('", "')}"
+      prompt += `- Common phrases to incorporate: "\${style.commonPhrases.slice(0, 5).join('", "')}"
 `;
     }
     // Add sample sentences
@@ -427,7 +427,7 @@ function showUpgradePrompt() {
             <div class="upgrade-actions">
                 <button class="upgrade-btn primary" onclick="startPremiumUpgrade()">
                     <i class="fas fa-crown"></i>
-                    Upgrade to Premium - $9.99/month
+                    Upgrade to Premium - \$9.99/month
                 </button>
                 <button class="upgrade-btn secondary" onclick="closeModal('upgradeModal')">
                     Maybe Later
@@ -632,7 +632,7 @@ async function sendOTP() {
 
 async function verifyOTPAndRegister() {
     const otp = document.getElementById('otpCode').value;
-    if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
+    if (!otp || otp.length !== 6 || !/^\d+\$/.test(otp)) {
         showNotification('Error', 'Please enter a valid 6-digit code', 'error');
         return;
     }
@@ -971,7 +971,7 @@ function updateAddedEmailsList() {
           <i class="fas fa-times"></i>
         </button>
       </div>
-      <div class="email-preview">${preview}</div>
+      <div class="email-preview">\${preview}</div>
     `;
 
     list.appendChild(emailCard);
@@ -1375,117 +1375,87 @@ async function generateEmailWithTone() {
 }
 
 // ========================================
-// APP FUNCTIONS (COPY, EDIT, SEND) - FIXED VERSION
+// APP FUNCTIONS (COPY, EDIT, SEND)
 // ========================================
 function setupEnhancedAppFunctions() {
   const copyBtn = document.getElementById('copyBtn');
   const editBtn = document.getElementById('editBtn');
   const sendBtn = document.getElementById('sendBtn');
-
   if (copyBtn) {
-    copyBtn.onclick = function() {
+    copyBtn.addEventListener('click', function() {
       const outputDiv = document.getElementById('output');
       const text = outputDiv.innerText;
-      navigator.clipboard.writeText(text)
-        .then(() => showNotification('Copied!', 'Email copied to clipboard', 'success'))
-        .catch(() => showNotification('Error', 'Failed to copy email', 'error'));
-    };
-  }
 
+      navigator.clipboard.writeText(text).then(() => {
+        showNotification('Copied!', 'Email copied to clipboard', 'success');
+      }).catch(err => {
+        showNotification('Error', 'Failed to copy email', 'error');
+      });
+    });
+  }
   if (editBtn) {
-    editBtn.onclick = function() {
+    editBtn.addEventListener('click', function() {
       const outputDiv = document.getElementById('output');
-      const originalContent = outputDiv.innerHTML;
+      const currentText = outputDiv.innerText;
+      const originalEmail = outputDiv.getAttribute('data-original-email') || currentText;
 
-      // Store original content for cancel
-      outputDiv.setAttribute('data-original-content', originalContent);
-
-      // Make directly editable with visual feedback
-      outputDiv.contentEditable = true;
-      outputDiv.focus();
-      outputDiv.style.outline = '2px solid #6366F1';
-      outputDiv.style.minHeight = '200px';
-
-      // Change edit button to save
-      editBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
-      editBtn.onclick = function() { saveEmailEdit(outputDiv); };
-
-      // Add cancel button if not exists
-      if (!document.getElementById('cancelEditBtn')) {
-        const cancelBtn = document.createElement('button');
-        cancelBtn.id = 'cancelEditBtn';
-        cancelBtn.className = 'action-btn';
-        cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
-        cancelBtn.onclick = function() { cancelEmailEdit(outputDiv); };
-        document.getElementById('actionButtons').prepend(cancelBtn);
-      }
-
-      // Handle Enter/Esc keys
-      document.addEventListener('keydown', handleEditKeyDown);
-
-      function handleEditKeyDown(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          saveEmailEdit(outputDiv);
-          document.removeEventListener('keydown', handleEditKeyDown);
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          cancelEmailEdit(outputDiv);
-          document.removeEventListener('keydown', handleEditKeyDown);
+      // Store original state
+      if (!outputDiv.hasAttribute('data-editing')) {
+        outputDiv.setAttribute('data-editing', 'true');
+        outputDiv.setAttribute('data-backup-text', currentText);
+        
+        // Make the output div editable without changing anything visually
+        outputDiv.contentEditable = 'true';
+        outputDiv.style.cursor = 'text';
+        
+        // Add a subtle indicator that it's in edit mode
+        outputDiv.style.outline = '2px solid rgba(99, 102, 241, 0.3)';
+        
+        // Change button text
+        editBtn.innerHTML = '<i class="fas fa-save"></i> Save Edits';
+        editBtn.classList.add('save-mode');
+        
+        // Focus at the end of content
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(outputDiv);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        outputDiv.focus();
+        
+        showNotification('Edit Mode', 'Click anywhere in the text to edit. Click Save when done.', 'info');
+      } else {
+        // Save mode - user clicked save
+        const editedText = outputDiv.innerText;
+        
+        if (!editedText.trim()) {
+          showNotification('Error', 'Email content cannot be empty', 'error');
+          return;
         }
+        
+        // Exit edit mode
+        outputDiv.removeAttribute('data-editing');
+        outputDiv.contentEditable = 'false';
+        outputDiv.style.cursor = 'default';
+        outputDiv.style.outline = 'none';
+        
+        // Update stored email
+        outputDiv.setAttribute('data-original-email', editedText);
+        
+        // Restore button
+        editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
+        editBtn.classList.remove('save-mode');
+        
+        showNotification('Saved', 'Changes saved successfully', 'success');
       }
-    };
+    });
   }
-
+  
   if (sendBtn) {
-    sendBtn.onclick = function() { showSendEmailModal(); };
-  }
-}
-
-function saveEmailEdit(outputDiv) {
-  const editedText = outputDiv.innerText;
-
-  // Remove edit mode
-  outputDiv.contentEditable = false;
-  outputDiv.style.outline = 'none';
-
-  // Remove cancel button
-  document.getElementById('cancelEditBtn')?.remove();
-
-  // Reset edit button
-  const editBtn = document.getElementById('editBtn');
-  if (editBtn) {
-    editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
-    editBtn.onclick = setupEnhancedAppFunctions;
-  }
-
-  // Save changes
-  outputDiv.setAttribute('data-original-email', editedText);
-  showNotification('Saved', 'Your changes have been saved', 'success');
-
-  // Save to tone profile if significantly edited
-  const originalEmail = outputDiv.getAttribute('data-original-email');
-  if (originalEmail) {
-    ToneProfileManager.saveEditedEmail(originalEmail, editedText);
-  }
-}
-
-function cancelEmailEdit(outputDiv) {
-  const originalContent = outputDiv.getAttribute('data-original-content');
-
-  // Restore original content
-  outputDiv.contentEditable = false;
-  outputDiv.style.outline = 'none';
-  outputDiv.innerHTML = originalContent || '';
-
-  // Remove cancel button
-  document.getElementById('cancelEditBtn')?.remove();
-
-  // Reset edit button
-  const editBtn = document.getElementById('editBtn');
-  if (editBtn) {
-    editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
-    editBtn.onclick = setupEnhancedAppFunctions;
+    sendBtn.addEventListener('click', function() {
+      showSendEmailModal();
+    });
   }
 }
 
@@ -1496,7 +1466,7 @@ function showSendEmailModal() {
 
   modal.innerHTML = `
     <div class="modal-content">
-      <button class="modal-close" onclick="closeModal('sendEmailModal')">
+      <button class="modal-close" onclick="closeSendModal()">
         <i class="fas fa-times"></i>
       </button>
       <h3>Send Email</h3>
@@ -1507,15 +1477,16 @@ function showSendEmailModal() {
         <input type="email" id="recipientEmail" class="auth-input" placeholder="recipient@example.com" required>
       </div>
       <div class="input-group">
-        <label for="businessName">Your Name</label>
-        <input type="text" id="businessName" class="auth-input" placeholder="Your name" value="${currentUser?.name || ''}" required>
+        <label for="businessName">Business Name</label>
+        <input type="text" id="businessName" class="auth-input" placeholder="Your Business Name" value="${currentUser?.name || ''}" required>
       </div>
       <div class="input-group">
-        <label for="replyToEmail">Your Email</label>
-        <input type="email" id="replyToEmail" class="auth-input" placeholder="your@email.com" value="${currentUser?.email || ''}" required>
+        <label for="replyToEmail">Reply-To Email</label>
+        <input type="email" id="replyToEmail" class="auth-input" placeholder="your-email@example.com" value="${currentUser?.email || ''}" required>
+        <span class="input-hint">Replies will be sent directly to this email</span>
       </div>
       <div class="modal-actions">
-        <button class="settings-btn secondary" onclick="closeModal('sendEmailModal')">Cancel</button>
+        <button class="settings-btn secondary" onclick="closeSendModal()">Cancel</button>
         <button class="settings-btn primary" onclick="confirmSendEmail()">
           <i class="fas fa-paper-plane"></i> Send Email
         </button>
@@ -1527,8 +1498,11 @@ function showSendEmailModal() {
   modal.style.display = 'flex';
 }
 
-function closeModal(modalId) {
-  document.getElementById(modalId)?.remove();
+function closeSendModal() {
+  const modal = document.getElementById('sendEmailModal');
+  if (modal) {
+    document.body.removeChild(modal);
+  }
 }
 
 async function confirmSendEmail() {
@@ -1538,26 +1512,22 @@ async function confirmSendEmail() {
   const outputDiv = document.getElementById('output');
   const emailContent = outputDiv.innerText;
 
-  const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
-  const subject = subjectMatch ? subjectMatch[1].trim() : 'Professional Communication';
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
+  const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|\$)/i);
+  const subject = subjectMatch ? subjectMatch[1].trim() : 'Email from LetiMail';
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+\$/;
   if (!emailRegex.test(to)) {
     showNotification('Error', 'Please enter a valid recipient email', 'error');
     return;
   }
-
   if (!emailRegex.test(replyToEmail)) {
     showNotification('Error', 'Please enter a valid reply-to email', 'error');
     return;
   }
-
   const confirmBtn = document.querySelector('#sendEmailModal .settings-btn.primary');
   if (confirmBtn) {
     confirmBtn.disabled = true;
     confirmBtn.innerHTML = '<span class="btn-spinner"></span> Sending...';
   }
-
   try {
     const response = await fetch(`${BACKEND_URL}/api/send-email`, {
       method: 'POST',
@@ -1573,18 +1543,15 @@ async function confirmSendEmail() {
         replyToEmail
       })
     });
-
     const data = await response.json();
-
     if (response.ok) {
-      showNotification('Sent!', `Email sent to ${to}`, 'success');
-      closeModal('sendEmailModal');
+      showNotification('Sent!', 'Email sent successfully! Replies will go to: ' + replyToEmail, 'success');
+      closeSendModal();
     } else {
       throw new Error(data.error || 'Failed to send email');
     }
   } catch (error) {
     showNotification('Error', error.message, 'error');
-  } finally {
     if (confirmBtn) {
       confirmBtn.disabled = false;
       confirmBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Email';
@@ -1794,7 +1761,7 @@ function loadToneManagementUI() {
           </div>
         </div>
         <div class="email-preview">${preview}</div>
-        <button class="view-full-btn" onclick="viewFullEmail(${email.id}, 'training')">
+        <button class="view-full-btn" onclick="viewFullEmail(\${email.id}, 'training')">
           View Full Email <i class="fas fa-chevron-right"></i>
         </button>
       `;
@@ -1822,7 +1789,7 @@ function loadToneManagementUI() {
       emailCard.setAttribute('data-id', email.id);
       emailCard.innerHTML = `
         <div class="email-card-header">
-          <span class="email-date">${new Date(email.dateEdited).toLocaleDateString()}</span>
+          <span class="email-date">\${new Date(email.dateEdited).toLocaleDateString()}</span>
           <div class="email-actions">
             <button class="icon-btn delete" onclick="deleteEditedEmail(${email.id})" title="Remove">
               <i class="fas fa-times"></i>
@@ -1831,7 +1798,7 @@ function loadToneManagementUI() {
         </div>
         <div class="email-preview">${preview}</div>
         <div class="edit-badge">
-          <i class="fas fa-pencil-alt"></i> ${Math.round((1 - email.similarity) * 100)}% edited
+          <i class="fas fa-pencil-alt"></i> \${Math.round((1 - email.similarity) * 100)}% edited
         </div>
       `;
       editedEmailsList.appendChild(emailCard);
@@ -1918,11 +1885,11 @@ function editToneEmail(id) {
       </button>
       <h3>Edit Training Email</h3>
 
-      <textarea id="editToneEmail" class="tone-email-textarea" rows="12">${email.content}</textarea>
+      <textarea id="editToneEmail" class="tone-email-textarea" rows="12">\${email.content}</textarea>
 
       <div class="modal-actions">
         <button class="settings-btn secondary" onclick="closeModal('editToneModal')">Cancel</button>
-        <button class="settings-btn primary" onclick="updateToneEmail(${id})">
+        <button class="settings-btn primary" onclick="updateToneEmail(\${id})">
           <i class="fas fa-save"></i> Save Changes
         </button>
       </div>
@@ -2064,7 +2031,7 @@ window.deleteToneEmail = deleteToneEmail;
 window.deleteEditedEmail = deleteEditedEmail;
 window.viewFullEmail = viewFullEmail;
 window.closeModal = closeModal;
-window.closeSendModal = closeModal;
+window.closeSendModal = closeSendModal;
 window.confirmSendEmail = confirmSendEmail;
 window.handleDeleteAccount = handleDeleteAccount;
 window.startPremiumUpgrade = startPremiumUpgrade;
