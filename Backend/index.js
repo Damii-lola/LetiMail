@@ -138,6 +138,31 @@ const authenticateToken = async (req, res, next) => {
 };
 
 // ============================================
+// DEBUG ENDPOINT - CHECK OTP STATUS
+// ============================================
+
+app.get("/api/debug/otp/:email", async (req, res) => {
+  const { email } = req.params;
+  
+  try {
+    const result = await pool.query(
+      'SELECT email, otp, expires_at, created_at, (expires_at > NOW()) as is_valid FROM otp_verifications WHERE email = $1',
+      [email]
+    );
+    
+    res.json({
+      email: email,
+      otps_found: result.rows.length,
+      otps: result.rows,
+      current_time: new Date(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
 // SIMPLIFIED OTP SYSTEM
 // ============================================
 
@@ -150,23 +175,38 @@ app.post("/api/auth/send-otp", async (req, res) => {
   }
 
   try {
+    console.log('\n========================================');
+    console.log('🔐 SENDING OTP');
+    console.log('========================================');
+    console.log('📧 Email:', email);
+    
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    console.log(`🔐 Generated OTP for ${email}: ${otp}`);
-    console.log(`⏰ Expires at: ${expiresAt}`);
+    console.log('🎲 Generated OTP:', otp);
+    console.log('⏰ Current time:', new Date().toISOString());
+    console.log('⏰ Expires at:', expiresAt.toISOString());
+    console.log('⏰ Time until expiry:', '10 minutes');
 
     // Delete any existing OTPs for this email
-    await pool.query('DELETE FROM otp_verifications WHERE email = $1', [email]);
+    const deleteResult = await pool.query('DELETE FROM otp_verifications WHERE email = $1', [email]);
+    console.log('🗑️  Deleted', deleteResult.rowCount, 'old OTP(s)');
 
     // Insert new OTP
-    await pool.query(
-      'INSERT INTO otp_verifications (email, otp, expires_at) VALUES ($1, $2, $3)',
+    const insertResult = await pool.query(
+      'INSERT INTO otp_verifications (email, otp, expires_at) VALUES ($1, $2, $3) RETURNING *',
       [email, otp, expiresAt]
     );
+    
+    console.log('✅ OTP stored in database:', insertResult.rows[0]);
 
-    console.log('✅ OTP stored in database');
+    // Verify it was stored correctly
+    const verifyResult = await pool.query(
+      'SELECT * FROM otp_verifications WHERE email = $1',
+      [email]
+    );
+    console.log('✅ Verification query returned:', verifyResult.rows);
 
     // Send OTP via email
     const emailContent = `
@@ -183,6 +223,8 @@ If you didn't request this code, please ignore this email.
 Best regards,
 The LetiMail Team
     `;
+
+    console.log('📤 Sending email to:', email);
 
     const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
@@ -207,20 +249,28 @@ The LetiMail Team
     });
 
     if (sendGridResponse.ok) {
-      console.log('✅ OTP email sent successfully');
+      console.log('✅ OTP email sent successfully via SendGrid');
+      console.log('========================================\n');
+      
       res.json({
         success: true,
         message: 'OTP sent successfully',
-        debug: process.env.NODE_ENV === 'development' ? { otp } : undefined
+        debug: {
+          otp: otp, // TEMPORARY - REMOVE IN PRODUCTION
+          email: email,
+          expiresAt: expiresAt
+        }
       });
     } else {
       const errorText = await sendGridResponse.text();
       console.error('❌ SendGrid error:', errorText);
+      console.log('========================================\n');
       res.status(500).json({ error: 'Failed to send OTP email' });
     }
   } catch (error) {
     console.error('❌ OTP send error:', error);
-    res.status(500).json({ error: 'Failed to send OTP' });
+    console.log('========================================\n');
+    res.status(500).json({ error: 'Failed to send OTP: ' + error.message });
   }
 });
 
@@ -237,50 +287,101 @@ app.post("/api/auth/register", async (req, res) => {
   }
 
   try {
-    console.log(`🔍 Registration attempt for: ${email}`);
-    console.log(`🔐 OTP provided: ${otp}`);
+    console.log('\n========================================');
+    console.log('🔍 REGISTRATION ATTEMPT');
+    console.log('========================================');
+    console.log('📧 Email:', email);
+    console.log('👤 Name:', name);
+    console.log('🔐 OTP provided:', otp);
+    console.log('🔐 OTP type:', typeof otp);
+    console.log('🔐 OTP length:', otp.length);
 
     // Check if user already exists
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       console.log('❌ Email already registered');
+      console.log('========================================\n');
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Verify OTP
+    // First, let's see what OTPs exist for this email
+    const allOtps = await pool.query(
+      'SELECT *, (expires_at > NOW()) as is_valid, NOW() as current_db_time FROM otp_verifications WHERE email = $1',
+      [email]
+    );
+    
+    console.log('📊 All OTPs for this email:', allOtps.rows);
+    console.log('📊 Number of OTPs found:', allOtps.rows.length);
+
+    if (allOtps.rows.length > 0) {
+      const storedOtp = allOtps.rows[0];
+      console.log('🔍 Stored OTP:', storedOtp.otp);
+      console.log('🔍 Stored OTP type:', typeof storedOtp.otp);
+      console.log('🔍 Provided OTP:', otp);
+      console.log('🔍 Provided OTP type:', typeof otp);
+      console.log('🔍 OTPs match (===):', storedOtp.otp === otp);
+      console.log('🔍 OTPs match (==):', storedOtp.otp == otp);
+      console.log('🔍 String comparison:', String(storedOtp.otp) === String(otp));
+      console.log('⏰ Expires at:', storedOtp.expires_at);
+      console.log('⏰ Current DB time:', storedOtp.current_db_time);
+      console.log('⏰ Is valid?:', storedOtp.is_valid);
+      console.log('⏰ Time comparison:', new Date(storedOtp.expires_at) > new Date(storedOtp.current_db_time));
+    }
+
+    // Now do the actual verification query
     const otpResult = await pool.query(
       'SELECT * FROM otp_verifications WHERE email = $1 AND otp = $2 AND expires_at > NOW()',
       [email, otp]
     );
 
-    console.log(`📊 OTP verification query returned ${otpResult.rows.length} rows`);
+    console.log('📊 OTP verification query returned:', otpResult.rows.length, 'rows');
+    console.log('📊 Matched OTP details:', otpResult.rows);
 
     if (otpResult.rows.length === 0) {
-      // Check if OTP exists at all
-      const anyOtp = await pool.query(
-        'SELECT * FROM otp_verifications WHERE email = $1',
-        [email]
-      );
-
-      if (anyOtp.rows.length === 0) {
-        console.log('❌ No OTP found for this email');
-        return res.status(400).json({ error: 'No verification code found. Please request a new one.' });
+      console.log('❌ OTP VERIFICATION FAILED');
+      
+      if (allOtps.rows.length === 0) {
+        console.log('❌ Reason: No OTP found for this email');
+        console.log('========================================\n');
+        return res.status(400).json({ 
+          error: 'No verification code found. Please request a new one.',
+          debug: { email, otp_provided: otp }
+        });
       }
 
-      const storedOtp = anyOtp.rows[0];
-      console.log(`📋 Stored OTP: ${storedOtp.otp}, Provided OTP: ${otp}`);
-      console.log(`⏰ OTP expires at: ${storedOtp.expires_at}, Current time: ${new Date()}`);
+      const storedOtp = allOtps.rows[0];
+      
+      if (storedOtp.otp !== otp && String(storedOtp.otp) !== String(otp)) {
+        console.log('❌ Reason: OTP mismatch');
+        console.log('========================================\n');
+        return res.status(400).json({ 
+          error: 'Invalid verification code',
+          debug: { 
+            stored: storedOtp.otp, 
+            provided: otp,
+            match: storedOtp.otp === otp
+          }
+        });
+      }
 
       if (new Date(storedOtp.expires_at) < new Date()) {
-        console.log('❌ OTP expired');
-        return res.status(400).json({ error: 'Verification code expired. Please request a new one.' });
+        console.log('❌ Reason: OTP expired');
+        console.log('========================================\n');
+        return res.status(400).json({ 
+          error: 'Verification code expired. Please request a new one.',
+          debug: {
+            expired_at: storedOtp.expires_at,
+            current_time: new Date()
+          }
+        });
       }
 
-      console.log('❌ OTP mismatch');
+      console.log('❌ Reason: Unknown - check query logic');
+      console.log('========================================\n');
       return res.status(400).json({ error: 'Invalid verification code' });
     }
 
-    console.log('✅ OTP verified successfully');
+    console.log('✅ OTP VERIFIED SUCCESSFULLY!');
 
     // Create user
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -292,14 +393,17 @@ app.post("/api/auth/register", async (req, res) => {
     );
 
     const user = result.rows[0];
+    console.log('✅ User created:', user);
 
     // Delete used OTP
     await pool.query('DELETE FROM otp_verifications WHERE email = $1', [email]);
+    console.log('✅ Used OTP deleted');
 
     // Generate JWT
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
-    console.log('✅ User registered successfully');
+    console.log('✅ USER REGISTERED SUCCESSFULLY!');
+    console.log('========================================\n');
 
     res.json({
       success: true,
@@ -316,6 +420,7 @@ app.post("/api/auth/register", async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Registration error:', error);
+    console.log('========================================\n');
     res.status(500).json({ error: 'Registration failed: ' + error.message });
   }
 });
