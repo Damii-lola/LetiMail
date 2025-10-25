@@ -3323,3 +3323,24 @@ textarea::-webkit-scrollbar-thumb:hover {
     grid-template-columns: 1fr;
   }
 }
+
+.edit-btn {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.edit-btn:hover {
+  background: rgba(245, 158, 11, 0.2);
+  transform: translateY(-2px);
+}
+
+.edit-btn.save-mode {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.edit-btn.save-mode:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
