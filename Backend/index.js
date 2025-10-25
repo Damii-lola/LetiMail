@@ -220,21 +220,29 @@ app.post("/api/auth/verify-otp", async (req, res) => {
   if (!email || !otp) {
     return res.status(400).json({ error: 'Email and OTP are required' });
   }
+
   try {
-    // Check OTP from database
+    // Check OTP from database - removed verified = false condition
     const result = await pool.query(
       `SELECT * FROM otp_verifications
-       WHERE email = $1 AND otp = $2 AND expires_at > NOW() AND verified = false`,
+       WHERE email = $1 AND otp = $2 AND expires_at > NOW()`,
       [email, otp]
     );
+
     if (result.rows.length === 0) {
+      // Log for debugging
+      console.log('❌ OTP validation failed for:', email, 'OTP:', otp);
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
+
+    console.log('✅ OTP validated successfully for:', email);
+
     // Mark OTP as verified
     await pool.query(
       `UPDATE otp_verifications SET verified = true WHERE email = $1 AND otp = $2`,
       [email, otp]
     );
+
     res.json({
       success: true,
       message: 'Email verified successfully'
