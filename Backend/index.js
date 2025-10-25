@@ -180,11 +180,13 @@ app.post("/api/auth/send-otp", async (req, res) => {
     console.log('========================================');
     console.log('📧 Email:', email);
     
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate 6-digit OTP AS A STRING
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     console.log('🎲 Generated OTP:', otp);
+    console.log('🎲 OTP Type:', typeof otp);
+    console.log('🎲 OTP Length:', otp.length);
     console.log('⏰ Current time:', new Date().toISOString());
     console.log('⏰ Expires at:', expiresAt.toISOString());
     console.log('⏰ Time until expiry:', '10 minutes');
@@ -193,20 +195,29 @@ app.post("/api/auth/send-otp", async (req, res) => {
     const deleteResult = await pool.query('DELETE FROM otp_verifications WHERE email = $1', [email]);
     console.log('🗑️  Deleted', deleteResult.rowCount, 'old OTP(s)');
 
-    // Insert new OTP
+    // Insert new OTP - CAST AS TEXT TO ENSURE STRING STORAGE
     const insertResult = await pool.query(
-      'INSERT INTO otp_verifications (email, otp, expires_at) VALUES ($1, $2, $3) RETURNING *',
+      'INSERT INTO otp_verifications (email, otp, expires_at) VALUES ($1, $2::text, $3) RETURNING *',
       [email, otp, expiresAt]
     );
     
     console.log('✅ OTP stored in database:', insertResult.rows[0]);
+    console.log('✅ Stored OTP value:', insertResult.rows[0].otp);
+    console.log('✅ Stored OTP type:', typeof insertResult.rows[0].otp);
 
-    // Verify it was stored correctly
+    // Verify it was stored correctly by reading it back
     const verifyResult = await pool.query(
-      'SELECT * FROM otp_verifications WHERE email = $1',
+      'SELECT otp, email FROM otp_verifications WHERE email = $1',
       [email]
     );
-    console.log('✅ Verification query returned:', verifyResult.rows);
+    console.log('🔍 Verification readback:', verifyResult.rows[0]);
+    console.log('🔍 Readback OTP:', verifyResult.rows[0].otp);
+    console.log('🔍 Readback matches generated:', verifyResult.rows[0].otp === otp);
+
+    // THIS IS THE OTP WE'LL SEND IN THE EMAIL - IT'S THE SAME ONE!
+    const otpToSendInEmail = otp;
+    console.log('📧 OTP that will be emailed:', otpToSendInEmail);
+    console.log('📧 Email OTP matches DB OTP:', otpToSendInEmail === insertResult.rows[0].otp);
 
     // Send OTP via email
     const emailContent = `
@@ -214,7 +225,7 @@ Hello,
 
 Your LetiMail verification code is:
 
-${otp}
+${otpToSendInEmail}
 
 This code will expire in 10 minutes.
 
@@ -225,6 +236,7 @@ The LetiMail Team
     `;
 
     console.log('📤 Sending email to:', email);
+    console.log('📤 Email content includes OTP:', otpToSendInEmail);
 
     const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
@@ -250,15 +262,23 @@ The LetiMail Team
 
     if (sendGridResponse.ok) {
       console.log('✅ OTP email sent successfully via SendGrid');
+      console.log('✅ SUMMARY:');
+      console.log('   - Generated OTP:', otp);
+      console.log('   - Stored in DB:', insertResult.rows[0].otp);
+      console.log('   - Sent in Email:', otpToSendInEmail);
+      console.log('   - All three match:', otp === insertResult.rows[0].otp && otp === otpToSendInEmail);
       console.log('========================================\n');
       
       res.json({
         success: true,
         message: 'OTP sent successfully',
         debug: {
-          otp: otp, // TEMPORARY - REMOVE IN PRODUCTION
+          otp: otp,
           email: email,
-          expiresAt: expiresAt
+          expiresAt: expiresAt,
+          storedOtp: insertResult.rows[0].otp,
+          emailedOtp: otpToSendInEmail,
+          allMatch: otp === insertResult.rows[0].otp && otp === otpToSendInEmail
         }
       });
     } else {
@@ -292,9 +312,13 @@ app.post("/api/auth/register", async (req, res) => {
     console.log('========================================');
     console.log('📧 Email:', email);
     console.log('👤 Name:', name);
-    console.log('🔐 OTP provided:', otp);
-    console.log('🔐 OTP type:', typeof otp);
-    console.log('🔐 OTP length:', otp.length);
+    
+    // Convert OTP to string to ensure consistency
+    const otpString = String(otp).trim();
+    console.log('🔐 OTP provided (original):', otp);
+    console.log('🔐 OTP provided (as string):', otpString);
+    console.log('🔐 OTP type:', typeof otpString);
+    console.log('🔐 OTP length:', otpString.length);
 
     // Check if user already exists
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -315,27 +339,26 @@ app.post("/api/auth/register", async (req, res) => {
 
     if (allOtps.rows.length > 0) {
       const storedOtp = allOtps.rows[0];
-      console.log('🔍 Stored OTP:', storedOtp.otp);
+      const storedOtpString = String(storedOtp.otp).trim();
+      
+      console.log('🔍 Stored OTP (raw):', storedOtp.otp);
+      console.log('🔍 Stored OTP (as string):', storedOtpString);
       console.log('🔍 Stored OTP type:', typeof storedOtp.otp);
-      console.log('🔍 Provided OTP:', otp);
-      console.log('🔍 Provided OTP type:', typeof otp);
-      console.log('🔍 OTPs match (===):', storedOtp.otp === otp);
-      console.log('🔍 OTPs match (==):', storedOtp.otp == otp);
-      console.log('🔍 String comparison:', String(storedOtp.otp) === String(otp));
+      console.log('🔍 Provided OTP:', otpString);
+      console.log('🔍 String comparison:', storedOtpString === otpString);
+      console.log('🔍 Loose comparison:', storedOtp.otp == otp);
       console.log('⏰ Expires at:', storedOtp.expires_at);
       console.log('⏰ Current DB time:', storedOtp.current_db_time);
       console.log('⏰ Is valid?:', storedOtp.is_valid);
-      console.log('⏰ Time comparison:', new Date(storedOtp.expires_at) > new Date(storedOtp.current_db_time));
     }
 
-    // Now do the actual verification query
+    // Do the actual verification query with explicit string casting
     const otpResult = await pool.query(
-      'SELECT * FROM otp_verifications WHERE email = $1 AND otp = $2 AND expires_at > NOW()',
-      [email, otp]
+      'SELECT * FROM otp_verifications WHERE email = $1 AND otp::text = $2::text AND expires_at > NOW()',
+      [email, otpString]
     );
 
     console.log('📊 OTP verification query returned:', otpResult.rows.length, 'rows');
-    console.log('📊 Matched OTP details:', otpResult.rows);
 
     if (otpResult.rows.length === 0) {
       console.log('❌ OTP VERIFICATION FAILED');
@@ -344,23 +367,20 @@ app.post("/api/auth/register", async (req, res) => {
         console.log('❌ Reason: No OTP found for this email');
         console.log('========================================\n');
         return res.status(400).json({ 
-          error: 'No verification code found. Please request a new one.',
-          debug: { email, otp_provided: otp }
+          error: 'No verification code found. Please request a new one.'
         });
       }
 
       const storedOtp = allOtps.rows[0];
+      const storedOtpString = String(storedOtp.otp).trim();
       
-      if (storedOtp.otp !== otp && String(storedOtp.otp) !== String(otp)) {
+      if (storedOtpString !== otpString) {
         console.log('❌ Reason: OTP mismatch');
+        console.log('   Expected:', storedOtpString);
+        console.log('   Got:', otpString);
         console.log('========================================\n');
         return res.status(400).json({ 
-          error: 'Invalid verification code',
-          debug: { 
-            stored: storedOtp.otp, 
-            provided: otp,
-            match: storedOtp.otp === otp
-          }
+          error: `Invalid verification code. Please check the code and try again.`
         });
       }
 
@@ -368,11 +388,7 @@ app.post("/api/auth/register", async (req, res) => {
         console.log('❌ Reason: OTP expired');
         console.log('========================================\n');
         return res.status(400).json({ 
-          error: 'Verification code expired. Please request a new one.',
-          debug: {
-            expired_at: storedOtp.expires_at,
-            current_time: new Date()
-          }
+          error: 'Verification code expired. Please request a new one.'
         });
       }
 
