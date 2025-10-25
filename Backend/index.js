@@ -222,20 +222,39 @@ app.post("/api/auth/verify-otp", async (req, res) => {
   }
 
   try {
-    // Check OTP from database - removed verified = false condition
+    console.log(`🔍 Verifying OTP for email: ${email}, OTP: ${otp}`);
+    
+    // Check OTP from database
     const result = await pool.query(
       `SELECT * FROM otp_verifications
-       WHERE email = $1 AND otp = $2 AND expires_at > NOW()`,
+       WHERE email = $1 AND otp = $2 AND expires_at > NOW() AND verified = false`,
       [email, otp]
     );
 
+    console.log(`📊 OTP query result: ${result.rows.length} rows found`);
+    
     if (result.rows.length === 0) {
-      // Log for debugging
-      console.log('❌ OTP validation failed for:', email, 'OTP:', otp);
-      return res.status(400).json({ error: 'Invalid or expired OTP' });
+      // Check if OTP exists but is expired or already used
+      const checkResult = await pool.query(
+        `SELECT * FROM otp_verifications WHERE email = $1 AND otp = $2`,
+        [email, otp]
+      );
+      
+      if (checkResult.rows.length > 0) {
+        const otpRecord = checkResult.rows[0];
+        if (otpRecord.verified) {
+          console.log('❌ OTP already used');
+          return res.status(400).json({ error: 'This OTP has already been used' });
+        }
+        if (new Date(otpRecord.expires_at) < new Date()) {
+          console.log('❌ OTP expired');
+          return res.status(400).json({ error: 'OTP has expired. Please request a new one' });
+        }
+      }
+      
+      console.log('❌ Invalid OTP');
+      return res.status(400).json({ error: 'Invalid OTP code' });
     }
-
-    console.log('✅ OTP validated successfully for:', email);
 
     // Mark OTP as verified
     await pool.query(
@@ -243,6 +262,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       [email, otp]
     );
 
+    console.log('✅ OTP verified successfully');
     res.json({
       success: true,
       message: 'Email verified successfully'
