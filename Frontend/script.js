@@ -1,7 +1,6 @@
 // Global Auth State
 let currentUser = null;
 let authToken = null;
-let signupData = {}; // Store signup data between OTP steps
 const BACKEND_URL = 'https://letimail-production.up.railway.app';
 
 // Onboarding state management
@@ -515,9 +514,7 @@ function createAuthModals() {
                     <h3>Create Your Account</h3>
                     <p>Join thousands of professionals using LetiMail</p>
                 </div>
-
-                <!-- Step 1: Basic Info -->
-                <form id="signupForm" class="auth-form" style="display: block;">
+                <form id="signupForm" class="auth-form">
                     <div class="input-group">
                         <label for="signupName">Full Name</label>
                         <input type="text" id="signupName" required class="auth-input" placeholder="Enter your full name">
@@ -530,23 +527,8 @@ function createAuthModals() {
                         <label for="signupPassword">Password</label>
                         <input type="password" id="signupPassword" required class="auth-input" placeholder="Create a password (min. 6 characters)" minlength="6">
                     </div>
-                    <button type="button" class="auth-btn primary" onclick="sendOTP()">
-                        <span class="btn-text">Send Verification Code</span>
-                        <div class="btn-spinner"></div>
-                    </button>
-                </form>
-                <!-- Step 2: OTP Verification -->
-                <form id="otpForm" class="auth-form" style="display: none;">
-                    <div class="input-group">
-                        <label for="otpCode">Verification Code</label>
-                        <div class="otp-input-container">
-                            <input type="text" id="otpCode" required class="auth-input otp-input" placeholder="Enter 6-digit code" maxlength="6" pattern="[0-9]{6}">
-                            <button type="button" class="otp-resend" id="resendOtp" onclick="sendOTP()">Resend</button>
-                        </div>
-                        <span class="otp-hint">Check your email for the verification code</span>
-                    </div>
-                    <button type="button" class="auth-btn primary" onclick="verifyOTPAndRegister()">
-                        <span class="btn-text">Verify & Create Account</span>
+                    <button type="submit" class="auth-btn primary">
+                        <span class="btn-text">Create Account</span>
                         <div class="btn-spinner"></div>
                     </button>
                 </form>
@@ -588,112 +570,61 @@ function createAuthModals() {
 }
 
 // ========================================
-// OTP VERIFICATION
+// SIMPLE SIGNUP - NO OTP
 // ========================================
-async function sendOTP() {
-    const email = document.getElementById('signupEmail').value;
+
+async function handleSignup(e) {
+    const button = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(button);
+
     const name = document.getElementById('signupName').value;
+    const email = document.getElementById('signupEmail').value;
     const password = document.getElementById('signupPassword').value;
+
     if (!name || !email || !password) {
         showNotification('Error', 'Please fill in all fields', 'error');
+        hideButtonLoading(button);
         return;
     }
+
     if (password.length < 6) {
         showNotification('Error', 'Password must be at least 6 characters', 'error');
+        hideButtonLoading(button);
         return;
     }
-    const sendOtpBtn = document.querySelector('#signupForm .auth-btn');
-    showButtonLoading(sendOtpBtn);
-    signupData = { name, email, password };
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/auth/send-otp`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ email })
-        });
-        const data = await response.json();
-        if (response.ok) {
-            document.getElementById('signupForm').style.display = 'none';
-            document.getElementById('otpForm').style.display = 'block';
 
-            showNotification('Success', `Verification code sent to ${email}`, 'success');
-            startResendTimer();
-        } else {
-            throw new Error(data.error || 'Failed to send verification code');
-        }
-    } catch (error) {
-        showNotification('Error', error.message, 'error');
-    } finally {
-        hideButtonLoading(sendOtpBtn);
-    }
-}
-
-async function verifyOTPAndRegister() {
-    const otp = document.getElementById('otpCode').value;
-    if (!otp || otp.length !== 6 || !/^\d+\$/.test(otp)) {
-        showNotification('Error', 'Please enter a valid 6-digit code', 'error');
-        return;
-    }
-    const verifyBtn = document.querySelector('#otpForm .auth-btn');
-    showButtonLoading(verifyBtn);
     try {
+        console.log('📝 Signing up:', email);
+
         const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                ...signupData,
-                otp: otp
-            })
+            body: JSON.stringify({ name, email, password })
         });
+
         const data = await response.json();
+        console.log('📊 Signup response:', data);
+
         if (response.ok) {
             authToken = data.token;
             localStorage.setItem('authToken', authToken);
             currentUser = data.user;
-
             showNotification('Success', 'Account created successfully!', 'success');
             hideAuthModal();
             showUserMenu(currentUser);
             updateEmailTracking();
-
-            signupData = {};
-
-            // Use improved redirect handling
             handlePostAuthRedirect();
-
         } else {
             throw new Error(data.error || 'Registration failed');
         }
     } catch (error) {
+        console.error('❌ Signup error:', error);
         showNotification('Error', error.message, 'error');
     } finally {
-        hideButtonLoading(verifyBtn);
+        hideButtonLoading(button);
     }
-}
-
-function startResendTimer() {
-    const resendBtn = document.getElementById('resendOtp');
-    if (!resendBtn) return;
-
-    let timeLeft = 60;
-
-    resendBtn.disabled = true;
-    resendBtn.textContent = `Resend in ${timeLeft}s`;
-
-    const timer = setInterval(() => {
-        timeLeft--;
-        resendBtn.textContent = `Resend in ${timeLeft}s`;
-
-        if (timeLeft <= 0) {
-            clearInterval(timer);
-            resendBtn.disabled = false;
-            resendBtn.textContent = 'Resend';
-        }
-    }, 1000);
 }
 
 // ========================================
@@ -1054,6 +985,11 @@ function setupEventListeners() {
     document.getElementById('signupBtn')?.addEventListener('click', showSignupModal);
 
     document.addEventListener('submit', function(e) {
+        if (e.target.id === 'signupForm') {
+          e.preventDefault();
+          handleSignup(e);
+        }
+      
         if (e.target.id === 'loginForm') {
             e.preventDefault();
             handleLogin(e);
@@ -1144,13 +1080,6 @@ function resetForms() {
             }
         }
     });
-
-    const signupForm = document.getElementById('signupForm');
-    const otpForm = document.getElementById('otpForm');
-    if (signupForm) signupForm.style.display = 'block';
-    if (otpForm) otpForm.style.display = 'none';
-
-    signupData = {};
 }
 
 function showButtonLoading(button) {
@@ -2014,8 +1943,6 @@ window.showSignupModal = showSignupModal;
 window.hideAuthModal = hideAuthModal;
 window.handleGetStarted = handleGetStarted;
 window.generateEmailWithTone = generateEmailWithTone;
-window.sendOTP = sendOTP;
-window.verifyOTPAndRegister = verifyOTPAndRegister;
 window.switchSettingsTab = switchSettingsTab;
 window.showOnboardingModal = showOnboardingModal;
 window.nextOnboardingStep = nextOnboardingStep;
