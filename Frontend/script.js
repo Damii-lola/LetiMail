@@ -1326,61 +1326,56 @@ function setupEnhancedAppFunctions() {
   if (editBtn) {
     editBtn.addEventListener('click', function() {
       const outputDiv = document.getElementById('output');
-      
-      // Check if we're currently in edit mode
-      const isEditing = outputDiv.getAttribute('contenteditable') === 'true';
-      
-      if (!isEditing) {
-        // ENTER EDIT MODE
-        const currentText = outputDiv.innerText;
-        
-        // Store original text as backup
+      const currentText = outputDiv.innerText;
+      const originalEmail = outputDiv.getAttribute('data-original-email') || currentText;
+
+      // Store original state
+      if (!outputDiv.hasAttribute('data-editing')) {
+        outputDiv.setAttribute('data-editing', 'true');
         outputDiv.setAttribute('data-backup-text', currentText);
         
-        // Make it editable
+        // Make the output div editable without changing anything visually
         outputDiv.contentEditable = 'true';
         outputDiv.style.cursor = 'text';
-        outputDiv.style.outline = '2px solid rgba(99, 102, 241, 0.5)';
-        outputDiv.style.outlineOffset = '2px';
         
-        // Change button to "Save"
-        editBtn.innerHTML = '<span class="btn-icon">💾</span> Save Edits';
-        editBtn.style.background = 'rgba(16, 185, 129, 0.1)';
-        editBtn.style.color = 'var(--success)';
-        editBtn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        // Add a subtle indicator that it's in edit mode
+        outputDiv.style.outline = '2px solid rgba(99, 102, 241, 0.3)';
         
-        // Focus at the end
-        outputDiv.focus();
+        // Change button text
+        editBtn.innerHTML = '<i class="fas fa-save"></i> Save Edits';
+        editBtn.classList.add('save-mode');
+        
+        // Focus at the end of content
         const range = document.createRange();
         const sel = window.getSelection();
         range.selectNodeContents(outputDiv);
         range.collapse(false);
         sel.removeAllRanges();
         sel.addRange(range);
+        outputDiv.focus();
         
-        showNotification('Edit Mode', 'Click anywhere to edit. Click Save when done.', 'info');
+        showNotification('Edit Mode', 'Click anywhere in the text to edit. Click Save when done.', 'info');
       } else {
-        // SAVE EDIT MODE
-        const editedText = outputDiv.innerText.trim();
+        // Save mode - user clicked save
+        const editedText = outputDiv.innerText;
         
-        if (!editedText) {
+        if (!editedText.trim()) {
           showNotification('Error', 'Email content cannot be empty', 'error');
           return;
         }
         
         // Exit edit mode
+        outputDiv.removeAttribute('data-editing');
         outputDiv.contentEditable = 'false';
         outputDiv.style.cursor = 'default';
         outputDiv.style.outline = 'none';
         
-        // Update the stored email
+        // Update stored email
         outputDiv.setAttribute('data-original-email', editedText);
         
         // Restore button
-        editBtn.innerHTML = '<span class="btn-icon">✏️</span> Edit Email';
-        editBtn.style.background = 'rgba(245, 158, 11, 0.1)';
-        editBtn.style.color = 'var(--warning)';
-        editBtn.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+        editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
+        editBtn.classList.remove('save-mode');
         
         showNotification('Saved', 'Changes saved successfully', 'success');
       }
