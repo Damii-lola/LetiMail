@@ -1310,11 +1310,11 @@ function setupEnhancedAppFunctions() {
   const copyBtn = document.getElementById('copyBtn');
   const editBtn = document.getElementById('editBtn');
   const sendBtn = document.getElementById('sendBtn');
+
   if (copyBtn) {
     copyBtn.addEventListener('click', function() {
       const outputDiv = document.getElementById('output');
       const text = outputDiv.innerText;
-
       navigator.clipboard.writeText(text).then(() => {
         showNotification('Copied!', 'Email copied to clipboard', 'success');
       }).catch(err => {
@@ -1322,73 +1322,94 @@ function setupEnhancedAppFunctions() {
       });
     });
   }
-  
+
   if (editBtn) {
     editBtn.addEventListener('click', function() {
       const outputDiv = document.getElementById('output');
-      const currentText = outputDiv.innerText;
-      const originalEmail = outputDiv.getAttribute('data-original-email') || currentText;
-
-      // Store original state
-      if (!outputDiv.hasAttribute('data-editing')) {
-        outputDiv.setAttribute('data-editing', 'true');
+      
+      // Check if button currently says "Save" (meaning we're in edit mode)
+      const isSaveMode = editBtn.innerHTML.includes('Save Edits');
+      
+      console.log('🔍 Edit button clicked');
+      console.log('📊 Current contenteditable:', outputDiv.getAttribute('contenteditable'));
+      console.log('📊 Is save mode?:', isSaveMode);
+      
+      if (!isSaveMode) {
+        // ENTER EDIT MODE
+        console.log('✏️ Entering edit mode...');
+        
+        const currentText = outputDiv.innerText;
+        
+        // Store original text as backup
         outputDiv.setAttribute('data-backup-text', currentText);
         
-        // Make the output div editable without changing anything visually
-        outputDiv.contentEditable = 'true';
+        // Make it editable
+        outputDiv.setAttribute('contenteditable', 'true');
         outputDiv.style.cursor = 'text';
+        outputDiv.style.outline = '2px solid rgba(99, 102, 241, 0.5)';
+        outputDiv.style.outlineOffset = '2px';
+        outputDiv.style.padding = '20px'; // Ensure padding for clicking
         
-        // Add a subtle indicator that it's in edit mode
-        outputDiv.style.outline = '2px solid rgba(99, 102, 241, 0.3)';
+        // Change button to "Save"
+        editBtn.innerHTML = '<span class="btn-icon">💾</span> Save Edits';
+        editBtn.style.background = 'rgba(16, 185, 129, 0.1)';
+        editBtn.style.color = 'var(--success)';
+        editBtn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
         
-        // Change button text
-        editBtn.innerHTML = '<i class="fas fa-save"></i> Save Edits';
-        editBtn.classList.add('save-mode');
-        
-        // Focus at the end of content
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(outputDiv);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
+        // Focus the div
         outputDiv.focus();
         
-        showNotification('Edit Mode', 'Click anywhere in the text to edit. Click Save when done.', 'info');
-      } else {
-        // Save mode - user clicked save
-        const editedText = outputDiv.innerText;
+        // Place cursor at the end
+        try {
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.selectNodeContents(outputDiv);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (e) {
+          console.log('Could not set cursor position:', e);
+        }
         
-        if (!editedText.trim()) {
+        console.log('✅ Edit mode activated');
+        showNotification('Edit Mode', 'Click in the text to edit. Click Save when done.', 'info');
+      } else {
+        // SAVE EDIT MODE
+        console.log('💾 Saving edits...');
+        
+        const editedText = outputDiv.innerText.trim();
+        
+        if (!editedText) {
           showNotification('Error', 'Email content cannot be empty', 'error');
           return;
         }
         
         // Exit edit mode
-        outputDiv.removeAttribute('data-editing');
-        outputDiv.contentEditable = 'false';
+        outputDiv.setAttribute('contenteditable', 'false');
         outputDiv.style.cursor = 'default';
         outputDiv.style.outline = 'none';
         
-        // Update stored email
+        // Update the stored email
         outputDiv.setAttribute('data-original-email', editedText);
         
         // Restore button
-        editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Email';
-        editBtn.classList.remove('save-mode');
+        editBtn.innerHTML = '<span class="btn-icon">✏️</span> Edit Email';
+        editBtn.style.background = 'rgba(245, 158, 11, 0.1)';
+        editBtn.style.color = 'var(--warning)';
+        editBtn.style.borderColor = 'rgba(245, 158, 11, 0.3)';
         
+        console.log('✅ Edits saved');
         showNotification('Saved', 'Changes saved successfully', 'success');
       }
     });
   }
-  
+
   if (sendBtn) {
     sendBtn.addEventListener('click', function() {
       showSendEmailModal();
     });
   }
 }
-
 function showSendEmailModal() {
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
