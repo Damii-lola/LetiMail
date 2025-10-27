@@ -262,7 +262,251 @@ app.delete("/api/auth/delete-account", authenticateToken, async (req, res) => {
 });
 
 // ============================================
-// EMAIL GENERATION
+// SETTINGS ENDPOINTS
+// ============================================
+
+// Update user profile
+app.put("/api/auth/profile", authenticateToken, async (req, res) => {
+  const { name } = req.body;
+  
+  if (!name || name.trim().length === 0) {
+    return res.status(400).json({ error: 'Name is required' });
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE users SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name, email, plan',
+      [name.trim(), req.user.id]
+    );
+
+    console.log('✅ Profile updated for user:', req.user.id);
+    
+    res.json({
+      success: true,
+      user: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// Change password
+app.put("/api/auth/password", authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current and new password are required' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters' });
+  }
+
+  try {
+    // Verify current password
+    const result = await pool.query('SELECT password FROM users WHERE id = $1', [req.user.id]);
+    const user = result.rows[0];
+    
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Update password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      'UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [hashedPassword, req.user.id]
+    );
+
+    console.log('✅ Password changed for user:', req.user.id);
+    
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Password change error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+// Save user preferences
+app.put("/api/auth/preferences", authenticateToken, async (req, res) => {
+  const { defaultTone, emailLength, autoSave, spellCheck } = req.body;
+  
+  try {
+    // Store preferences as JSON in database
+    const preferences = {
+      defaultTone: defaultTone || 'friendly',
+      emailLength: emailLength || 'medium',
+      autoSave: autoSave !== undefined ? autoSave : true,
+      spellCheck: spellCheck !== undefined ? spellCheck : true
+    };
+
+    await pool.query(
+      `UPDATE users SET 
+       updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $1`,
+      [req.user.id]
+    );
+
+    console.log('✅ Preferences saved for user:', req.user.id);
+    
+    res.json({ success: true, preferences });
+  } catch (error) {
+    console.error('Preferences save error:', error);
+    res.status(500).json({ error: 'Failed to save preferences' });
+  }
+});
+
+// ============================================
+// EMAIL HISTORY
+// ============================================
+
+// Save email to history
+async function saveEmailToHistory(userId, business, context, tone, generatedEmail) {
+  try {
+    await pool.query(
+      `INSERT INTO email_history (user_id, business_context, email_context, tone, generated_email)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, business, context, tone, generatedEmail]
+    );
+    console.log('✅ Email saved to history');
+  } catch (error) {
+    console.error('Failed to save email history:', error);
+  }
+}
+
+// Get user's email history
+app.get("/api/email-history", authenticateToken, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const result = await pool.query(
+      `SELECT id, business_context, email_context, tone, generated_email, created_at 
+       FROM email_history 
+       WHERE user_id = $1 
+       ORDER BY created_at DESC 
+       LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    const countResult = await pool.query(
+      'SELECT COUNT(*) FROM email_history WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    res.json({
+      success: true,
+      emails: result.rows,
+      total: parseInt(countResult.rows[0].count),
+      limit,
+      offset
+    });
+  } catch (error) {
+    console.error('Email history error:', error);
+    res.status(500).json({ error: 'Failed to get email history' });
+  }
+});
+
+// Delete email from history
+app.delete("/api/email-history/:id", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM email_history WHERE id = $1 AND user_id = $2 RETURNING id',
+      [req.params.id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Email not found' });
+    }
+
+    res.json({ success: true, message: 'Email deleted from history' });
+  } catch (error) {
+    console.error('Delete history error:', error);
+    res.status(500).json({ error: 'Failed to delete email' });
+  }
+});
+
+// ============================================
+// DAILY EMAIL RESET (Call this from a cron job)
+// ============================================
+
+async function resetDailyEmails() {
+  try {
+    const result = await pool.query(
+      `UPDATE users 
+       SET daily_emails_used = 0, last_reset_date = CURRENT_DATE 
+       WHERE last_reset_date < CURRENT_DATE 
+       RETURNING id`
+    );
+    console.log(`✅ Reset daily emails for ${result.rows.length} users`);
+  } catch (error) {
+    console.error('Daily reset error:', error);
+  }
+}
+
+// Endpoint to manually trigger reset (for testing or cron)
+app.post("/api/admin/reset-daily", async (req, res) => {
+  const adminKey = req.headers['x-admin-key'];
+  
+  if (adminKey !== process.env.ADMIN_KEY) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  await resetDailyEmails();
+  res.json({ success: true, message: 'Daily emails reset' });
+});
+
+// Auto-reset on server startup
+resetDailyEmails();
+
+// ============================================
+// RATE LIMITING MIDDLEWARE
+// ============================================
+
+const rateLimitStore = new Map();
+
+function rateLimit(maxRequests = 10, windowMs = 60000) {
+  return (req, res, next) => {
+    const identifier = req.user?.id || req.ip;
+    const now = Date.now();
+    
+    if (!rateLimitStore.has(identifier)) {
+      rateLimitStore.set(identifier, []);
+    }
+    
+    const requests = rateLimitStore.get(identifier);
+    const recentRequests = requests.filter(time => now - time < windowMs);
+    
+    if (recentRequests.length >= maxRequests) {
+      return res.status(429).json({ 
+        error: 'Too many requests. Please try again later.',
+        retryAfter: Math.ceil((recentRequests[0] + windowMs - now) / 1000)
+      });
+    }
+    
+    recentRequests.push(now);
+    rateLimitStore.set(identifier, recentRequests);
+    
+    // Clean up old entries every 100 requests
+    if (Math.random() < 0.01) {
+      for (const [key, times] of rateLimitStore.entries()) {
+        const recent = times.filter(time => now - time < windowMs);
+        if (recent.length === 0) {
+          rateLimitStore.delete(key);
+        } else {
+          rateLimitStore.set(key, recent);
+        }
+      }
+    }
+    
+    next();
+  };
+}
+
+// ============================================
+// ENHANCED EMAIL GENERATION WITH HISTORY
 // ============================================
 
 function cleanAIResponse(content) {
@@ -288,7 +532,7 @@ function cleanAIResponse(content) {
   return cleaned || content;
 }
 
-app.post("/api/generate", authenticateToken, async (req, res) => {
+app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, res) => {
   const { business, context, tone, emailLength, stylePrompt } = req.body;
   
   if (!business || !context) {
@@ -318,7 +562,7 @@ IMPORTANT: Make this email sound like a real human wrote it - natural, conversat
 Return ONLY the email content starting with "Subject:".
 `;
 
-    console.log("📝 Generating email with prompt:", prompt);
+    console.log("📝 Generating email for user:", user.id);
 
     const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -345,6 +589,10 @@ Return ONLY the email content starting with "Subject:".
       email = "Subject: Professional Communication\n\n" + email;
     }
 
+    // Save to history (async, don't wait)
+    saveEmailToHistory(user.id, business, context, tone, email);
+
+    // Update email count
     if (user.plan === 'free') {
       await pool.query(
         'UPDATE users SET emails_used = emails_used + 1 WHERE id = $1',
@@ -355,7 +603,7 @@ Return ONLY the email content starting with "Subject:".
     res.json({ email });
   } catch (error) {
     console.error("Generation error:", error);
-    res.status(500).json({ email: "Error generating email." });
+    res.status(500).json({ error: "Error generating email. Please try again." });
   }
 });
 
