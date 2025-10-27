@@ -1324,55 +1324,48 @@ function setupEnhancedAppFunctions() {
   }
 
   if (editBtn) {
-    editBtn.addEventListener('click', function() {
-      const outputDiv = document.getElementById('output');
+    let isProcessing = false; // Prevent double clicks
+    
+    editBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
       
-      // Check if button currently says "Save" (meaning we're in edit mode)
+      // Prevent double clicks
+      if (isProcessing) {
+        console.log('⚠️ Already processing, ignoring click');
+        return;
+      }
+      
+      isProcessing = true;
+      
+      const outputDiv = document.getElementById('output');
       const isSaveMode = editBtn.innerHTML.includes('Save Edits');
       
       console.log('🔍 Edit button clicked');
-      console.log('📊 Current contenteditable:', outputDiv.getAttribute('contenteditable'));
       console.log('📊 Is save mode?:', isSaveMode);
       
       if (!isSaveMode) {
         // ENTER EDIT MODE
         console.log('✏️ Entering edit mode...');
         
-        const currentText = outputDiv.innerText;
-        
-        // Store original text as backup
-        outputDiv.setAttribute('data-backup-text', currentText);
-        
-        // Make it editable
+        outputDiv.setAttribute('data-backup-text', outputDiv.innerText);
         outputDiv.setAttribute('contenteditable', 'true');
         outputDiv.style.cursor = 'text';
         outputDiv.style.outline = '2px solid rgba(99, 102, 241, 0.5)';
         outputDiv.style.outlineOffset = '2px';
-        outputDiv.style.padding = '20px'; // Ensure padding for clicking
         
-        // Change button to "Save"
         editBtn.innerHTML = '<span class="btn-icon">💾</span> Save Edits';
         editBtn.style.background = 'rgba(16, 185, 129, 0.1)';
         editBtn.style.color = 'var(--success)';
         editBtn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
         
-        // Focus the div
-        outputDiv.focus();
+        setTimeout(() => {
+          outputDiv.focus();
+          isProcessing = false;
+        }, 100);
         
-        // Place cursor at the end
-        try {
-          const range = document.createRange();
-          const sel = window.getSelection();
-          range.selectNodeContents(outputDiv);
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        } catch (e) {
-          console.log('Could not set cursor position:', e);
-        }
-        
-        console.log('✅ Edit mode activated');
         showNotification('Edit Mode', 'Click in the text to edit. Click Save when done.', 'info');
+        
       } else {
         // SAVE EDIT MODE
         console.log('💾 Saving edits...');
@@ -1381,25 +1374,25 @@ function setupEnhancedAppFunctions() {
         
         if (!editedText) {
           showNotification('Error', 'Email content cannot be empty', 'error');
+          isProcessing = false;
           return;
         }
         
-        // Exit edit mode
         outputDiv.setAttribute('contenteditable', 'false');
         outputDiv.style.cursor = 'default';
         outputDiv.style.outline = 'none';
-        
-        // Update the stored email
         outputDiv.setAttribute('data-original-email', editedText);
         
-        // Restore button
         editBtn.innerHTML = '<span class="btn-icon">✏️</span> Edit Email';
         editBtn.style.background = 'rgba(245, 158, 11, 0.1)';
         editBtn.style.color = 'var(--warning)';
         editBtn.style.borderColor = 'rgba(245, 158, 11, 0.3)';
         
-        console.log('✅ Edits saved');
         showNotification('Saved', 'Changes saved successfully', 'success');
+        
+        setTimeout(() => {
+          isProcessing = false;
+        }, 100);
       }
     });
   }
