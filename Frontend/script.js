@@ -1401,24 +1401,87 @@ function handleEditClick() {
       return;
     }
     
-    // Replace textarea with the edited text
+    const originalText = outputDiv.dataset.originalContent || editedText;
+    
+    // Check if user actually made changes
+    if (editedText === originalText) {
+      // No changes made, just exit edit mode
+      outputDiv.innerHTML = '';
+      outputDiv.innerText = editedText;
+      outputDiv.dataset.editMode = 'false';
+      
+      editBtn.innerHTML = '<span class="btn-icon">✏️</span> Edit Email';
+      editBtn.style.background = 'rgba(245, 158, 11, 0.1)';
+      editBtn.style.color = '#f59e0b';
+      editBtn.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+      
+      showNotification('No Changes', 'No edits were made', 'info');
+      return;
+    }
+    
+    // User made changes - polish with AI
+    polishEditedEmail(originalText, editedText, outputDiv, editBtn);
+  }
+}
+
+// Polish edited email with AI
+async function polishEditedEmail(originalEmail, editedEmail, outputDiv, editBtn) {
+  console.log('✨ Polishing edited email with AI...');
+  
+  // Show loading state
+  outputDiv.innerHTML = '<div class="output-placeholder"><div class="placeholder-animation"><div class="animation-ring"></div><div class="placeholder-icon">✨</div></div><p>AI is polishing your edits...</p><small>Fixing grammar, tone, and flow</small></div>';
+  
+  // Disable button during processing
+  editBtn.disabled = true;
+  editBtn.innerHTML = '<span class="btn-icon">⏳</span> Polishing...';
+  
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/polish-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        originalEmail: originalEmail,
+        editedEmail: editedEmail
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Show polished email
+      outputDiv.innerHTML = '';
+      outputDiv.innerText = data.polishedEmail;
+      outputDiv.setAttribute('data-original-email', data.polishedEmail);
+      
+      showNotification('Polished!', 'AI refined your edits for better flow and grammar', 'success');
+    } else {
+      // Polishing failed, use edited version
+      outputDiv.innerHTML = '';
+      outputDiv.innerText = editedEmail;
+      outputDiv.setAttribute('data-original-email', editedEmail);
+      
+      showNotification('Saved', data.message || 'Your edits have been saved', 'info');
+    }
+  } catch (error) {
+    console.error('❌ Polish error:', error);
+    
+    // On error, just use the edited text
     outputDiv.innerHTML = '';
-    outputDiv.innerText = editedText;
+    outputDiv.innerText = editedEmail;
+    outputDiv.setAttribute('data-original-email', editedEmail);
     
-    // Update stored email
-    outputDiv.setAttribute('data-original-email', editedText);
-    
-    // Mark as not editing
+    showNotification('Saved', 'Your edits have been saved', 'success');
+  } finally {
+    // Reset edit mode and button
     outputDiv.dataset.editMode = 'false';
-    
-    // Restore button
+    editBtn.disabled = false;
     editBtn.innerHTML = '<span class="btn-icon">✏️</span> Edit Email';
     editBtn.style.background = 'rgba(245, 158, 11, 0.1)';
     editBtn.style.color = '#f59e0b';
     editBtn.style.borderColor = 'rgba(245, 158, 11, 0.3)';
-    
-    console.log('✅ Changes saved');
-    showNotification('Saved', 'Your changes have been saved', 'success');
   }
 }
 
