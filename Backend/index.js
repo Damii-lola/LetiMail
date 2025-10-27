@@ -65,17 +65,6 @@ async function initializeDatabase() {
       )
     `);
 
-    // Simplified OTP table - removed verified column
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS otp_verifications (
-        id SERIAL PRIMARY KEY,
-        email VARCHAR(255) NOT NULL,
-        otp VARCHAR(6) NOT NULL,
-        expires_at TIMESTAMP NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
     await pool.query(`
       CREATE TABLE IF NOT EXISTS email_history (
         id SERIAL PRIMARY KEY,
@@ -90,8 +79,8 @@ async function initializeDatabase() {
 
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_verifications(email)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_history_user ON email_history(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_history_created ON email_history(created_at)`);
 
     console.log('✅ Database tables initialized successfully');
   } catch (error) {
@@ -138,7 +127,7 @@ const authenticateToken = async (req, res, next) => {
 };
 
 // ============================================
-// SIMPLE AUTH - NO OTP
+// AUTH ENDPOINTS - NO OTP
 // ============================================
 
 // Register new user - NO OTP REQUIRED
@@ -163,7 +152,7 @@ app.post("/api/auth/register", async (req, res) => {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Create user directly - NO OTP VERIFICATION
+    // Create user directly
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await pool.query(
       `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
@@ -198,10 +187,6 @@ app.post("/api/auth/register", async (req, res) => {
     res.status(500).json({ error: 'Registration failed: ' + error.message });
   }
 });
-
-// ============================================
-// AUTH ENDPOINTS
-// ============================================
 
 // Login user
 app.post("/api/auth/login", async (req, res) => {
@@ -371,6 +356,78 @@ Return ONLY the email content starting with "Subject:".
   } catch (error) {
     console.error("Generation error:", error);
     res.status(500).json({ email: "Error generating email." });
+  }
+});
+
+// Polish edited email - FREE (doesn't count against email limit)
+app.post("/api/polish-email", authenticateToken, async (req, res) => {
+  const { originalEmail, editedEmail } = req.body;
+  
+  if (!originalEmail || !editedEmail) {
+    return res.status(400).json({ error: "Both original and edited email are required" });
+  }
+
+  try {
+    console.log('✨ Polishing edited email...');
+
+    const prompt = `You are an email editor. The user made edits to an AI-generated email. Your job is to:
+
+1. Keep ALL the user's edits and changes intact
+2. Make the edited parts flow naturally with the rest of the email
+3. Fix any grammar, punctuation, or formatting issues
+4. Ensure consistent tone and style throughout
+5. Keep the same structure and formatting as the original
+
+ORIGINAL EMAIL:
+${originalEmail}
+
+USER'S EDITED VERSION:
+${editedEmail}
+
+IMPORTANT RULES:
+- Preserve the user's intended changes completely
+- Only polish grammar, punctuation, and flow
+- Do NOT rewrite or change the user's edits
+- Make edited sections blend seamlessly with unchanged sections
+- Maintain the original email's tone and formality
+
+Return ONLY the polished email, nothing else.`;
+
+    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 1000,
+      }),
+    });
+
+    const data = await groqResponse.json();
+    let polishedEmail = data.choices?.[0]?.message?.content?.trim() || editedEmail;
+
+    // Clean up any AI prefixes
+    polishedEmail = polishedEmail.replace(/^(Here is|Here's) (the )?(polished|refined|edited) (version of the )?email:\s*/i, '');
+    polishedEmail = polishedEmail.replace(/^(Based on your edits, here( is|'s))?/i, '');
+    polishedEmail = polishedEmail.trim();
+
+    console.log('✅ Email polished successfully');
+
+    res.json({
+      polishedEmail: polishedEmail || editedEmail,
+      success: true
+    });
+  } catch (error) {
+    console.error("Polish error:", error);
+    res.json({
+      polishedEmail: editedEmail,
+      success: false,
+      message: "Polishing failed, returning your edits"
+    });
   }
 });
 
@@ -576,7 +633,7 @@ app.get("/api/health", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("✅ LetiMail backend running - OTP system v2.0");
+  res.send("✅ LetiMail backend running - Simple registration, AI polish feature included");
 });
 
 const PORT = process.env.PORT || 3000;
