@@ -3333,3 +3333,38 @@ textarea::-webkit-scrollbar-thumb:hover {
 .edit-btn.save-mode:hover {
   background: rgba(16, 185, 129, 0.2);
 }
+
+/* Email Editor Textarea - BRAND NEW */
+.email-editor-textarea {
+  width: 100%;
+  min-height: 400px;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+  resize: vertical;
+  transition: all 0.3s ease;
+}
+
+.email-editor-textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Output text styling */
+.edit-btn {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  transition: all 0.3s ease;
+}
+
+.edit-btn:hover {
+  background: rgba(245, 158, 11, 0.2);
+  transform: translateY(-2px);
+}
