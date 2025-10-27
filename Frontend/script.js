@@ -1323,78 +1323,9 @@ function setupEnhancedAppFunctions() {
     });
   }
 
+  // BRAND NEW EDIT SYSTEM - COMPLETELY REDONE
   if (editBtn) {
-    let isProcessing = false; // Prevent double clicks
-    
-    editBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      // Prevent double clicks
-      if (isProcessing) {
-        console.log('⚠️ Already processing, ignoring click');
-        return;
-      }
-      
-      isProcessing = true;
-      
-      const outputDiv = document.getElementById('output');
-      const isSaveMode = editBtn.innerHTML.includes('Save Edits');
-      
-      console.log('🔍 Edit button clicked');
-      console.log('📊 Is save mode?:', isSaveMode);
-      
-      if (!isSaveMode) {
-        // ENTER EDIT MODE
-        console.log('✏️ Entering edit mode...');
-        
-        outputDiv.setAttribute('data-backup-text', outputDiv.innerText);
-        outputDiv.setAttribute('contenteditable', 'true');
-        outputDiv.style.cursor = 'text';
-        outputDiv.style.outline = '2px solid rgba(99, 102, 241, 0.5)';
-        outputDiv.style.outlineOffset = '2px';
-        
-        editBtn.innerHTML = '<span class="btn-icon">💾</span> Save Edits';
-        editBtn.style.background = 'rgba(16, 185, 129, 0.1)';
-        editBtn.style.color = 'var(--success)';
-        editBtn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-        
-        setTimeout(() => {
-          outputDiv.focus();
-          isProcessing = false;
-        }, 100);
-        
-        showNotification('Edit Mode', 'Click in the text to edit. Click Save when done.', 'info');
-        
-      } else {
-        // SAVE EDIT MODE
-        console.log('💾 Saving edits...');
-        
-        const editedText = outputDiv.innerText.trim();
-        
-        if (!editedText) {
-          showNotification('Error', 'Email content cannot be empty', 'error');
-          isProcessing = false;
-          return;
-        }
-        
-        outputDiv.setAttribute('contenteditable', 'false');
-        outputDiv.style.cursor = 'default';
-        outputDiv.style.outline = 'none';
-        outputDiv.setAttribute('data-original-email', editedText);
-        
-        editBtn.innerHTML = '<span class="btn-icon">✏️</span> Edit Email';
-        editBtn.style.background = 'rgba(245, 158, 11, 0.1)';
-        editBtn.style.color = 'var(--warning)';
-        editBtn.style.borderColor = 'rgba(245, 158, 11, 0.3)';
-        
-        showNotification('Saved', 'Changes saved successfully', 'success');
-        
-        setTimeout(() => {
-          isProcessing = false;
-        }, 100);
-      }
-    });
+    editBtn.addEventListener('click', handleEditClick, { once: false });
   }
 
   if (sendBtn) {
@@ -1403,43 +1334,92 @@ function setupEnhancedAppFunctions() {
     });
   }
 }
-function showSendEmailModal() {
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.id = 'sendEmailModal';
 
-  modal.innerHTML = `
-    <div class="modal-content">
-      <button class="modal-close" onclick="closeSendModal()">
-        <i class="fas fa-times"></i>
-      </button>
-      <h3>Send Email</h3>
-      <p class="modal-description">Send your generated email directly from LetiMail.</p>
-
-      <div class="input-group">
-        <label for="recipientEmail">Recipient Email</label>
-        <input type="email" id="recipientEmail" class="auth-input" placeholder="recipient@example.com" required>
-      </div>
-      <div class="input-group">
-        <label for="businessName">Business Name</label>
-        <input type="text" id="businessName" class="auth-input" placeholder="Your Business Name" value="${currentUser?.name || ''}" required>
-      </div>
-      <div class="input-group">
-        <label for="replyToEmail">Reply-To Email</label>
-        <input type="email" id="replyToEmail" class="auth-input" placeholder="your-email@example.com" value="${currentUser?.email || ''}" required>
-        <span class="input-hint">Replies will be sent directly to this email</span>
-      </div>
-      <div class="modal-actions">
-        <button class="settings-btn secondary" onclick="closeSendModal()">Cancel</button>
-        <button class="settings-btn primary" onclick="confirmSendEmail()">
-          <i class="fas fa-paper-plane"></i> Send Email
-        </button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-  modal.style.display = 'flex';
+// SEPARATE FUNCTION FOR EDIT HANDLING
+function handleEditClick() {
+  const editBtn = document.getElementById('editBtn');
+  const outputDiv = document.getElementById('output');
+  
+  // Check current state by looking at a custom data attribute
+  const isCurrentlyEditing = outputDiv.dataset.editMode === 'true';
+  
+  console.log('🖱️ Edit button clicked');
+  console.log('📝 Currently editing?', isCurrentlyEditing);
+  
+  if (!isCurrentlyEditing) {
+    // ========== ENTER EDIT MODE ==========
+    console.log('▶️ ENTERING EDIT MODE');
+    
+    // Get current text
+    const currentText = outputDiv.innerText;
+    
+    // Create a textarea with the current text
+    const textarea = document.createElement('textarea');
+    textarea.className = 'email-editor-textarea';
+    textarea.value = currentText;
+    textarea.id = 'emailEditorTextarea';
+    
+    // Store original content
+    outputDiv.dataset.originalContent = currentText;
+    
+    // Replace output content with textarea
+    outputDiv.innerHTML = '';
+    outputDiv.appendChild(textarea);
+    
+    // Mark as editing
+    outputDiv.dataset.editMode = 'true';
+    
+    // Update button
+    editBtn.innerHTML = '<span class="btn-icon">💾</span> Save Changes';
+    editBtn.style.background = 'rgba(16, 185, 129, 0.1)';
+    editBtn.style.color = '#10b981';
+    editBtn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+    
+    // Focus textarea
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    
+    console.log('✅ Edit mode active - textarea created');
+    showNotification('Edit Mode', 'Make your changes and click Save', 'info');
+    
+  } else {
+    // ========== SAVE EDIT MODE ==========
+    console.log('▶️ SAVING CHANGES');
+    
+    const textarea = document.getElementById('emailEditorTextarea');
+    
+    if (!textarea) {
+      console.error('❌ Textarea not found!');
+      outputDiv.dataset.editMode = 'false';
+      return;
+    }
+    
+    const editedText = textarea.value.trim();
+    
+    if (!editedText) {
+      showNotification('Error', 'Email cannot be empty', 'error');
+      return;
+    }
+    
+    // Replace textarea with the edited text
+    outputDiv.innerHTML = '';
+    outputDiv.innerText = editedText;
+    
+    // Update stored email
+    outputDiv.setAttribute('data-original-email', editedText);
+    
+    // Mark as not editing
+    outputDiv.dataset.editMode = 'false';
+    
+    // Restore button
+    editBtn.innerHTML = '<span class="btn-icon">✏️</span> Edit Email';
+    editBtn.style.background = 'rgba(245, 158, 11, 0.1)';
+    editBtn.style.color = '#f59e0b';
+    editBtn.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+    
+    console.log('✅ Changes saved');
+    showNotification('Saved', 'Your changes have been saved', 'success');
+  }
 }
 
 function closeSendModal() {
