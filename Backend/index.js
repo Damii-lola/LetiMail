@@ -856,20 +856,37 @@ Return ONLY the polished email, nothing else.`;
 app.post("/api/send-email", authenticateToken, async (req, res) => {
   const { to, subject, content, businessName, replyToEmail } = req.body;
   
+  console.log('📧 Send email request:', { to, subject, businessName, replyToEmail, hasContent: !!content });
+  
   if (!to || !subject || !content || !businessName || !replyToEmail) {
-    return res.status(400).json({ error: "All fields are required" });
+    const missing = [];
+    if (!to) missing.push('recipient email');
+    if (!subject) missing.push('subject');
+    if (!content) missing.push('content');
+    if (!businessName) missing.push('business name');
+    if (!replyToEmail) missing.push('reply-to email');
+    
+    console.error('❌ Missing fields:', missing);
+    return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // More lenient email validation
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  
   if (!emailRegex.test(to)) {
-    return res.status(400).json({ error: "Invalid recipient email address" });
+    console.error('❌ Invalid recipient email:', to);
+    return res.status(400).json({ error: `Invalid recipient email format: ${to}` });
   }
+  
   if (!emailRegex.test(replyToEmail)) {
-    return res.status(400).json({ error: "Invalid reply-to email address" });
+    console.error('❌ Invalid reply-to email:', replyToEmail);
+    return res.status(400).json({ error: `Invalid reply-to email format: ${replyToEmail}` });
   }
 
   try {
     const formattedContent = formatEmailContent(content, businessName);
+
+    console.log('📤 Sending via SendGrid...');
 
     const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
@@ -880,8 +897,7 @@ app.post("/api/send-email", authenticateToken, async (req, res) => {
       body: JSON.stringify({
         personalizations: [{
           to: [{ email: to }],
-          subject: subject,
-          reply_to: { email: replyToEmail }
+          subject: subject
         }],
         from: {
           email: process.env.FROM_EMAIL,
@@ -899,6 +915,7 @@ app.post("/api/send-email", authenticateToken, async (req, res) => {
     });
 
     if (sendGridResponse.ok) {
+      console.log('✅ Email sent successfully');
       res.json({
         success: true,
         message: "Email sent successfully",
@@ -906,12 +923,12 @@ app.post("/api/send-email", authenticateToken, async (req, res) => {
       });
     } else {
       const errorData = await sendGridResponse.text();
-      console.error("SendGrid Error:", errorData);
-      res.status(500).json({ error: "Failed to send email" });
+      console.error("❌ SendGrid Error:", errorData);
+      res.status(500).json({ error: "Failed to send email via SendGrid" });
     }
   } catch (error) {
-    console.error("Send Email Error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Send Email Error:", error);
+    res.status(500).json({ error: "Internal server error: " + error.message });
   }
 });
 
