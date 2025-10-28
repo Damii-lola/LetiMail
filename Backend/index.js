@@ -50,19 +50,17 @@ const pool = new Pool({
 async function initializeDatabase() {
   try {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        plan VARCHAR(50) DEFAULT 'free',
-        emails_used INTEGER DEFAULT 0,
-        emails_left INTEGER DEFAULT 5,
-        daily_emails_used INTEGER DEFAULT 0,
-        last_reset_date DATE DEFAULT CURRENT_DATE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      plan VARCHAR(50) DEFAULT 'free',
+      emails_used INTEGER DEFAULT 0,
+      emails_left INTEGER DEFAULT 10,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
     `);
 
     await pool.query(`
@@ -156,8 +154,8 @@ app.post("/api/auth/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await pool.query(
       `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
-       VALUES ($1, $2, $3, 'free', 0, 10, 0, CURRENT_DATE)
-       RETURNING id, name, email, plan, emails_used, emails_left, daily_emails_used, created_at`,
+       VALUES ($1, $2, $3, 'free', 0, 10)
+       RETURNING id, name, email, plan, emails_used, emails_left, created_at`,
       [name, email, hashedPassword]
     );
 
@@ -178,8 +176,7 @@ app.post("/api/auth/register", async (req, res) => {
         email: user.email,
         plan: user.plan,
         emails_used: user.emails_used,
-        emails_left: user.emails_left,
-        daily_emails_used: user.daily_emails_used
+        emails_left: user.emails_left
       }
     });
   } catch (error) {
@@ -221,8 +218,7 @@ app.post("/api/auth/login", async (req, res) => {
         email: user.email,
         plan: user.plan,
         emails_used: user.emails_used,
-        emails_left: user.emails_left,
-        daily_emails_used: user.daily_emails_used
+        emails_left: user.emails_left
       }
     });
   } catch (error) {
@@ -427,39 +423,6 @@ app.delete("/api/email-history/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete email' });
   }
 });
-
-// ============================================
-// DAILY EMAIL RESET (Call this from a cron job)
-// ============================================
-
-async function resetDailyEmails() {
-  try {
-    const result = await pool.query(
-      `UPDATE users 
-       SET daily_emails_used = 0, last_reset_date = CURRENT_DATE 
-       WHERE last_reset_date < CURRENT_DATE 
-       RETURNING id`
-    );
-    console.log(`✅ Reset daily emails for ${result.rows.length} users`);
-  } catch (error) {
-    console.error('Daily reset error:', error);
-  }
-}
-
-// Endpoint to manually trigger reset (for testing or cron)
-app.post("/api/admin/reset-daily", async (req, res) => {
-  const adminKey = req.headers['x-admin-key'];
-  
-  if (adminKey !== process.env.ADMIN_KEY) {
-    return res.status(403).json({ error: 'Unauthorized' });
-  }
-
-  await resetDailyEmails();
-  res.json({ success: true, message: 'Daily emails reset' });
-});
-
-// Auto-reset on server startup
-resetDailyEmails();
 
 // ============================================
 // RATE LIMITING MIDDLEWARE
@@ -1022,6 +985,86 @@ function formatEmailContent(content, senderName) {
 
   return htmlEmail;
 }
+
+// Smart Reply - Generate reply suggestions
+app.post("/api/smart-reply", authenticateToken, rateLimit(10, 60000), async (req, res) => {
+  const { emailContent, context } = req.body;
+  
+  if (!emailContent) {
+    return res.status(400).json({ error: "Email content is required" });
+  }
+
+  try {
+    console.log('🤖 Generating smart reply...');
+
+    const prompt = `You are an email reply assistant. Read the email below and generate 3 different reply options.
+
+EMAIL RECEIVED:
+${emailContent}
+
+${context ? `ADDITIONAL CONTEXT: ${context}` : ''}
+
+Generate 3 reply options:
+1. A brief, professional reply (2-3 sentences)
+2. A detailed, thoughtful reply (4-6 sentences)
+3. A friendly, conversational reply (3-4 sentences)
+
+Format each reply with a "Reply Option X:" prefix.
+Return ONLY the 3 reply options, nothing else.`;
+
+    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 1000,
+      }),
+    });
+
+    const data = await groqResponse.json();
+    let replies = data.choices?.[0]?.message?.content?.trim() || "Error generating replies.";
+
+    // Parse replies into array
+    const replyOptions = [];
+    const replyMatches = replies.match(/Reply Option \d+:([\s\S]*?)(?=Reply Option \d+:|$)/gi);
+    
+    if (replyMatches) {
+      replyMatches.forEach((match, index) => {
+        const replyText = match.replace(/Reply Option \d+:/i, '').trim();
+        replyOptions.push({
+          id: index + 1,
+          type: index === 0 ? 'brief' : index === 1 ? 'detailed' : 'friendly',
+          content: replyText
+        });
+      });
+    } else {
+      // Fallback: return as single option
+      replyOptions.push({
+        id: 1,
+        type: 'general',
+        content: replies
+      });
+    }
+
+    console.log('✅ Smart replies generated');
+
+    res.json({
+      success: true,
+      replies: replyOptions
+    });
+  } catch (error) {
+    console.error("Smart reply error:", error);
+    res.status(500).json({ 
+      error: "Failed to generate replies. Please try again.",
+      success: false
+    });
+  }
+});
 
 function convertTextToSimpleHTML(text) {
   if (!text) return '<p>No content available.</p>';
