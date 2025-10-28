@@ -513,22 +513,58 @@ function cleanAIResponse(content) {
   if (!content) return content;
   
   let cleaned = content
-    .replace(/^(Here is|Here's) your (.+? email|refined email|email)[\s\S]*?(?=Subject:)/i, '')
-    .replace(/\n*Note:[\s\S]*?(?=\n\n|$)/gi, '')
-    .replace(/\n*Please note:[\s\S]*?(?=\n\n|$)/gi, '')
-    .replace(/\n*I have (preserved|applied|maintained)[\s\S]*?(?=\n\n|$)/gi, '')
-    .replace(/\n*This email[\s\S]*?(?=\n\n|$)/gi, '')
+    // REMOVE ALL INTERNAL THINKING/REASONING BLOCKS
+    .replace(/\*\*.*?:\*\*[\s\S]*?(?=\n\n|$)/g, '') // Remove "**Proof:**" etc. blocks
+    .replace(/\*{2}[\s\S]*?\*{2}/g, '') // Remove any **bold** formatting
+    .replace(/\*([^*]+)\*/g, '$1') // Remove *italic* formatting  
+    .replace(/_{2}([^_]+)_{2}/g, '$1') // Remove __underline__
+    .replace(/`{3}[\s\S]*?`{3}/g, '') // Remove ```code blocks```
+    .replace(/`([^`]+)`/g, '$1') // Remove `inline code`
+    
+    // REMOVE ALL NUMBERED/BULLETED LISTS THAT ARE FORMATTING
+    .replace(/\n\s*\d+\.\s*\*\*[^*]+\*\*[\s\S]*?(?=\n\n|$)/g, '')
+    .replace(/\n\s*•\s*\*\*[^*]+\*\*[\s\S]*?(?=\n\n|$)/g, '')
+    .replace(/\n\s*[-*•]\s*/g, '\n') // Clean bullet points
+    
+    // REMOVE AI SELF-REFERENCE AND INSTRUCTIONS
+    .replace(/\n\s*\d+\.\s*"[^"]+"[\s\S]*?(?=\n\n|$)/g, '')
+    .replace(/The tone is[\s\S]*?corporate-speak\./g, '')
+    .replace(/CC:.*$/gim, '')
+    .replace(/Implementation Details:[\s\S]*?(?=What's Next:|$)/gi, '')
+    
+    // CLEAN UP RANDOM FORMATTING ARTIFACTS
+    .replace(/\*\*/g, '') // Remove any remaining **
+    .replace(/\*/g, '') // Remove any remaining *
+    .replace(/_{2}/g, '') // Remove any remaining __
+    
+    // NORMALIZE WHITESPACE
+    .replace(/\n\s*\n\s*\n/g, '\n\n')
+    .replace(/^\s+|\s+$/g, '')
     .trim();
 
   if (!cleaned.startsWith('Subject:')) {
-    const subjectIndex = cleaned.indexOf('Subject:');
-    if (subjectIndex > 0) {
-      cleaned = cleaned.substring(subjectIndex);
+    const subjectMatch = cleaned.match(/(?:^|\n)Subject:\s*(.*?)(?:\n|$)/i);
+    if (subjectMatch) {
+      cleaned = 'Subject: ' + subjectMatch[1].trim() + '\n\n' + cleaned.replace(/(?:^|\n)Subject:\s*(.*?)(?:\n|$)/i, '');
     } else {
       cleaned = "Subject: Professional Communication\n\n" + cleaned;
     }
   }
 
+  cleaned = cleaned
+    .split('\n')
+    .filter(line => {
+      const trimmed = line.trim();
+      // Remove lines that are clearly formatting commands
+      if (trimmed.match(/^(\d+\.\s*")|(The tone is)|(Implementation Details:)|(What's Next:)|(CC:)/i)) return false;
+      // Remove lines that are just single words in caps
+      if (trimmed.match(/^[A-Z\s]{2,}$/) && trimmed.length < 20) return false;
+      return true;
+    })
+    .join('\n')
+    .replace(/\n\s*\n\s*\n/g, '\n\n')
+    .trim();
+  
   return cleaned || content;
 }
 
@@ -549,13 +585,10 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
     }
 
     const prompt = `
-# 🎯 LETIMAIL PREMIUM EMAIL GENERATION PROTOCOL
-**MISSION:** Generate business emails that sound like they were written by a top-tier executive coach, sales strategist, or communication expert. Every email must feel intentionally crafted, psychologically sharp, and strategically sound.
+MISSION: Generate business emails that sound like they were written by a top-tier executive coach, sales strategist, or communication expert. Every email must feel intentionally crafted, psychologically sharp, and strategically sound.
 
-## 📋 FOUNDATIONAL PRINCIPLES
-
-### 🚫 ABSOLUTELY FORBIDDEN PHRASES & PATTERNS:
-**OPENING LINES:**
+# 🚫 ABSOLUTELY FORBIDDEN PHRASES & PATTERNS:
+OPENING LINES:
 - "I hope this email finds you well"
 - "I came across your company" / "I was looking at your website"
 - "My name is [X] and I'm from [Y]"
@@ -563,155 +596,178 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
 - "Just checking in" / "Just following up"
 - "I wanted to see if" / "I was wondering if"
 
-**CORPORATE BUZZWORDS (INSTANT REJECTION):**
+CORPORATE BUZZWORDS (INSTANT REJECTION):
 - "Leverage," "synergy," "value-add," "circle back"
 - "Streamline," "optimize," "enhance," "transform"
 - "Cutting-edge," "best-in-class," "world-class"
 - "Solution," "ecosystem," "paradigm shift"
 
-**WEAK LANGUAGE PATTERNS:**
+WEAK LANGUAGE PATTERNS:
 - "We're incredibly excited" / "We're thrilled" (fake enthusiasm)
 - "I think you might be interested" (uncertainty)
 - "Would you be available?" / "Let me know what you think" (weak CTAs)
 - "Please don't hesitate to contact me" (corporate cliché)
 
-**ROBOTIC STRUCTURES:**
+ROBOTIC STRUCTURES:
 - Starting every sentence with "We" or "I"
 - Overusing adverbs: "very," "really," "extremely"
 - Formulaic paragraph transitions
 - Generic sign-offs: "Best regards," "Sincerely"
 
-### ✅ MANDATORY EXCELLENCE STANDARDS:
+# ✅ MANDATORY EXCELLENCE STANDARDS:
 
-**SUBJECT LINE ARCHITECTURE (Choose based on email type):**
-- **COLD OUTREACH:** "3 insights about [their industry]" or "Question about [specific thing]" or "Idea for [their company]"
-- **FOLLOW-UP:** "Following up on [concrete thing]" or "New thought on [topic]" or "That thing we discussed"
-- **CLIENT COMMUNICATION:** "Update: [project] timeline" or "Decision needed: [specific]" or "Quick win for [goal]"
-- **INTERNAL:** "Action required: [what]" or "Heads up: [news]" or "Celebrating [win]"
+SUBJECT LINE ARCHITECTURE (Choose based on email type):
+- COLD OUTREACH: "3 insights about [their industry]" or "Question about [specific thing]" or "Idea for [their company]"
+- FOLLOW-UP: "Following up on [concrete thing]" or "New thought on [topic]" or "That thing we discussed"
+- CLIENT COMMUNICATION: "Update: [project] timeline" or "Decision needed: [specific]" or "Quick win for [goal]"
+- INTERNAL: "Action required: [what]" or "Heads up: [news]" or "Celebrating [win]"
 
-**OPENING HOOK PSYCHOLOGY (First 15 words must grab attention):**
-- **INSIGHT LED:** "Noticed your recent [achievement/change] and had a thought..."
-- **QUESTION LED:** "Quick question that came up while reviewing [specific thing]..."
-- **VALUE LED:** "I have one idea that could [specific benefit] for your [specific metric]..."
-- **STORY LED:** "Was working with [similar company] and discovered [surprising insight]..."
+OPENING HOOK PSYCHOLOGY (First 15 words must grab attention):
+- INSIGHT LED: "Noticed your recent [achievement/change] and had a thought..."
+- QUESTION LED: "Quick question that came up while reviewing [specific thing]..."
+- VALUE LED: "I have one idea that could [specific benefit] for your [specific metric]..."
+- STORY LED: "Was working with [similar company] and discovered [surprising insight]..."
 
-**BODY COPY EXCELLENCE:**
-- **PARAGRAPH 1:** Immediate value or relevance to RECIPIENT
-- **PARAGRAPH 2:** Specific evidence or concrete detail
-- **PARAGRAPH 3:** Clear connection to their world/business
-- **PARAGRAPH 4:** Confident next steps
+BODY COPY EXCELLENCE:
+- PARAGRAPH 1: Immediate value or relevance to RECIPIENT
+- PARAGRAPH 2: Specific evidence or concrete detail
+- PARAGRAPH 3: Clear connection to their world/business
+- PARAGRAPH 4: Confident next steps
+- PARAGRAPH 5: Closing and goodbye
 
-**CALL TO ACTION ENGINEERING:**
-- **SPECIFIC:** "Schedule 15 minutes Tuesday at 2 PM ET"
-- **LOW-FRICTION:** "Reply with 'yes' if this makes sense"
-- **TIME-BOUND:** "By Friday if possible"
-- **VALUE-ORIENTED:** "Let's discuss how this saves 5 hours weekly"
+CALL TO ACTION ENGINEERING:
+- SPECIFIC: "Schedule 15 minutes Tuesday at 2 PM ET"
+- LOW-FRICTION: "Reply with 'yes' if this makes sense"
+- TIME-BOUND: "By Friday if possible"
+- VALUE-ORIENTED: "Let's discuss how this saves 5 hours weekly"
 
-**HUMAN VOICE INDICATORS:**
+HUMAN VOICE INDICATORS:
 - Occasional contractions ("I'm," "you're," "we'll")
 - Natural interjections ("Actually," "By the way," "Quick question")
 - Varied sentence length (mix of short punchy and longer explanatory)
 - Authentic phrasing over corporate speech
 
-## 🎭 TONE MASTERY
+# 🎭 TONE MASTERY
 
-**PROFESSIONAL ≠ ROBOTIC:**
+PROFESSIONAL ≠ ROBOTIC:
 - Clear, direct, but warm
 - Authority without arrogance
 - Expertise without condescension
 - Replace "We are pleased to announce" with "We're launching"
 
-**FRIENDLY ≠ UNPROFESSIONAL:**
+FRIENDLY ≠ UNPROFESSIONAL:
 - Warm but focused
 - Personable but purposeful
 - Conversational but concise
 - Replace "Hey guys!" with "Team - quick update"
 
-**FORMAL ≠ STIFF:**
+FORMAL ≠ STIFF:
 - Polished but human
 - Reserved but engaging
 - Traditional but not archaic
 - Replace "Pursuant to our discussion" with "Following our conversation"
 
-## 🏗️ EMAIL ARCHITECTURE BY TYPE
+# 🏗️ EMAIL ARCHITECTURE BY TYPE
 
-### COLD OUTREACH BLUEPRINT:
-**Subject:** [Intriguing insight/question about THEIR world]
-**Opener:** Specific observation about their business/role
-**Body:** One concrete idea/insight that provides immediate value
-**Proof:** Brief social proof or relevant case study
-**CTA:** Specific, low-commitment next step
+## COLD OUTREACH BLUEPRINT:
+Subject: [Intriguing insight/question about THEIR world]
+Opener: Specific observation about their business/role
+Body: One concrete idea/insight that provides immediate value
+Proof: Brief social proof or relevant case study
+CTA: Specific, low-commitment next step
 
-### FOLLOW-UP SEQUENCE:
-**Subject:** "Following up: [original topic] + [new value]"
-**Opener:** Reference previous contact + add new insight
-**Body:** Additional value or refined thinking
-**CTA:** Slightly more direct version of original ask
+## FOLLOW-UP SEQUENCE:
+Subject: "Following up: [original topic] + [new value]"
+Opener: Reference previous contact + add new insight
+Body: Additional value or refined thinking
+CTA: Slightly more direct version of original ask
 
-### CLIENT UPDATE:
-**Subject:** "Update: [project] - [key development]"
-**Opener:** Bottom-line up front
-**Body:** What's done, what's next, any blockers
-**CTA:** Specific decision needed or confirmation requested
+## CLIENT UPDATE:
+Subject: "Update: [project] - [key development]"
+Opener: Bottom-line up front
+Body: What's done, what's next, any blockers
+CTA: Specific decision needed or confirmation requested
 
-### INTERNAL ANNOUNCEMENT:
-**Subject:** "[Action required/Heads up]: [topic]"
-**Opener:** Most important information first
-**Body:** Context, impact, next steps
-**CTA:** Clear what happens next and who's responsible
+## INTERNAL ANNOUNCEMENT:
+Subject: "[Action required/Heads up]: [topic]"
+Opener: Most important information first
+Body: Context, impact, next steps
+CTA: Clear what happens next and who's responsible
 
-## 🧠 PSYCHOLOGICAL TRIGGERS TO EMPLOY
+# 🧠 PSYCHOLOGICAL TRIGGERS TO EMPLOY
 
-**SOCIAL PROOF:** "Similar companies saw [metric improvement]"
-**SCARCITY:** "We have 2 spots remaining this quarter"
-**RECIPROCITY:** "Here's one immediate idea you can use"
-**AUTHORITY:** "Based on our work with [credible company]"
-**CONSISTENCY:** "Since you value [their stated value], this aligns with..."
+SOCIAL PROOF: "Similar companies saw [metric improvement]"
+SCARCITY: "We have 2 spots remaining this quarter"
+RECIPROCITY: "Here's one immediate idea you can use"
+AUTHORITY: "Based on our work with [credible company]"
+CONSISTENCY: "Since you value [their stated value], this aligns with..."
 
-## 🎯 CONTEXT-SPECIFIC EXCELLENCE
+# 🎯 CONTEXT-SPECIFIC EXCELLENCE
 
-**BUSINESS CONTEXT:** ${business}
-**PRIMARY OBJECTIVE:** ${context}
-**DESIRED TONE:** ${tone} (translate to human equivalent)
-**LENGTH CONSTRAINT:** ${emailLength} (be ruthlessly concise)
+BUSINESS CONTEXT: ${business}
+PRIMARY OBJECTIVE: ${context}
+DESIRED TONE: ${tone} (translate to human equivalent)
+LENGTH CONSTRAINT: ${emailLength} (be ruthlessly concise)
 
 ${stylePrompt ? `**VOICE INSTRUCTIONS:** ${stylePrompt}` : ''}
 
-## 🔧 TECHNICAL EXCELLENCE
+# 🔧 TECHNICAL EXCELLENCE
 
-**CONCISENESS:**
+CONCISENESS:
 - No fluff words
 - Every sentence must advance the objective
 - Cut 30% after writing
 
-**SPECIFICITY OVER GENERALITY:**
+SPECIFICITY OVER GENERALITY:
 - "Increased conversion by 17%" not "improved metrics"
 - "For your Q4 product launch" not "for your business"
 - "Save 5 hours weekly on reporting" not "save time"
 
-**READABILITY:**
+READABILITY:
 - Varied sentence structure
 - Strategic paragraph breaks
 - White space is your friend
 
-## 🚀 GENERATION INSTRUCTIONS
+# 🚀 GENERATION INSTRUCTIONS
 
-**STEP 1:** Analyze the business context and primary objective
-**STEP 2:** Determine the optimal psychological approach
-**STEP 3:** Craft a subject line that demands opening
-**STEP 4:** Write an opening hook that earns continued reading
-**STEP 5:** Build the body with concrete value and evidence
-**STEP 6:** Engineer a CTA that's specific and compelling
-**STEP 7:** Apply human voice touches throughout
-**STEP 8:** Review and eliminate any corporate-speak or clichés
+STEP 1: Analyze the business context and primary objective
+STEP 2: Determine the optimal psychological approach
+STEP 3: Craft a subject line that demands opening
+STEP 4: Write an opening hook that earns continued reading
+STEP 5: Build the body with concrete value and evidence
+STEP 6: Engineer a CTA that's specific and compelling
+STEP 7: Apply human voice touches throughout
+STEP 8: Review and eliminate any corporate-speak or clichés
 
-## FINAL OUTPUT REQUIREMENTS:
+# FINAL OUTPUT REQUIREMENTS:
 
 Generate ONLY the email content starting with "Subject:". The output should feel like it was written by someone who charges $1,000/hour for communication consulting.
 
-**REMEMBER:** You're not writing an email. You're crafting a strategic business communication that moves relationships and opportunities forward.
+REMEMBER: You're not writing an email. You're crafting a strategic business communication that moves relationships and opportunities forward.
 
-**BENCHMARK:** If this email wouldn't impress a Fortune 500 CEO, it's not good enough. Start over.
+BENCHMARK: If this email wouldn't impress a Fortune 500 CEO, it's not good enough. Start over.
+
+# 🎯 OUTPUT FORMATTING RULES - STRICT COMPLIANCE:
+
+CRITICAL: You MUST output ONLY pure email text with NO formatting, NO markdown, NO internal reasoning, and NO lists.
+
+STRICTLY PROHIBITED IN OUTPUT:
+- NO **bold** or *italic* text
+- NO bullet points with • or *
+- NO numbered lists (1. 2. 3.)
+- NO section headers like **Proof:** or **CTA:**
+- NO internal commentary like "The tone is formal yet human"
+- NO formatting commands or instructions
+- NO emojis or symbols (🚫, ✅, 🎯)
+
+REQUIRED OUTPUT FORMAT:
+- Start immediately with "Subject: [Your Subject Line]"
+- Use plain text only
+- Use normal paragraph breaks (empty line between paragraphs)
+- If you need to show lists, use plain text with normal line breaks
+- End with a simple sign-off like "Best," or "Regards,"
+
+REMEMBER: You are OUTPUTTING the final email, not designing it or commenting on it.
 `;
 
     console.log("📝 Generating email for user:", user.id);
@@ -725,11 +781,11 @@ Generate ONLY the email content starting with "Subject:". The output should feel
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.8,             // Balanced creativity/consistency
-        max_tokens: 2000,             // Much longer for detailed prompts
-        top_p: 0.85,
-        frequency_penalty: 0.8,       // Stronger penalty for repetition
-        presence_penalty: 0.7,
+        temperature: 0.9,             // Balanced creativity/consistency
+        max_tokens: 800,             // Much longer for detailed prompts
+        top_p: 0.0,
+        frequency_penalty: 0.5,       // Stronger penalty for repetition
+        presence_penalty: 0.5,
       }),
     });
 
@@ -802,8 +858,8 @@ Return ONLY the polished email, nothing else.`;
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",  // CRITICAL - much more capable model
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.8,             // Balanced creativity/consistency
-        max_tokens: 2000,             // Much longer for detailed prompts
+        temperature: 0.3,             // Balanced creativity/consistency
+        max_tokens: 1000,             // Much longer for detailed prompts
       }),
     });
 
