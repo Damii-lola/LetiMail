@@ -549,17 +549,169 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
     }
 
     const prompt = `
-Write this email to sound authentically human and natural.
-${stylePrompt ? stylePrompt : ''}
+# 🎯 LETIMAIL PREMIUM EMAIL GENERATION PROTOCOL
+**MISSION:** Generate business emails that sound like they were written by a top-tier executive coach, sales strategist, or communication expert. Every email must feel intentionally crafted, psychologically sharp, and strategically sound.
 
-BUSINESS CONTEXT:
-- Business: ${business}
-- Purpose: ${context}
-- Tone: ${tone}
-- Length: ${emailLength}
+## 📋 FOUNDATIONAL PRINCIPLES
 
-IMPORTANT: Make this email sound like a real human wrote it - natural, conversational, and authentic.
-Return ONLY the email content starting with "Subject:".
+### 🚫 ABSOLUTELY FORBIDDEN PHRASES & PATTERNS:
+**OPENING LINES:**
+- "I hope this email finds you well"
+- "I came across your company" / "I was looking at your website"
+- "My name is [X] and I'm from [Y]"
+- "I'm reaching out because" / "I wanted to touch base"
+- "Just checking in" / "Just following up"
+- "I wanted to see if" / "I was wondering if"
+
+**CORPORATE BUZZWORDS (INSTANT REJECTION):**
+- "Leverage," "synergy," "value-add," "circle back"
+- "Streamline," "optimize," "enhance," "transform"
+- "Cutting-edge," "best-in-class," "world-class"
+- "Solution," "ecosystem," "paradigm shift"
+
+**WEAK LANGUAGE PATTERNS:**
+- "We're incredibly excited" / "We're thrilled" (fake enthusiasm)
+- "I think you might be interested" (uncertainty)
+- "Would you be available?" / "Let me know what you think" (weak CTAs)
+- "Please don't hesitate to contact me" (corporate cliché)
+
+**ROBOTIC STRUCTURES:**
+- Starting every sentence with "We" or "I"
+- Overusing adverbs: "very," "really," "extremely"
+- Formulaic paragraph transitions
+- Generic sign-offs: "Best regards," "Sincerely"
+
+### ✅ MANDATORY EXCELLENCE STANDARDS:
+
+**SUBJECT LINE ARCHITECTURE (Choose based on email type):**
+- **COLD OUTREACH:** "3 insights about [their industry]" or "Question about [specific thing]" or "Idea for [their company]"
+- **FOLLOW-UP:** "Following up on [concrete thing]" or "New thought on [topic]" or "That thing we discussed"
+- **CLIENT COMMUNICATION:** "Update: [project] timeline" or "Decision needed: [specific]" or "Quick win for [goal]"
+- **INTERNAL:** "Action required: [what]" or "Heads up: [news]" or "Celebrating [win]"
+
+**OPENING HOOK PSYCHOLOGY (First 15 words must grab attention):**
+- **INSIGHT LED:** "Noticed your recent [achievement/change] and had a thought..."
+- **QUESTION LED:** "Quick question that came up while reviewing [specific thing]..."
+- **VALUE LED:** "I have one idea that could [specific benefit] for your [specific metric]..."
+- **STORY LED:** "Was working with [similar company] and discovered [surprising insight]..."
+
+**BODY COPY EXCELLENCE:**
+- **PARAGRAPH 1:** Immediate value or relevance to RECIPIENT
+- **PARAGRAPH 2:** Specific evidence or concrete detail
+- **PARAGRAPH 3:** Clear connection to their world/business
+- **PARAGRAPH 4:** Confident next steps
+
+**CALL TO ACTION ENGINEERING:**
+- **SPECIFIC:** "Schedule 15 minutes Tuesday at 2 PM ET"
+- **LOW-FRICTION:** "Reply with 'yes' if this makes sense"
+- **TIME-BOUND:** "By Friday if possible"
+- **VALUE-ORIENTED:** "Let's discuss how this saves 5 hours weekly"
+
+**HUMAN VOICE INDICATORS:**
+- Occasional contractions ("I'm," "you're," "we'll")
+- Natural interjections ("Actually," "By the way," "Quick question")
+- Varied sentence length (mix of short punchy and longer explanatory)
+- Authentic phrasing over corporate speech
+
+## 🎭 TONE MASTERY
+
+**PROFESSIONAL ≠ ROBOTIC:**
+- Clear, direct, but warm
+- Authority without arrogance
+- Expertise without condescension
+- Replace "We are pleased to announce" with "We're launching"
+
+**FRIENDLY ≠ UNPROFESSIONAL:**
+- Warm but focused
+- Personable but purposeful
+- Conversational but concise
+- Replace "Hey guys!" with "Team - quick update"
+
+**FORMAL ≠ STIFF:**
+- Polished but human
+- Reserved but engaging
+- Traditional but not archaic
+- Replace "Pursuant to our discussion" with "Following our conversation"
+
+## 🏗️ EMAIL ARCHITECTURE BY TYPE
+
+### COLD OUTREACH BLUEPRINT:
+**Subject:** [Intriguing insight/question about THEIR world]
+**Opener:** Specific observation about their business/role
+**Body:** One concrete idea/insight that provides immediate value
+**Proof:** Brief social proof or relevant case study
+**CTA:** Specific, low-commitment next step
+
+### FOLLOW-UP SEQUENCE:
+**Subject:** "Following up: [original topic] + [new value]"
+**Opener:** Reference previous contact + add new insight
+**Body:** Additional value or refined thinking
+**CTA:** Slightly more direct version of original ask
+
+### CLIENT UPDATE:
+**Subject:** "Update: [project] - [key development]"
+**Opener:** Bottom-line up front
+**Body:** What's done, what's next, any blockers
+**CTA:** Specific decision needed or confirmation requested
+
+### INTERNAL ANNOUNCEMENT:
+**Subject:** "[Action required/Heads up]: [topic]"
+**Opener:** Most important information first
+**Body:** Context, impact, next steps
+**CTA:** Clear what happens next and who's responsible
+
+## 🧠 PSYCHOLOGICAL TRIGGERS TO EMPLOY
+
+**SOCIAL PROOF:** "Similar companies saw [metric improvement]"
+**SCARCITY:** "We have 2 spots remaining this quarter"
+**RECIPROCITY:** "Here's one immediate idea you can use"
+**AUTHORITY:** "Based on our work with [credible company]"
+**CONSISTENCY:** "Since you value [their stated value], this aligns with..."
+
+## 🎯 CONTEXT-SPECIFIC EXCELLENCE
+
+**BUSINESS CONTEXT:** ${business}
+**PRIMARY OBJECTIVE:** ${context}
+**DESIRED TONE:** ${tone} (translate to human equivalent)
+**LENGTH CONSTRAINT:** ${emailLength} (be ruthlessly concise)
+
+${stylePrompt ? `**VOICE INSTRUCTIONS:** ${stylePrompt}` : ''}
+
+## 🔧 TECHNICAL EXCELLENCE
+
+**CONCISENESS:**
+- No fluff words
+- Every sentence must advance the objective
+- Cut 30% after writing
+
+**SPECIFICITY OVER GENERALITY:**
+- "Increased conversion by 17%" not "improved metrics"
+- "For your Q4 product launch" not "for your business"
+- "Save 5 hours weekly on reporting" not "save time"
+
+**READABILITY:**
+- Varied sentence structure
+- Strategic paragraph breaks
+- White space is your friend
+
+## 🚀 GENERATION INSTRUCTIONS
+
+**STEP 1:** Analyze the business context and primary objective
+**STEP 2:** Determine the optimal psychological approach
+**STEP 3:** Craft a subject line that demands opening
+**STEP 4:** Write an opening hook that earns continued reading
+**STEP 5:** Build the body with concrete value and evidence
+**STEP 6:** Engineer a CTA that's specific and compelling
+**STEP 7:** Apply human voice touches throughout
+**STEP 8:** Review and eliminate any corporate-speak or clichés
+
+## FINAL OUTPUT REQUIREMENTS:
+
+Generate ONLY the email content starting with "Subject:". The output should feel like it was written by someone who charges $1,000/hour for communication consulting.
+
+**REMEMBER:** You're not writing an email. You're crafting a strategic business communication that moves relationships and opportunities forward.
+
+**BENCHMARK:** If this email wouldn't impress a Fortune 500 CEO, it's not good enough. Start over.
 `;
 
     console.log("📝 Generating email for user:", user.id);
@@ -571,13 +723,13 @@ Return ONLY the email content starting with "Subject:".
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "mixtral-8x7b-32768",  // CRITICAL - much more capable model
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.9,
-        max_tokens: 800,
-        top_p: 0.9,
-        frequency_penalty: 0.5,
-        presence_penalty: 0.3,
+        temperature: 0.8,             // Balanced creativity/consistency
+        max_tokens: 2000,             // Much longer for detailed prompts
+        top_p: 0.85,
+        frequency_penalty: 0.8,       // Stronger penalty for repetition
+        presence_penalty: 0.7,
       }),
     });
 
@@ -648,10 +800,13 @@ Return ONLY the polished email, nothing else.`;
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "mixtral-8x7b-32768",  // CRITICAL - much more capable model
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        max_tokens: 1000,
+        temperature: 0.8,             // Balanced creativity/consistency
+        max_tokens: 2000,             // Much longer for detailed prompts
+        top_p: 0.85,
+        frequency_penalty: 0.8,       // Stronger penalty for repetition
+        presence_penalty: 0.7,
       }),
     });
 
