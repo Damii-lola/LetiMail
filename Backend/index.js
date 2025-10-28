@@ -601,6 +601,7 @@ CORPORATE BUZZWORDS (INSTANT REJECTION):
 - "Streamline," "optimize," "enhance," "transform"
 - "Cutting-edge," "best-in-class," "world-class"
 - "Solution," "ecosystem," "paradigm shift"
+- "Aligns with," "going forward," "touch base"
 
 WEAK LANGUAGE PATTERNS:
 - "We're incredibly excited" / "We're thrilled" (fake enthusiasm)
