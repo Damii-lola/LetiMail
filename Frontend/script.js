@@ -1333,6 +1333,18 @@ function setupEnhancedAppFunctions() {
       showSendEmailModal();
     });
   }
+
+  const smartReplyBtn = document.getElementById('smartReplyBtn');
+  if (smartReplyBtn) {
+    smartReplyBtn.addEventListener('click', function() {
+      if (!currentUser || !authToken) {
+        showNotification('Sign In Required', 'Please sign in to use Smart Reply', 'error');
+        showLoginModal();
+        return;
+      }
+      showSmartReplyModal();
+    });
+  }
 }
 
 // SEPARATE FUNCTION FOR EDIT HANDLING
@@ -1492,29 +1504,84 @@ function closeSendModal() {
   }
 }
 
-async function confirmSendEmail() {
-  const to = document.getElementById('recipientEmail').value;
-  const businessName = document.getElementById('businessName').value;
-  const replyToEmail = document.getElementById('replyToEmail').value;
+function showSendEmailModal() {
   const outputDiv = document.getElementById('output');
   const emailContent = outputDiv.innerText;
 
-  const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|\$)/i);
-  const subject = subjectMatch ? subjectMatch[1].trim() : 'Email from LetiMail';
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+\$/;
-  if (!emailRegex.test(to)) {
+  if (!emailContent || emailContent.includes('Your personalized email will appear here')) {
+    showNotification('Error', 'Please generate an email first', 'error');
+    return;
+  }
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'sendEmailModal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeSendModal()">
+        <i class="fas fa-times"></i>
+      </button>
+      <h3>Send Email</h3>
+      <p class="modal-description">Send your generated email directly from LetiMail.</p>
+      <div class="input-group">
+        <label for="recipientEmail">Recipient Email</label>
+        <input type="email" id="recipientEmail" class="auth-input" placeholder="recipient@example.com" required>
+      </div>
+      <div class="input-group">
+        <label for="businessName">Business Name</label>
+        <input type="text" id="businessName" class="auth-input" placeholder="Your Business Name" value="${currentUser?.name || ''}" required>
+      </div>
+      <div class="input-group">
+        <label for="replyToEmail">Reply-To Email</label>
+        <input type="email" id="replyToEmail" class="auth-input" placeholder="your-email@example.com" value="${currentUser?.email || ''}" required>
+        <span class="input-hint">Replies will be sent directly to this email</span>
+      </div>
+      <div class="modal-actions">
+        <button class="settings-btn secondary" onclick="closeSendModal()">Cancel</button>
+        <button class="settings-btn primary" onclick="confirmSendEmail()" id="sendEmailBtn">
+          <i class="fas fa-paper-plane"></i> Send Email
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+}
+
+async function confirmSendEmail() {
+  const to = document.getElementById('recipientEmail').value.trim();
+  const businessName = document.getElementById('businessName').value.trim();
+  const replyToEmail = document.getElementById('replyToEmail').value.trim();
+  const outputDiv = document.getElementById('output');
+  const emailContent = outputDiv.innerText;
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  if (!to || !emailRegex.test(to)) {
     showNotification('Error', 'Please enter a valid recipient email', 'error');
     return;
   }
-  if (!emailRegex.test(replyToEmail)) {
+
+  if (!businessName) {
+    showNotification('Error', 'Please enter your business name', 'error');
+    return;
+  }
+
+  if (!replyToEmail || !emailRegex.test(replyToEmail)) {
     showNotification('Error', 'Please enter a valid reply-to email', 'error');
     return;
   }
-  const confirmBtn = document.querySelector('#sendEmailModal .settings-btn.primary');
+
+  const subjectMatch = emailContent.match(/Subject:\s*(.*?)(?:\n|$)/i);
+  const subject = subjectMatch ? subjectMatch[1].trim() : 'Email from LetiMail';
+
+  const confirmBtn = document.getElementById('sendEmailBtn');
   if (confirmBtn) {
     confirmBtn.disabled = true;
     confirmBtn.innerHTML = '<span class="btn-spinner"></span> Sending...';
   }
+
   try {
     const response = await fetch(`${BACKEND_URL}/api/send-email`, {
       method: 'POST',
@@ -1530,20 +1597,158 @@ async function confirmSendEmail() {
         replyToEmail
       })
     });
+
     const data = await response.json();
+
     if (response.ok) {
-      showNotification('Sent!', 'Email sent successfully! Replies will go to: ' + replyToEmail, 'success');
+      showNotification('Sent!', `Email sent successfully! Replies will go to: ${replyToEmail}`, 'success');
       closeSendModal();
     } else {
       throw new Error(data.error || 'Failed to send email');
     }
   } catch (error) {
+    console.error('Send error:', error);
     showNotification('Error', error.message, 'error');
     if (confirmBtn) {
       confirmBtn.disabled = false;
       confirmBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Email';
     }
   }
+}
+
+// Smart Reply Feature
+function showSmartReplyModal() {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'smartReplyModal';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 700px;">
+      <button class="modal-close" onclick="closeSmartReplyModal()">
+        <i class="fas fa-times"></i>
+      </button>
+      <h3>🤖 Smart Reply</h3>
+      <p class="modal-description">Paste the email you received, and AI will suggest replies.</p>
+      
+      <div class="input-group">
+        <label for="receivedEmail">Email You Received</label>
+        <textarea id="receivedEmail" class="auth-input" rows="8" placeholder="Paste the email content here..." required></textarea>
+      </div>
+      
+      <div class="input-group">
+        <label for="replyContext">Additional Context (Optional)</label>
+        <input type="text" id="replyContext" class="auth-input" placeholder="e.g., 'Meeting scheduled for next week'">
+      </div>
+      
+      <button class="settings-btn primary" onclick="generateSmartReplies()" id="generateRepliesBtn">
+        <i class="fas fa-magic"></i> Generate Reply Options
+      </button>
+      
+      <div id="replyOptionsContainer" style="display: none; margin-top: 24px;">
+        <h4 style="margin-bottom: 16px;">Reply Options:</h4>
+        <div id="replyOptionsList"></div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+}
+
+function closeSmartReplyModal() {
+  const modal = document.getElementById('smartReplyModal');
+  if (modal) {
+    document.body.removeChild(modal);
+  }
+}
+
+async function generateSmartReplies() {
+  const receivedEmail = document.getElementById('receivedEmail').value.trim();
+  const context = document.getElementById('replyContext').value.trim();
+
+  if (!receivedEmail) {
+    showNotification('Error', 'Please paste the email you received', 'error');
+    return;
+  }
+
+  const button = document.getElementById('generateRepliesBtn');
+  button.disabled = true;
+  button.innerHTML = '<span class="btn-spinner"></span> Generating...';
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/smart-reply`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        emailContent: receivedEmail,
+        context: context || undefined
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.success && data.replies) {
+      displayReplyOptions(data.replies);
+      showNotification('Success', `${data.replies.length} reply options generated!`, 'success');
+    } else {
+      throw new Error(data.error || 'Failed to generate replies');
+    }
+  } catch (error) {
+    console.error('Smart reply error:', error);
+    showNotification('Error', error.message, 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '<i class="fas fa-magic"></i> Generate Reply Options';
+  }
+}
+
+function displayReplyOptions(replies) {
+  const container = document.getElementById('replyOptionsContainer');
+  const list = document.getElementById('replyOptionsList');
+  
+  list.innerHTML = '';
+  
+  replies.forEach(reply => {
+    const typeLabels = {
+      brief: '⚡ Brief',
+      detailed: '📝 Detailed',
+      friendly: '😊 Friendly',
+      general: '💬 General'
+    };
+    
+    const optionDiv = document.createElement('div');
+    optionDiv.style.cssText = 'background: var(--bg-secondary); padding: 20px; border-radius: 12px; margin-bottom: 16px; border: 1px solid var(--border-subtle);';
+    optionDiv.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <strong style="color: var(--accent-primary);">${typeLabels[reply.type] || 'Reply'} ${reply.id}</strong>
+        <button onclick="useReply(${reply.id})" class="settings-btn primary" style="padding: 8px 16px; font-size: 13px;">
+          <i class="fas fa-check"></i> Use This
+        </button>
+      </div>
+      <div style="color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap;">${reply.content}</div>
+    `;
+    list.appendChild(optionDiv);
+  });
+  
+  container.style.display = 'block';
+  
+  // Store replies globally for use
+  window.smartReplies = replies;
+}
+
+function useReply(replyId) {
+  const reply = window.smartReplies?.find(r => r.id === replyId);
+  if (!reply) return;
+  
+  // Copy to clipboard
+  navigator.clipboard.writeText(reply.content).then(() => {
+    showNotification('Copied!', 'Reply copied to clipboard', 'success');
+    closeSmartReplyModal();
+  }).catch(() => {
+    showNotification('Error', 'Failed to copy reply', 'error');
+  });
 }
 
 // ========================================
@@ -2066,6 +2271,10 @@ window.confirmSendEmail = confirmSendEmail;
 window.handleDeleteAccount = handleDeleteAccount;
 window.startPremiumUpgrade = startPremiumUpgrade;
 window.loadToneManagementUI = loadToneManagementUI;
+window.showSmartReplyModal = showSmartReplyModal;
+window.closeSmartReplyModal = closeSmartReplyModal;
+window.generateSmartReplies = generateSmartReplies;
+window.useReply = useReply;
 
 // ========================================
 // AUTO-INITIALIZATION
