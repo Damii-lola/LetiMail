@@ -1550,16 +1550,17 @@ function showSendEmailModal() {
 }
 
 async function confirmSendEmail() {
-  const to = document.getElementById('recipientEmail').value.trim();
-  const businessName = document.getElementById('businessName').value.trim();
-  const replyToEmail = document.getElementById('replyToEmail').value.trim();
+  const to = document.getElementById('recipientEmail')?.value?.trim();
+  const businessName = document.getElementById('businessName')?.value?.trim();
+  const replyToEmail = document.getElementById('replyToEmail')?.value?.trim();
   const outputDiv = document.getElementById('output');
-  const emailContent = outputDiv.innerText;
+  const emailContent = outputDiv?.innerText;
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
-  if (!to || !emailRegex.test(to)) {
-    showNotification('Error', 'Please enter a valid recipient email', 'error');
+  console.log('📧 Send Email Data:', { to, businessName, replyToEmail });
+
+  // Check if fields exist and have values
+  if (!to) {
+    showNotification('Error', 'Please enter a recipient email', 'error');
     return;
   }
 
@@ -1568,8 +1569,28 @@ async function confirmSendEmail() {
     return;
   }
 
-  if (!replyToEmail || !emailRegex.test(replyToEmail)) {
-    showNotification('Error', 'Please enter a valid reply-to email', 'error');
+  if (!replyToEmail) {
+    showNotification('Error', 'Please enter a reply-to email', 'error');
+    return;
+  }
+
+  // Improved email validation regex
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  
+  if (!emailRegex.test(to)) {
+    showNotification('Error', `Invalid recipient email format: ${to}`, 'error');
+    console.error('❌ Invalid recipient email:', to);
+    return;
+  }
+
+  if (!emailRegex.test(replyToEmail)) {
+    showNotification('Error', `Invalid reply-to email format: ${replyToEmail}`, 'error');
+    console.error('❌ Invalid reply-to email:', replyToEmail);
+    return;
+  }
+
+  if (!emailContent || emailContent.includes('Your personalized email will appear here')) {
+    showNotification('Error', 'No email content to send', 'error');
     return;
   }
 
@@ -1583,6 +1604,8 @@ async function confirmSendEmail() {
   }
 
   try {
+    console.log('📤 Sending email to backend...');
+    
     const response = await fetch(`${BACKEND_URL}/api/send-email`, {
       method: 'POST',
       headers: {
@@ -1590,32 +1613,33 @@ async function confirmSendEmail() {
         'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({
-        to,
-        subject,
+        to: to,
+        subject: subject,
         content: emailContent,
-        businessName,
-        replyToEmail
+        businessName: businessName,
+        replyToEmail: replyToEmail
       })
     });
 
     const data = await response.json();
+    console.log('📊 Send response:', data);
 
     if (response.ok) {
-      showNotification('Sent!', `Email sent successfully! Replies will go to: ${replyToEmail}`, 'success');
+      showNotification('Sent!', `Email sent successfully to ${to}! Replies will go to: ${replyToEmail}`, 'success');
       closeSendModal();
     } else {
       throw new Error(data.error || 'Failed to send email');
     }
   } catch (error) {
-    console.error('Send error:', error);
+    console.error('❌ Send error:', error);
     showNotification('Error', error.message, 'error');
+  } finally {
     if (confirmBtn) {
       confirmBtn.disabled = false;
       confirmBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Email';
     }
   }
 }
-
 // Smart Reply Feature
 function showSmartReplyModal() {
   const modal = document.createElement('div');
