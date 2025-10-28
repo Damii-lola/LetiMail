@@ -723,7 +723,7 @@ Generate ONLY the email content starting with "Subject:". The output should feel
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "mixtral-8x7b-32768",  // CRITICAL - much more capable model
+        model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.8,             // Balanced creativity/consistency
         max_tokens: 2000,             // Much longer for detailed prompts
@@ -800,13 +800,10 @@ Return ONLY the polished email, nothing else.`;
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "mixtral-8x7b-32768",  // CRITICAL - much more capable model
+        model: "llama-3.1-8b-instant",  // CRITICAL - much more capable model
         messages: [{ role: "user", content: prompt }],
         temperature: 0.8,             // Balanced creativity/consistency
         max_tokens: 2000,             // Much longer for detailed prompts
-        top_p: 0.85,
-        frequency_penalty: 0.8,       // Stronger penalty for repetition
-        presence_penalty: 0.7,
       }),
     });
 
