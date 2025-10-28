@@ -627,6 +627,7 @@ OPENING HOOK PSYCHOLOGY (First 15 words must grab attention):
 - QUESTION LED: "Quick question that came up while reviewing [specific thing]..."
 - VALUE LED: "I have one idea that could [specific benefit] for your [specific metric]..."
 - STORY LED: "Was working with [similar company] and discovered [surprising insight]..."
+- VARY YOUR OPENING PATTERNS: Don't start every email with "Noticed your..." - mix between questions, insights, and direct statements.
 
 BODY COPY EXCELLENCE:
 - PARAGRAPH 1: Immediate value or relevance to RECIPIENT
