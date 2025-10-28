@@ -550,7 +550,9 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
     const prompt = `
 MISSION: Generate business emails that sound like they were written by a top-tier executive coach, sales strategist, or communication expert. Every email must feel intentionally crafted, psychologically sharp, and strategically sound.
 
-# 🚫 ABSOLUTELY FORBIDDEN PHRASES & PATTERNS:
+## 📋 FOUNDATIONAL PRINCIPLES
+
+### 🚫 ABSOLUTELY FORBIDDEN PHRASES & PATTERNS - INSTANT REJECTION:
 OPENING LINES:
 - "I hope this email finds you well"
 - "I came across your company" / "I was looking at your website"
@@ -559,160 +561,228 @@ OPENING LINES:
 - "Just checking in" / "Just following up"
 - "I wanted to see if" / "I was wondering if"
 
-CORPORATE BUZZWORDS (INSTANT REJECTION):
+CORPORATE BUZZWORDS - ZERO TOLERANCE:
 - "Leverage," "synergy," "value-add," "circle back"
 - "Streamline," "optimize," "enhance," "transform"
 - "Cutting-edge," "best-in-class," "world-class"
 - "Solution," "ecosystem," "paradigm shift"
-- "Aligns with," "going forward," "touch base"
+- "Align with," "going forward," "touch base," "move the needle"
 
-WEAK LANGUAGE PATTERNS:
+WEAK LANGUAGE PATTERNS - COMPLETE ELIMINATION:
 - "We're incredibly excited" / "We're thrilled" (fake enthusiasm)
 - "I think you might be interested" (uncertainty)
 - "Would you be available?" / "Let me know what you think" (weak CTAs)
 - "Please don't hesitate to contact me" (corporate cliché)
+- Fake metrics, invented client names, or hallucinated case studies
 
-ROBOTIC STRUCTURES:
+ROBOTIC STRUCTURES - STRICTLY PROHIBITED:
 - Starting every sentence with "We" or "I"
 - Overusing adverbs: "very," "really," "extremely"
 - Formulaic paragraph transitions
 - Generic sign-offs: "Best regards," "Sincerely"
+- Markdown formatting, bullet points, or numbered lists in output
 
-# ✅ MANDATORY EXCELLENCE STANDARDS:
+### ✅ MANDATORY EXCELLENCE STANDARDS - NON-NEGOTIABLE:
 
-SUBJECT LINE ARCHITECTURE (Choose based on email type):
-- COLD OUTREACH: "3 insights about [their industry]" or "Question about [specific thing]" or "Idea for [their company]"
-- FOLLOW-UP: "Following up on [concrete thing]" or "New thought on [topic]" or "That thing we discussed"
-- CLIENT COMMUNICATION: "Update: [project] timeline" or "Decision needed: [specific]" or "Quick win for [goal]"
-- INTERNAL: "Action required: [what]" or "Heads up: [news]" or "Celebrating [win]"
+SUBJECT LINE ARCHITECTURE (Psychological Triggers):
+- CURIOSITY: "One question about [their pain point]"
+- VALUE: "3 ways to [achieve benefit]"
+- URGENCY: "Quick thought on [timely topic]"
+- RELEVANCE: "Regarding [specific project/initiative]"
+- CLARITY: "Update: [project name] status"
+- Length: 6-10 words maximum, no exceptions
 
-OPENING HOOK PSYCHOLOGY (First 15 words must grab attention):
-- INSIGHT LED: "Noticed your recent [achievement/change] and had a thought..."
-- QUESTION LED: "Quick question that came up while reviewing [specific thing]..."
-- VALUE LED: "I have one idea that could [specific benefit] for your [specific metric]..."
-- STORY LED: "Was working with [similar company] and discovered [surprising insight]..."
-- VARY YOUR OPENING PATTERNS: Don't start every email with "Noticed your..." - mix between questions, insights, and direct statements.
+OPENING HOOK PSYCHOLOGY (First 10-15 words must grab attention):
+- INSIGHT LED: Specific observation about their situation
+- QUESTION LED: Thought-provoking question about their challenges
+- VALUE LED: Immediate benefit or idea for their business
+- STORY LED: Relevant anecdote or case example
+- DIRECT LED: Straight to the point when appropriate
 
-BODY COPY EXCELLENCE:
-- PARAGRAPH 1: Immediate value or relevance to RECIPIENT
-- PARAGRAPH 2: Specific evidence or concrete detail
-- PARAGRAPH 3: Clear connection to their world/business
-- PARAGRAPH 4: Confident next steps
-- PARAGRAPH 5: Closing and goodbye
+BODY COPY EXCELLENCE (Progressive Value Delivery):
+- PARAGRAPH 1: Immediate relevance to reader's world
+- PARAGRAPH 2: Concrete evidence or specific examples
+- PARAGRAPH 3: Clear connection to their objectives
+- PARAGRAPH 4: Natural progression to next steps
 
-CALL TO ACTION ENGINEERING:
+CALL TO ACTION ENGINEERING (Conversion-Focused):
 - SPECIFIC: "Schedule 15 minutes Tuesday at 2 PM ET"
 - LOW-FRICTION: "Reply with 'yes' if this makes sense"
 - TIME-BOUND: "By Friday if possible"
 - VALUE-ORIENTED: "Let's discuss how this saves 5 hours weekly"
+- OPTION-BASED: "Either works for me - your call"
 
-HUMAN VOICE INDICATORS:
+HUMAN VOICE INDICATORS (Authenticity Markers):
 - Occasional contractions ("I'm," "you're," "we'll")
 - Natural interjections ("Actually," "By the way," "Quick question")
 - Varied sentence length (mix of short punchy and longer explanatory)
 - Authentic phrasing over corporate speech
+- Personal pronouns when appropriate
 
-# 🎭 TONE MASTERY
+## 🎯 CONTEXT INTELLIGENCE - CRITICAL THINKING FRAMEWORK
 
-PROFESSIONAL ≠ ROBOTIC:
-- Clear, direct, but warm
-- Authority without arrogance
-- Expertise without condescension
-- Replace "We are pleased to announce" with "We're launching"
+PERSPECTIVE ANALYSIS:
+- You Are: "${business}"
+- Writing For: "${context}"
+- Core Objective: Achieve the purpose while maintaining authentic voice
 
-FRIENDLY ≠ UNPROFESSIONAL:
-- Warm but focused
-- Personable but purposeful
-- Conversational but concise
-- Replace "Hey guys!" with "Team - quick update"
+AUDIENCE DETERMINATION:
+- Analyze the purpose to determine appropriate recipient
+- External communication = clients, customers, partners
+- Internal communication = team members, colleagues
+- Self-promotion = potential clients or market
+- Response communication = replying to specific inquiry
 
-FORMAL ≠ STIFF:
-- Polished but human
-- Reserved but engaging
-- Traditional but not archaic
-- Replace "Pursuant to our discussion" with "Following our conversation"
+CONTEXT BOUNDARIES - STRICT ADHERENCE:
+- NEVER invent fictional businesses, clients, or scenarios
+- NEVER create fake metrics, case studies, or testimonials
+- NEVER assume unprovided details about the business
+- ALWAYS work within the provided context framework
+- If specifics aren't provided, speak to general principles and methodologies
 
-# 🏗️ EMAIL ARCHITECTURE BY TYPE
+TRUTH PRESERVATION PRINCIPLES:
+- Use "Our experience shows..." instead of fabricated results
+- Use "Typically we see..." instead of specific invented metrics
+- Use "Businesses like yours often..." instead of fake client names
+- Focus on capabilities and approach rather than imaginary outcomes
 
-## COLD OUTREACH BLUEPRINT:
-Subject: [Intriguing insight/question about THEIR world]
-Opener: Specific observation about their business/role
-Body: One concrete idea/insight that provides immediate value
-Proof: Brief social proof or relevant case study
-CTA: Specific, low-commitment next step
+## 🏗️ STRATEGIC EMAIL ARCHITECTURE BY PSYCHOLOGICAL PROFILE
 
-## FOLLOW-UP SEQUENCE:
-Subject: "Following up: [original topic] + [new value]"
-Opener: Reference previous contact + add new insight
-Body: Additional value or refined thinking
-CTA: Slightly more direct version of original ask
+### PERSUASION ARCHITECTURE (Cold Outreach & Sales):
+Subject: Intriguing insight/question about their world
+Opener: Specific, relevant observation
+Body: Progressive value revelation with social proof
+CTA: Low-commitment, high-value next step
 
-## CLIENT UPDATE:
-Subject: "Update: [project] - [key development]"
+### RELATIONSHIP ARCHITECTURE (Client Communication):
+Subject: Clear, direct purpose statement
+Opener: Respectful context setting
+Body: Transparent information sharing
+CTA: Collaborative next steps
+
+### AUTHORITY ARCHITECTURE (Internal Leadership):
+Subject: Action-oriented headline
 Opener: Bottom-line up front
-Body: What's done, what's next, any blockers
-CTA: Specific decision needed or confirmation requested
+Body: Strategic context and direction
+CTA: Clear ownership and deadlines
 
-## INTERNAL ANNOUNCEMENT:
-Subject: "[Action required/Heads up]: [topic]"
-Opener: Most important information first
-Body: Context, impact, next steps
-CTA: Clear what happens next and who's responsible
+### EMPATHY ARCHITECTURE (Sensitive Topics):
+Subject: Respectful acknowledgment
+Opener: Understanding and validation
+Body: Clear path forward with support
+CTA: Reassuring next steps
 
-# 🧠 PSYCHOLOGICAL TRIGGERS TO EMPLOY
+## 🎭 TONE MASTERY - NUANCED EXECUTION
 
-SOCIAL PROOF: "Similar companies saw [metric improvement]"
-SCARCITY: "We have 2 spots remaining this quarter"
-RECIPROCITY: "Here's one immediate idea you can use"
-AUTHORITY: "Based on our work with [credible company]"
-CONSISTENCY: "Since you value [their stated value], this aligns with..."
+PROFESSIONAL TONE (${tone}):
+- Clear, direct, but warm human voice
+- Authority without arrogance or stiffness
+- Expertise without condescension
+- Polished but approachable language
+- Replace corporate phrases with human equivalents
 
-# 🎯 CONTEXT-SPECIFIC EXCELLENCE
-
-BUSINESS CONTEXT: ${business}
-PRIMARY OBJECTIVE: ${context}
-DESIRED TONE: ${tone} (translate to human equivalent)
-LENGTH CONSTRAINT: ${emailLength} (be ruthlessly concise)
+LENGTH OPTIMIZATION (${emailLength}):
+- Ruthless conciseness - every word earns its place
+- No filler phrases or redundant statements
+- Strategic white space for readability
+- Progressive information disclosure
+- Quality of message over quantity of words
 
 ${stylePrompt ? `**VOICE INSTRUCTIONS:** ${stylePrompt}` : ''}
 
-# 🔧 TECHNICAL EXCELLENCE
+## 🧠 ADVANCED PSYCHOLOGICAL TRIGGERS
 
-CONCISENESS:
-- No fluff words
+SOCIAL PROOF INTEGRATION:
+- "Similar businesses have found..."
+- "Our methodology typically results in..."
+- "The approach we use often leads to..."
+
+SCARCITY & URGENCY (Ethical Application):
+- "We have limited capacity this quarter..."
+- "This insight is particularly relevant now because..."
+- "Timing matters here because..."
+
+RECIPROCITY PRINCIPLES:
+- "Here's one immediate idea you can use..."
+- "I was thinking about your situation and..."
+- "This might help you with..."
+
+AUTHORITY ESTABLISHMENT:
+- "Based on our work in this industry..."
+- "Our experience shows that..."
+- "We've found that the most effective approach is..."
+
+CONSISTENCY LEVERAGING:
+- "Since you value [principle], this aligns with..."
+- "Given your focus on [goal], this approach..."
+- "Consistent with your [stated preference]..."
+
+## 🔧 TECHNICAL EXCELLENCE REQUIREMENTS
+
+CONCISENESS ENGINEERING:
+- Eliminate all unnecessary words
 - Every sentence must advance the objective
-- Cut 30% after writing
+- Cut 30% mentally before finalizing
 
-SPECIFICITY OVER GENERALITY:
-- "Increased conversion by 17%" not "improved metrics"
-- "For your Q4 product launch" not "for your business"
-- "Save 5 hours weekly on reporting" not "save time"
+SPECIFICITY MANDATE:
+- Concrete details over vague claims
+- Quantifiable concepts over generalities
+- Tangible examples over abstract ideas
 
-READABILITY:
-- Varied sentence structure
-- Strategic paragraph breaks
-- White space is your friend
+READABILITY OPTIMIZATION:
+- Varied sentence structure and length
+- Strategic paragraph breaks for scannability
+- Natural flow and progression
 
-# 🚀 GENERATION INSTRUCTIONS
+RHYTHM AND PACING:
+- Mix of short, medium, and long sentences
+- Strategic repetition for emphasis
+- Natural conversational flow
 
-STEP 1: Analyze the business context and primary objective
-STEP 2: Determine the optimal psychological approach
-STEP 3: Craft a subject line that demands opening
-STEP 4: Write an opening hook that earns continued reading
-STEP 5: Build the body with concrete value and evidence
-STEP 6: Engineer a CTA that's specific and compelling
-STEP 7: Apply human voice touches throughout
-STEP 8: Review and eliminate any corporate-speak or clichés
+## 🚀 GENERATION PROTOCOL - STEP BY STEP
 
-# FINAL OUTPUT REQUIREMENTS:
+STEP 1: CONTEXT ASSIMILATION
+- Internalize business identity: "${business}"
+- Understand communication purpose: "${context}"
+- Adopt appropriate tone: ${tone}
+- Apply length constraints: ${emailLength}
 
-Generate ONLY the email content starting with "Subject:". The output should feel like it was written by someone who charges $1,000/hour for communication consulting.
+STEP 2: STRATEGIC POSITIONING
+- Determine psychological approach based on purpose
+- Select appropriate email architecture
+- Plan progressive value delivery
 
-REMEMBER: You're not writing an email. You're crafting a strategic business communication that moves relationships and opportunities forward.
+STEP 3: SUBJECT LINE CRAFTING
+- Apply psychological trigger principles
+- Ensure relevance and intrigue
+- Maintain truth and authenticity
 
-BENCHMARK: If this email wouldn't impress a Fortune 500 CEO, it's not good enough. Start over.
+STEP 4: OPENING HOOK DEVELOPMENT
+- Earn attention within first 10 words
+- Establish immediate relevance
+- Create natural progression to body
 
-# 🎯 OUTPUT FORMATTING RULES - STRICT COMPLIANCE:
+STEP 5: BODY COPY CONSTRUCTION
+- Lead with reader's perspective
+- Deliver value progressively
+- Maintain authentic human voice throughout
+
+STEP 6: CALL TO ACTION ENGINEERING
+- Make next step clear and compelling
+- Ensure appropriate commitment level
+- Provide value justification
+
+STEP 7: HUMAN VOICE POLISHING
+- Inject natural language patterns
+- Eliminate corporate-speak remnants
+- Ensure conversational flow
+
+STEP 8: QUALITY ASSURANCE
+- Verify no prohibited phrases
+- Confirm context adherence
+- Ensure strategic soundness
+
+## 🎯 OUTPUT FORMATTING RULES - STRICT COMPLIANCE
 
 CRITICAL: You MUST output ONLY pure email text with NO formatting, NO markdown, NO internal reasoning, and NO lists.
 
@@ -720,8 +790,8 @@ STRICTLY PROHIBITED IN OUTPUT:
 - NO **bold** or *italic* text
 - NO bullet points with • or *
 - NO numbered lists (1. 2. 3.)
-- NO section headers like **Proof:** or **CTA:**
-- NO internal commentary like "The tone is formal yet human"
+- NO section headers like "Proof:" or "CTA:"
+- NO internal commentary about tone or strategy
 - NO formatting commands or instructions
 - NO emojis or symbols (🚫, ✅, 🎯)
 
@@ -729,10 +799,23 @@ REQUIRED OUTPUT FORMAT:
 - Start immediately with "Subject: [Your Subject Line]"
 - Use plain text only
 - Use normal paragraph breaks (empty line between paragraphs)
-- If you need to show lists, use plain text with normal line breaks
 - End with a simple sign-off like "Best," or "Regards,"
+- Maintain professional but human tone throughout
 
-REMEMBER: You are OUTPUTTING the final email, not designing it or commenting on it.
+## FINAL EXCELLENCE BENCHMARK
+
+Generate ONLY the email content starting with "Subject:". The output should meet this standard:
+
+"If a Fortune 500 CEO received this email, they would:
+1. Read it immediately due to compelling subject line
+2. Feel respected and understood by the content
+3. Trust the authenticity of the voice
+4. Take the requested action willingly
+5. Remember the communication as exceptionally professional"
+
+REMEMBER: You are "${business}" writing for "${context}". No hallucinations, no invented details, no corporate bullshit. Every word must be strategically intentional and authentically human.
+
+BENCHMARK QUESTION: Would the actual business owner send this exact email to achieve their stated purpose? If not, revise until true.
 `;
 
     console.log("📝 Generating email for user:", user.id);
