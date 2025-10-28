@@ -631,17 +631,17 @@ async function handleSignup(e) {
 // IMPROVED ONBOARDING REDIRECT
 // ========================================
 function handlePostAuthRedirect() {
-    const onboardingComplete = localStorage.getItem('letimail_onboarding_complete');
-
-    if (!onboardingComplete) {
-        // Show onboarding modal instead of redirecting immediately
-        setTimeout(() => {
-            showOnboardingModal();
-        }, 1000);
-    } else {
-        // If onboarding is complete, show success and let user choose where to go
-        showNotification('Welcome!', 'Successfully signed in. You can start generating emails or manage your settings.', 'success');
-    }
+  const onboardingComplete = localStorage.getItem('letimail_onboarding_complete');
+  
+  if (!onboardingComplete) {
+    // Show onboarding modal for new users
+    setTimeout(() => {
+      showOnboardingModal();
+    }, 1000);
+  } else {
+    // If onboarding is complete, just show success
+    showNotification('Welcome!', 'Successfully signed in. You can start generating emails!', 'success');
+  }
 }
 
 // ========================================
@@ -1610,19 +1610,31 @@ async function handleProfileUpdate(e) {
     const name = document.getElementById('profileName').value;
 
     try {
-        if (currentUser) {
-            currentUser.name = name;
+        const response = await fetch(`${BACKEND_URL}/api/auth/profile`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ name })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            currentUser.name = data.user.name;
             showNotification('Success', 'Profile updated successfully', 'success');
             updateUserInfo(currentUser);
             updateSettingsPage();
+        } else {
+            throw new Error(data.error || 'Failed to update profile');
         }
     } catch (error) {
-        showNotification('Error', 'Failed to update profile', 'error');
+        showNotification('Error', error.message, 'error');
     } finally {
         hideButtonLoading(button);
     }
 }
-
 async function handlePreferencesUpdate(e) {
     const button = e.target.querySelector('button[type="submit"]');
     showButtonLoading(button);
@@ -1640,15 +1652,31 @@ async function handlePreferencesUpdate(e) {
             spellCheck
         };
 
-        localStorage.setItem('letimail_preferences', JSON.stringify(preferences));
-        showNotification('Success', 'Preferences saved successfully', 'success');
+        // Save to backend
+        const response = await fetch(`${BACKEND_URL}/api/auth/preferences`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(preferences)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Also save to localStorage for quick access
+            localStorage.setItem('letimail_preferences', JSON.stringify(preferences));
+            showNotification('Success', 'Preferences saved successfully', 'success');
+        } else {
+            throw new Error(data.error || 'Failed to save preferences');
+        }
     } catch (error) {
-        showNotification('Error', 'Failed to save preferences', 'error');
+        showNotification('Error', error.message, 'error');
     } finally {
         hideButtonLoading(button);
     }
 }
-
 async function handlePasswordChange(e) {
     const button = e.target.querySelector('button[type="submit"]');
     showButtonLoading(button);
@@ -1670,15 +1698,32 @@ async function handlePasswordChange(e) {
     }
 
     try {
-        showNotification('Success', 'Password updated successfully', 'success');
-        e.target.reset();
+        const response = await fetch(`${BACKEND_URL}/api/auth/password`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                currentPassword,
+                newPassword
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification('Success', 'Password updated successfully', 'success');
+            e.target.reset();
+        } else {
+            throw new Error(data.error || 'Failed to update password');
+        }
     } catch (error) {
-        showNotification('Error', 'Failed to update password', 'error');
+        showNotification('Error', error.message, 'error');
     } finally {
         hideButtonLoading(button);
     }
 }
-
 // ========================================
 // TONE MANAGEMENT IN SETTINGS
 // ========================================
