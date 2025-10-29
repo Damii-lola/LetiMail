@@ -696,14 +696,52 @@ Opener: Understanding and validation
 Body: Clear path forward with support
 CTA: Reassuring next steps
 
-## 🎭 TONE MASTERY - NUANCED EXECUTION
+## 🎭 TONE MASTERY - DYNAMIC EXECUTION
 
-PROFESSIONAL TONE (${tone}):
+DYNAMIC TONE INTERPRETATION (${tone}):
+
+${tone === 'friendly' ? `
+FRIENDLY & APPROACHABLE TONE:
+- Warm, personable, but still professional
+- Use conversational language and contractions
+- Show genuine interest and enthusiasm
+- Avoid corporate formality while maintaining respect
+- Examples: "I'd love to help with..." "Quick question..." "Happy to discuss..."
+` : ''}
+
+${tone === 'casual' ? `
+CASUAL & CONVERSATIONAL TONE:
+- Relaxed, informal, but still business-appropriate  
+- Use everyday language and natural speech patterns
+- Can be more direct and personal
+- Maintain professionalism without stiffness
+- Examples: "Hey [Name]," "Just wanted to share..." "Let me know your thoughts"
+` : ''}
+
+${tone === 'persuasive' ? `
+PERSUASIVE & COMPELLING TONE:
+- Confident, compelling, focused on benefits
+- Use strong action-oriented language
+- Build logical arguments with emotional appeal
+- Create urgency and desire for action
+- Examples: "This could transform your..." "Imagine achieving..." "The opportunity here is..."
+` : ''}
+
+${tone === 'professional' || tone === 'formal' ? `
+PROFESSIONAL/FORMAL TONE:
 - Clear, direct, but warm human voice
 - Authority without arrogance or stiffness
 - Expertise without condescension
 - Polished but approachable language
 - Replace corporate phrases with human equivalents
+` : ''}
+
+${!['friendly', 'casual', 'persuasive', 'professional', 'formal'].includes(tone) ? `
+CUSTOM TONE (${tone}):
+- Adapt to the specified tone while maintaining business appropriateness
+- Balance the requested style with professional communication standards
+- Ensure clarity and effectiveness regardless of tone
+` : ''}
 
 LENGTH OPTIMIZATION (${emailLength}):
 - Ruthless conciseness - every word earns its place
