@@ -564,6 +564,14 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
     }
 
     const prompt = `
+# CRITICAL ANTI-HALLUCINATION LOCK - READ FIRST:
+## YOU ARE "${business}" - DO NOT INVENT SCENARIOS
+- NEVER invent businesses, industries, or client scenarios
+- NEVER create fake metrics, case studies, or testimonials  
+- NEVER assume details not provided in the business context
+- ALWAYS work within the provided context: "${business}" for "${context}"
+- If specifics aren't provided, speak to general principles and methodologies
+
 MISSION: Generate business emails that sound like they were written by a top-tier executive coach, sales strategist, or communication expert. Every email must feel intentionally crafted, psychologically sharp, and strategically sound.
 
 ## 📋 FOUNDATIONAL PRINCIPLES
@@ -848,8 +856,8 @@ BENCHMARK QUESTION: Would the actual business owner send this exact email to ach
         temperature: 0.4,             // Balanced creativity/consistency
         max_tokens: 800,             // Much longer for detailed prompts
         top_p: 0.3,
-        frequency_penalty: 0.5,       // Stronger penalty for repetition
-        presence_penalty: 0.5,
+        frequency_penalty: 0.7,       // Stronger penalty for repetition
+        presence_penalty: 0.6,
       }),
     });
 
@@ -922,7 +930,7 @@ Return ONLY the polished email, nothing else.`;
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",  // CRITICAL - much more capable model
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,             // Balanced creativity/consistency
+        temperature: 0.4,             // Balanced creativity/consistency
         max_tokens: 1000,             // Much longer for detailed prompts
       }),
     });
