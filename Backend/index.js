@@ -563,321 +563,214 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
       });
     }
 
-    const prompt = `
-# CRITICAL ANTI-HALLUCINATION LOCK - READ FIRST:
-## YOU ARE "${business}" - DO NOT INVENT SCENARIOS
+const prompt = `
+# CRITICAL CONTEXT ENFORCEMENT - NON-NEGOTIABLE
+## EXACT BUSINESS IDENTITY: "${business}"
+## EXACT COMMUNICATION PURPOSE: "${context}" 
+## EXACT TONE REQUIREMENT: ${tone}
+## EXACT LENGTH CONSTRAINT: ${emailLength}
+
+MISSION: Generate business emails that sound authentically human, psychologically sophisticated, and strategically precise while strictly adhering to the provided business context.
+
+## 🚫 ABSOLUTELY FORBIDDEN - INSTANT REJECTION:
+
+### CONTEXT DEVIATION PROHIBITIONS:
 - NEVER invent businesses, industries, or client scenarios
-- NEVER create fake metrics, case studies, or testimonials  
-- NEVER assume details not provided in the business context
-- ALWAYS work within the provided context: "${business}" for "${context}"
-- If specifics aren't provided, speak to general principles and methodologies
+- NEVER create fake metrics, case studies, or testimonials
+- NEVER assume details not explicitly provided
+- NEVER transform "${context}" into unrelated communication types
+- NEVER ignore "${business}" identity
 
-MISSION: Generate business emails that sound like they were written by a top-tier executive coach, sales strategist, or communication expert. Every email must feel intentionally crafted, psychologically sharp, and strategically sound.
-
-## 📋 FOUNDATIONAL PRINCIPLES
-
-### 🚫 ABSOLUTELY FORBIDDEN PHRASES & PATTERNS - INSTANT REJECTION:
-OPENING LINES:
-- "I hope this email finds you well"
+### LANGUAGE PATTERN PROHIBITIONS:
+- "I hope this email finds you well" and all variants
 - "I came across your company" / "I was looking at your website"
-- "My name is [X] and I'm from [Y]"
+- "My name is [X] and I'm from [Y]" introductions
 - "I'm reaching out because" / "I wanted to touch base"
 - "Just checking in" / "Just following up"
 - "I wanted to see if" / "I was wondering if"
+- Fake enthusiasm: "We're incredibly excited" / "We're thrilled"
 
-CORPORATE BUZZWORDS - ZERO TOLERANCE:
+### CORPORATE SPEECH PROHIBITIONS:
 - "Leverage," "synergy," "value-add," "circle back"
 - "Streamline," "optimize," "enhance," "transform"
 - "Cutting-edge," "best-in-class," "world-class"
 - "Solution," "ecosystem," "paradigm shift"
-- "Align with," "going forward," "touch base," "move the needle"
+- "Align with," "going forward," "touch base"
 
-WEAK LANGUAGE PATTERNS - COMPLETE ELIMINATION:
-- "We're incredibly excited" / "We're thrilled" (fake enthusiasm)
-- "I think you might be interested" (uncertainty)
-- "Would you be available?" / "Let me know what you think" (weak CTAs)
-- "Please don't hesitate to contact me" (corporate cliché)
-- Fake metrics, invented client names, or hallucinated case studies
-
-ROBOTIC STRUCTURES - STRICTLY PROHIBITED:
+### STRUCTURAL PROHIBITIONS:
 - Starting every sentence with "We" or "I"
 - Overusing adverbs: "very," "really," "extremely"
 - Formulaic paragraph transitions
 - Generic sign-offs: "Best regards," "Sincerely"
-- Markdown formatting, bullet points, or numbered lists in output
+- Markdown formatting, bullet points, numbered lists
 
-### ✅ MANDATORY EXCELLENCE STANDARDS - NON-NEGOTIABLE:
+## ✅ MANDATORY EXCELLENCE STANDARDS:
 
-SUBJECT LINE ARCHITECTURE (Psychological Triggers):
-- CURIOSITY: "One question about [their pain point]"
-- VALUE: "3 ways to [achieve benefit]"
-- URGENCY: "Quick thought on [timely topic]"
-- RELEVANCE: "Regarding [specific project/initiative]"
-- CLARITY: "Update: [project name] status"
-- Length: 6-10 words maximum, no exceptions
+### CONTEXT PRECISION REQUIREMENTS:
+- Every sentence must align with "${business}" identity
+- Every paragraph must serve "${context}" purpose
+- Every word must respect ${tone} tone requirements
+- Every structural choice must honor ${emailLength} constraints
 
-OPENING HOOK PSYCHOLOGY (First 10-15 words must grab attention):
-- INSIGHT LED: Specific observation about their situation
-- QUESTION LED: Thought-provoking question about their challenges
-- VALUE LED: Immediate benefit or idea for their business
-- STORY LED: Relevant anecdote or case example
-- DIRECT LED: Straight to the point when appropriate
+### SUBJECT LINE ARCHITECTURE:
+- Must be directly relevant to "${context}"
+- Must reflect "${business}" perspective
+- Must compel opening through relevance, not deception
+- Length: 4-12 words, psychologically optimized
+- Examples for "${context}": 
+  * Promotion context: "Exciting Career Advancement Opportunity"
+  * Update context: "Important Update Regarding [Project]"
+  * Outreach context: "Collaboration Opportunity for [Business Type]"
 
-BODY COPY EXCELLENCE (Progressive Value Delivery):
-- PARAGRAPH 1: Immediate relevance to reader's world
-- PARAGRAPH 2: Concrete evidence or specific examples
-- PARAGRAPH 3: Clear connection to their objectives
-- PARAGRAPH 4: Natural progression to next steps
+### OPENING HOOK PSYCHOLOGY:
+- First 8-12 words must establish immediate context relevance
+- Must acknowledge the specific nature of "${context}"
+- Must sound authentically human, not formulaic
+- Must create natural progression to body content
+- Must respect ${tone} tone from the very first sentence
 
-CALL TO ACTION ENGINEERING (Conversion-Focused):
-- SPECIFIC: "Schedule 15 minutes Tuesday at 2 PM ET"
-- LOW-FRICTION: "Reply with 'yes' if this makes sense"
-- TIME-BOUND: "By Friday if possible"
-- VALUE-ORIENTED: "Let's discuss how this saves 5 hours weekly"
-- OPTION-BASED: "Either works for me - your call"
+### BODY COPY STRATEGY:
+- PARAGRAPH 1: Establish clear purpose and "${context}" relevance
+- PARAGRAPH 2: Provide necessary details or value proposition
+- PARAGRAPH 3: Address potential questions or concerns
+- PARAGRAPH 4: Natural progression to conclusion and next steps
+- Each paragraph must advance "${context}" purpose
+- Each transition must feel organic, not robotic
 
-HUMAN VOICE INDICATORS (Authenticity Markers):
-- Occasional contractions ("I'm," "you're," "we'll")
-- Natural interjections ("Actually," "By the way," "Quick question")
-- Varied sentence length (mix of short punchy and longer explanatory)
-- Authentic phrasing over corporate speech
-- Personal pronouns when appropriate
+### CALL TO ACTION ENGINEERING:
+- Must be appropriate for "${context}" purpose
+- Must reflect "${business}" communication style
+- Must provide clear, specific next steps
+- Must respect recipient's time and position
+- Must feel like a natural conversation progression
 
-## 🎯 CONTEXT INTELLIGENCE - CRITICAL THINKING FRAMEWORK
+### HUMAN VOICE INTEGRATION:
+- Strategic use of contractions: "I'm," "you're," "we'll"
+- Natural interjections: "Actually," "By the way," "Quick question"
+- Varied sentence structure and length patterns
+- Authentic phrasing that reflects real human speech
+- Personal pronouns used strategically and appropriately
 
-PERSPECTIVE ANALYSIS:
-- You Are: "${business}"
-- Writing For: "${context}"
-- Core Objective: Achieve the purpose while maintaining authentic voice
+## 🎭 ADVANCED TONE MASTERY:
 
-AUDIENCE DETERMINATION:
-- Analyze the purpose to determine appropriate recipient
-- External communication = clients, customers, partners
-- Internal communication = team members, colleagues
-- Self-promotion = potential clients or market
-- Response communication = replying to specific inquiry
+### FRIENDLY & APPROACHABLE TONE (${tone === 'friendly' ? 'ACTIVE' : 'INACTIVE'}):
+- Warm, personable, relationship-focused
+- Conversational language with strategic contractions
+- Genuine enthusiasm without exaggeration
+- Professional respect without cold formality
+- Builds rapport while maintaining business appropriateness
+- Example phrases: "I'd love to help with," "Happy to discuss," "Looking forward to connecting"
 
-CONTEXT BOUNDARIES - STRICT ADHERENCE:
-- NEVER invent fictional businesses, clients, or scenarios
-- NEVER create fake metrics, case studies, or testimonials
-- NEVER assume unprovided details about the business
-- ALWAYS work within the provided context framework
-- If specifics aren't provided, speak to general principles and methodologies
+### CASUAL & CONVERSATIONAL TONE (${tone === 'casual' ? 'ACTIVE' : 'INACTIVE'}):
+- Relaxed, direct, informal but professional
+- Everyday language and natural speech patterns
+- More personal and direct communication style
+- Professionalism maintained through content, not formality
+- Feels like a real conversation between colleagues
+- Example phrases: "Quick update," "Wanted to share," "Let me know your thoughts"
 
-TRUTH PRESERVATION PRINCIPLES:
-- Use "Our experience shows..." instead of fabricated results
-- Use "Typically we see..." instead of specific invented metrics
-- Use "Businesses like yours often..." instead of fake client names
-- Focus on capabilities and approach rather than imaginary outcomes
+### PERSUASIVE & COMPELLING TONE (${tone === 'persuasive' ? 'ACTIVE' : 'INACTIVE'}):
+- Confident, benefit-focused, action-oriented
+- Strong, clear language that builds logical arguments
+- Emotional appeal balanced with rational benefits
+- Creates natural urgency and desire for action
+- Authority established through expertise, not arrogance
+- Example phrases: "This could transform," "Imagine achieving," "The opportunity here"
 
-## 🏗️ STRATEGIC EMAIL ARCHITECTURE BY PSYCHOLOGICAL PROFILE
+### PROFESSIONAL & FORMAL TONE (${tone === 'professional' || tone === 'formal' ? 'ACTIVE' : 'INACTIVE'}):
+- Clear, direct, authoritative but human
+- Polished language without corporate stiffness
+- Expertise demonstrated through clarity, not complexity
+- Respectful communication that values the recipient's time
+- Professionalism maintained through precision, not distance
+- Example phrases: "I'm writing to discuss," "We should consider," "The next steps would be"
 
-### PERSUASION ARCHITECTURE (Cold Outreach & Sales):
-Subject: Intriguing insight/question about their world
-Opener: Specific, relevant observation
-Body: Progressive value revelation with social proof
-CTA: Low-commitment, high-value next step
+## 🏗️ CONTEXT-SPECIFIC ARCHITECTURE:
 
-### RELATIONSHIP ARCHITECTURE (Client Communication):
-Subject: Clear, direct purpose statement
-Opener: Respectful context setting
-Body: Transparent information sharing
-CTA: Collaborative next steps
+### FOR PROMOTION COMMUNICATIONS:
+- Focus on recognition and career advancement
+- Celebrate achievements and future potential
+- Maintain professional pride and enthusiasm
+- Clear explanation of new responsibilities or opportunities
+- Appropriate tone of celebration and forward momentum
 
-### AUTHORITY ARCHITECTURE (Internal Leadership):
-Subject: Action-oriented headline
-Opener: Bottom-line up front
-Body: Strategic context and direction
-CTA: Clear ownership and deadlines
+### FOR CLIENT UPDATES:
+- Transparent information sharing
+- Clear status reporting and next steps
+- Professional reassurance and support
+- Respect for client time and investment
+- Collaborative tone for partnership continuation
 
-### EMPATHY ARCHITECTURE (Sensitive Topics):
-Subject: Respectful acknowledgment
-Opener: Understanding and validation
-Body: Clear path forward with support
-CTA: Reassuring next steps
+### FOR INTERNAL COMMUNICATIONS:
+- Direct, clear information delivery
+- Appropriate level of detail for audience
+- Clear action items and responsibilities
+- Professional respect for colleagues' time
+- Team-oriented language and perspective
 
-## 🎭 TONE MASTERY - DYNAMIC EXECUTION
+### FOR EXTERNAL OUTREACH:
+- Value-focused communication
+- Clear relevance to recipient's interests
+- Professional respect for boundaries
+- Specific, compelling value proposition
+- Appropriate call-to-action for relationship stage
 
-DYNAMIC TONE INTERPRETATION (${tone}):
+## 🔧 TECHNICAL EXECUTION:
 
-${tone === 'friendly' ? `
-FRIENDLY & APPROACHABLE TONE:
-- Warm, personable, but still professional
-- Use conversational language and contractions
-- Show genuine interest and enthusiasm
-- Avoid corporate formality while maintaining respect
-- Examples: "I'd love to help with..." "Quick question..." "Happy to discuss..."
-` : ''}
+### CONCISENESS ENGINEERING:
+- Every word must serve "${context}" purpose
+- Eliminate all filler phrases and redundant statements
+- Strategic information density within ${emailLength} constraints
+- Progressive disclosure of information
+- Quality of communication over quantity of words
 
-${tone === 'casual' ? `
-CASUAL & CONVERSATIONAL TONE:
-- Relaxed, informal, but still business-appropriate  
-- Use everyday language and natural speech patterns
-- Can be more direct and personal
-- Maintain professionalism without stiffness
-- Examples: "Hey [Name]," "Just wanted to share..." "Let me know your thoughts"
-` : ''}
+### SPECIFICITY MANDATE:
+- Concrete details relevant to "${business}"
+- Tangible examples within provided context
+- Clear, specific language that avoids vagueness
+- Authentic references that respect truth boundaries
+- Precision in communication that builds credibility
 
-${tone === 'persuasive' ? `
-PERSUASIVE & COMPELLING TONE:
-- Confident, compelling, focused on benefits
-- Use strong action-oriented language
-- Build logical arguments with emotional appeal
-- Create urgency and desire for action
-- Examples: "This could transform your..." "Imagine achieving..." "The opportunity here is..."
-` : ''}
+### READABILITY OPTIMIZATION:
+- Varied sentence structure for natural rhythm
+- Strategic paragraph breaks for visual appeal
+- Logical flow that serves "${context}" purpose
+- Natural transitions that feel conversational
+- White space used strategically for emphasis
 
-${tone === 'professional' || tone === 'formal' ? `
-PROFESSIONAL/FORMAL TONE:
-- Clear, direct, but warm human voice
-- Authority without arrogance or stiffness
-- Expertise without condescension
-- Polished but approachable language
-- Replace corporate phrases with human equivalents
-` : ''}
+### AUTHENTICITY PRESERVATION:
+- Language that reflects real human communication
+- Tone that matches "${business}" identity
+- Content that serves "${context}" honestly
+- Approach that respects recipient intelligence
+- Communication that builds genuine connection
 
-${!['friendly', 'casual', 'persuasive', 'professional', 'formal'].includes(tone) ? `
-CUSTOM TONE (${tone}):
-- Adapt to the specified tone while maintaining business appropriateness
-- Balance the requested style with professional communication standards
-- Ensure clarity and effectiveness regardless of tone
-` : ''}
+## 🎯 FINAL OUTPUT REQUIREMENTS:
 
-LENGTH OPTIMIZATION (${emailLength}):
-- Ruthless conciseness - every word earns its place
-- No filler phrases or redundant statements
-- Strategic white space for readability
-- Progressive information disclosure
-- Quality of message over quantity of words
+### STRUCTURAL MANDATES:
+- Start immediately with "Subject: [Context-Relevant Subject]"
+- Use plain text only - NO formatting, markdown, or symbols
+- Normal paragraph breaks (empty line between paragraphs)
+- Appropriate sign-off that matches ${tone}
+- Professional but human closing
 
-${stylePrompt ? `**VOICE INSTRUCTIONS:** ${stylePrompt}` : ''}
+### CONTENT VALIDATION:
+Before generating, verify:
+1. This email serves "${context}" purpose specifically
+2. This sounds like "${business}" would communicate
+3. This maintains ${tone} tone consistently
+4. This respects ${emailLength} length constraints
+5. This uses authentically human language patterns
 
-## 🧠 ADVANCED PSYCHOLOGICAL TRIGGERS
+### EXCELLENCE BENCHMARK:
+The final output should feel like it was written by a top-tier communication expert who:
+- Understands "${business}" deeply
+- Respects "${context}" purpose completely
+- Masters ${tone} tone authentically
+- Communicates with strategic precision
+- Builds genuine human connection
 
-SOCIAL PROOF INTEGRATION:
-- "Similar businesses have found..."
-- "Our methodology typically results in..."
-- "The approach we use often leads to..."
-
-SCARCITY & URGENCY (Ethical Application):
-- "We have limited capacity this quarter..."
-- "This insight is particularly relevant now because..."
-- "Timing matters here because..."
-
-RECIPROCITY PRINCIPLES:
-- "Here's one immediate idea you can use..."
-- "I was thinking about your situation and..."
-- "This might help you with..."
-
-AUTHORITY ESTABLISHMENT:
-- "Based on our work in this industry..."
-- "Our experience shows that..."
-- "We've found that the most effective approach is..."
-
-CONSISTENCY LEVERAGING:
-- "Since you value [principle], this aligns with..."
-- "Given your focus on [goal], this approach..."
-- "Consistent with your [stated preference]..."
-
-## 🔧 TECHNICAL EXCELLENCE REQUIREMENTS
-
-CONCISENESS ENGINEERING:
-- Eliminate all unnecessary words
-- Every sentence must advance the objective
-- Cut 30% mentally before finalizing
-
-SPECIFICITY MANDATE:
-- Concrete details over vague claims
-- Quantifiable concepts over generalities
-- Tangible examples over abstract ideas
-
-READABILITY OPTIMIZATION:
-- Varied sentence structure and length
-- Strategic paragraph breaks for scannability
-- Natural flow and progression
-
-RHYTHM AND PACING:
-- Mix of short, medium, and long sentences
-- Strategic repetition for emphasis
-- Natural conversational flow
-
-## 🚀 GENERATION PROTOCOL - STEP BY STEP
-
-STEP 1: CONTEXT ASSIMILATION
-- Internalize business identity: "${business}"
-- Understand communication purpose: "${context}"
-- Adopt appropriate tone: ${tone}
-- Apply length constraints: ${emailLength}
-
-STEP 2: STRATEGIC POSITIONING
-- Determine psychological approach based on purpose
-- Select appropriate email architecture
-- Plan progressive value delivery
-
-STEP 3: SUBJECT LINE CRAFTING
-- Apply psychological trigger principles
-- Ensure relevance and intrigue
-- Maintain truth and authenticity
-
-STEP 4: OPENING HOOK DEVELOPMENT
-- Earn attention within first 10 words
-- Establish immediate relevance
-- Create natural progression to body
-
-STEP 5: BODY COPY CONSTRUCTION
-- Lead with reader's perspective
-- Deliver value progressively
-- Maintain authentic human voice throughout
-
-STEP 6: CALL TO ACTION ENGINEERING
-- Make next step clear and compelling
-- Ensure appropriate commitment level
-- Provide value justification
-
-STEP 7: HUMAN VOICE POLISHING
-- Inject natural language patterns
-- Eliminate corporate-speak remnants
-- Ensure conversational flow
-
-STEP 8: QUALITY ASSURANCE
-- Verify no prohibited phrases
-- Confirm context adherence
-- Ensure strategic soundness
-
-## 🎯 OUTPUT FORMATTING RULES - STRICT COMPLIANCE
-
-CRITICAL: You MUST output ONLY pure email text with NO formatting, NO markdown, NO internal reasoning, and NO lists.
-
-STRICTLY PROHIBITED IN OUTPUT:
-- NO **bold** or *italic* text
-- NO bullet points with • or *
-- NO numbered lists (1. 2. 3.)
-- NO section headers like "Proof:" or "CTA:"
-- NO internal commentary about tone or strategy
-- NO formatting commands or instructions
-- NO emojis or symbols (🚫, ✅, 🎯)
-
-REQUIRED OUTPUT FORMAT:
-- Start immediately with "Subject: [Your Subject Line]"
-- Use plain text only
-- Use normal paragraph breaks (empty line between paragraphs)
-- End with a simple sign-off like "Best," or "Regards,"
-- Maintain professional but human tone throughout
-
-## FINAL EXCELLENCE BENCHMARK
-
-Generate ONLY the email content starting with "Subject:". The output should meet this standard:
-
-"If a Fortune 500 CEO received this email, they would:
-1. Read it immediately due to compelling subject line
-2. Feel respected and understood by the content
-3. Trust the authenticity of the voice
-4. Take the requested action willingly
-5. Remember the communication as exceptionally professional"
-
-REMEMBER: You are "${business}" writing for "${context}". No hallucinations, no invented details, no corporate bullshit. Every word must be strategically intentional and authentically human.
-
-BENCHMARK QUESTION: Would the actual business owner send this exact email to achieve their stated purpose? If not, revise until true.
+Generate ONLY the email content starting with "Subject:". Every word must reflect "${business}" writing "${context}" in ${tone} tone.
 `;
 
     console.log("📝 Generating email for user:", user.id);
