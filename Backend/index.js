@@ -563,216 +563,277 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
       });
     }
 
-const prompt = `
-# CRITICAL CONTEXT ENFORCEMENT - NON-NEGOTIABLE
-## EXACT BUSINESS IDENTITY: "${business}"
-## EXACT COMMUNICATION PURPOSE: "${context}" 
-## EXACT TONE REQUIREMENT: ${tone}
-## EXACT LENGTH CONSTRAINT: ${emailLength}
+    const prompt = `
+# ULTIMATE PROFESSIONAL EMAIL ARCHITECTURE & ADVANCED CONTEXT INTELLIGENCE SYSTEM
 
-MISSION: Generate business emails that sound authentically human, psychologically sophisticated, and strategically precise while strictly adhering to the provided business context.
+## COMPREHENSIVE BUSINESS CONTEXT DECONSTRUCTION & ANALYSIS MATRIX:
 
-## 🚫 ABSOLUTELY FORBIDDEN - INSTANT REJECTION:
+### PRIMARY CONTEXT PARAMETERS:
+- BUSINESS ENTITY IDENTIFICATION: "${business}"
+- COMMUNICATION PURPOSE DECLARATION: "${context}"
+- TONAL EXPRESSION REQUIREMENT: ${tone}
+- MESSAGE LENGTH CONSTRAINT: ${emailLength}
 
-### CONTEXT DEVIATION PROHIBITIONS:
-- NEVER invent businesses, industries, or client scenarios
-- NEVER create fake metrics, case studies, or testimonials
-- NEVER assume details not explicitly provided
-- NEVER transform "${context}" into unrelated communication types
-- NEVER ignore "${business}" identity
+## INTELLIGENT CONTEXT INTERPRETATION & RELATIONSHIP MAPPING FRAMEWORK:
 
-### LANGUAGE PATTERN PROHIBITIONS:
+### SOPHISTICATED AUTHOR IDENTIFICATION PROTOCOL:
+- Analyze linguistic patterns in "${business}" to determine hierarchical position
+- "I run/own/founded a company" = Business Owner/CEO/Founder perspective
+- "We are a agency/company/organization" = Organizational Representative voice
+- "I am a freelancer/consultant/specialist" = Individual Professional identity
+- "Our team/group provides/offers" = Collective Organizational communication
+- "I work at/for company" = Employee/Staff Member perspective
+- "My business/venture/startup" = Entrepreneurial leadership voice
+- Default interpretation: Professional business entity representative
+
+### ADVANCED AUDIENCE DETERMINATION ALGORITHM:
+- Deconstruct "${context}" to identify recipient category and relationship
+- "Promotion letter/announcement" = Internal staff member or employee
+- "Client update/communication" = External client or customer relationship
+- "Sales outreach/pitch" = Prospective customer or business partner
+- "Team announcement/update" = Internal colleagues or staff members
+- "Partnership proposal" = Potential business collaborator or partner
+- "Thank you note/appreciation" = Client, partner, or team member
+- "Introduction/outreach" = New professional contact or referral
+- "Follow-up/check-in" = Existing business relationship contact
+
+### RELATIONSHIP DYNAMICS MAPPING MATRIX:
+- Business Owner/CEO → Employee: Authority with mentorship tone, organizational leadership
+- Manager/Supervisor → Team Member: Leadership with developmental tone, team guidance
+- Company Representative → Client: Service excellence tone, partnership mindset
+- Colleague → Colleague: Peer collaboration tone, mutual respect
+- Business → Prospective Client: Value proposition tone, professional courtship
+- Service Provider → Customer: Solution-oriented tone, customer success focus
+- Executive → Stakeholder: Strategic communication tone, value demonstration
+
+## 🏗️ ULTIMATE PROFESSIONAL EMAIL LAYOUT ARCHITECTURE - NON-NEGOTIABLE STRUCTURE:
+
+### SUBJECT LINE ENGINEERING SPECIFICATIONS:
+- Maximum 4-8 word count constraint
+- Title case capitalization implementation
+- Purpose-driven clarity with professional intrigue
+- Zero emoji or symbol tolerance
+- Context-appropriate professional tone
+- Examples by context category:
+  * Promotion: "Career Advancement Opportunity: [Position]"
+  * Client Update: "Project Update: [Project Name] - [Date]"
+  * Team Announcement: "Important Team Update: [Topic]"
+  * Sales Outreach: "Opportunity for [Benefit]: [Company Name]"
+
+### SALUTATION PROFESSIONAL STANDARDS HIERARCHY:
+- Formal Unknown Recipient: "Dear [Title] [Last Name],"
+- Professional Known Contact: "Dear [First Name],"
+- Internal Professional: "Hello [First Name],"
+- Team/Group Communication: "Team," or "Everyone,"
+- Executive/Formal: "Dear [Title] [Last Name],"
+- Client Relationship: "Hello [First Name],"
+- Absolute Prohibition: No standalone "Hi" or "Hey" without name
+
+### BODY ARCHITECTURE MANDATE - FOUR PARAGRAPH PROFESSIONAL STRUCTURE:
+
+**PARAGRAPH 1: EXECUTIVE PURPOSE STATEMENT**
+- Clear, direct statement of email purpose and context
+- Professional context establishment
+- Relationship-appropriate tone setting
+- Strategic positioning of communication intent
+- Professional engagement hook
+
+**PARAGRAPH 2: DETAILED INFORMATION & CONTEXT LAYER**
+- Comprehensive information delivery
+- Specific, relevant details and data points
+- Professional elaboration and explanation
+- Context-appropriate depth of information
+- Strategic value communication
+
+**PARAGRAPH 3: SUPPORTING RATIONALE & BENEFITS**
+- Logical reasoning and justification
+- Benefit-oriented language where appropriate
+- Professional persuasion elements
+- Value proposition reinforcement
+- Strategic alignment demonstration
+
+**PARAGRAPH 4: ACTION ORIENTATION & NEXT STEPS**
+- Clear, specific call-to-action
+- Professional expectation setting
+- Timeline and deadline communication
+- Follow-up procedure outline
+- Professional closing transition
+
+### PROFESSIONAL CLOSING ARCHITECTURE:
+- Standard Professional Sign-off: "Best regards,"
+- Formal Business Sign-off: "Sincerely,"
+- Warm Professional: "Kind regards,"
+- Internal Professional: "Best,"
+- Full Name Presentation
+- Position/Title Inclusion (when relevant)
+- Company Affiliation (for business communication)
+- Professional Contact Information (external communications)
+
+## 🚫 COMPREHENSIVE PROHIBITION MATRIX - ABSOLUTE ZERO TOLERANCE:
+
+### STRUCTURAL & FORMATTING PROHIBITIONS:
+- No bullet points, numbered lists, or any list formatting in email body
+- Absolute prohibition of markdown formatting: **bold**, *italic*, __underline__
+- Zero tolerance for emojis, symbols, or graphical elements
+- No informal greetings without proper recipient addressing
+- No abrupt endings without professional closing structure
+- No excessive punctuation or dramatic formatting
+- No creative formatting or structural experimentation
+
+### CONTENT & LANGUAGE PROHIBITIONS:
 - "I hope this email finds you well" and all variants
-- "I came across your company" / "I was looking at your website"
-- "My name is [X] and I'm from [Y]" introductions
-- "I'm reaching out because" / "I wanted to touch base"
-- "Just checking in" / "Just following up"
-- "I wanted to see if" / "I was wondering if"
-- Fake enthusiasm: "We're incredibly excited" / "We're thrilled"
+- "I came across your company/profile/website"
+- "Just checking in" or "Just following up"
+- "I wanted to see if" or "I was wondering if"
+- Fake metrics, invented statistics, or fabricated case studies
+- Corporate buzzwords: "leverage," "synergy," "value-add," "circle back"
+- Exaggerated enthusiasm: "We're incredibly excited," "We're thrilled"
+- Vague business speak: "streamline," "optimize," "enhance," "transform"
+- Empty adjectives: "cutting-edge," "best-in-class," "world-class"
+- Overused nouns: "solution," "ecosystem," "paradigm shift"
 
-### CORPORATE SPEECH PROHIBITIONS:
-- "Leverage," "synergy," "value-add," "circle back"
-- "Streamline," "optimize," "enhance," "transform"
-- "Cutting-edge," "best-in-class," "world-class"
-- "Solution," "ecosystem," "paradigm shift"
-- "Align with," "going forward," "touch base"
+### PROFESSIONAL STANDARDS VIOLATIONS:
+- Starting multiple consecutive sentences with "We" or "I"
+- Overusing adverbs: "very," "really," "extremely," "incredibly"
+- Formulaic, robotic paragraph transitions
+- Generic, thoughtless sign-offs without professional consideration
+- Inappropriate tone shifts within the communication
+- Unprofessional familiarity or excessive casualness
 
-### STRUCTURAL PROHIBITIONS:
-- Starting every sentence with "We" or "I"
-- Overusing adverbs: "very," "really," "extremely"
-- Formulaic paragraph transitions
-- Generic sign-offs: "Best regards," "Sincerely"
-- Markdown formatting, bullet points, numbered lists
+## ✅ ADVANCED EXCELLENCE STANDARDS MATRIX:
 
-## ✅ MANDATORY EXCELLENCE STANDARDS:
+### CONTEXT INTELLIGENCE & RELATIONSHIP AWARENESS:
+- Sophisticated analysis of "${business}" to determine appropriate writer voice and perspective
+- Intelligent interpretation of "${context}" to identify correct audience and relational dynamics
+- Consistent maintenance of professional business communication standards throughout
+- Strategic alignment of relationship dynamics with appropriate communication style
+- Professional boundary maintenance while building appropriate rapport
 
-### CONTEXT PRECISION REQUIREMENTS:
-- Every sentence must align with "${business}" identity
-- Every paragraph must serve "${context}" purpose
-- Every word must respect ${tone} tone requirements
-- Every structural choice must honor ${emailLength} constraints
+### PROFESSIONAL LANGUAGE & COMMUNICATION EXCELLENCE:
+- Clear, direct, purposeful business communication
+- Sophisticated sentence structure variation for enhanced readability
+- Strategic paragraph length management and visual appeal optimization
+- Industry-appropriate professional vocabulary and terminology
+- Authentic human expression within strictly professional boundaries
+- Strategic emphasis through language choice, not formatting
 
-### SUBJECT LINE ARCHITECTURE:
-- Must be directly relevant to "${context}"
-- Must reflect "${business}" perspective
-- Must compel opening through relevance, not deception
-- Length: 4-12 words, psychologically optimized
-- Examples for "${context}": 
-  * Promotion context: "Exciting Career Advancement Opportunity"
-  * Update context: "Important Update Regarding [Project]"
-  * Outreach context: "Collaboration Opportunity for [Business Type]"
+### TONE MASTERY WITHIN PROFESSIONAL CONSTRAINTS:
 
-### OPENING HOOK PSYCHOLOGY:
-- First 8-12 words must establish immediate context relevance
-- Must acknowledge the specific nature of "${context}"
-- Must sound authentically human, not formulaic
-- Must create natural progression to body content
-- Must respect ${tone} tone from the very first sentence
+**FRIENDLY & APPROACHABLE PROFESSIONALISM (${tone === 'friendly' ? 'ACTIVE IMPLEMENTATION' : 'STANDARD PROFESSIONALISM'}):**
+- Warm, engaging communication within professional boundaries
+- Conversational flow maintenance with structural professionalism
+- Genuine, authentic tone without informality compromise
+- Rapport building through professional personalization
+- Approachable authority and leadership presence
 
-### BODY COPY STRATEGY:
-- PARAGRAPH 1: Establish clear purpose and "${context}" relevance
-- PARAGRAPH 2: Provide necessary details or value proposition
-- PARAGRAPH 3: Address potential questions or concerns
-- PARAGRAPH 4: Natural progression to conclusion and next steps
-- Each paragraph must advance "${context}" purpose
-- Each transition must feel organic, not robotic
+**CASUAL & CONVERSATIONAL PROFESSIONALISM (${tone === 'casual' ? 'ACTIVE IMPLEMENTATION' : 'STANDARD PROFESSIONALISM'}):**
+- Relaxed, direct language with uncompromised professional structure
+- Personal communication style with maintained business respect
+- Individual voice expression within organizational standards
+- Human-centric communication with professional delivery
+- Comfortable professional interaction tone
 
-### CALL TO ACTION ENGINEERING:
-- Must be appropriate for "${context}" purpose
-- Must reflect "${business}" communication style
-- Must provide clear, specific next steps
-- Must respect recipient's time and position
-- Must feel like a natural conversation progression
+**PERSUASIVE & COMPELLING PROFESSIONALISM (${tone === 'persuasive' ? 'ACTIVE IMPLEMENTATION' : 'STANDARD PROFESSIONALISM'}):**
+- Confident, compelling argumentation with professional delivery
+- Strong value proposition communication with factual foundation
+- Benefit-oriented language with professional persuasion techniques
+- Action inspiration through professional communication excellence
+- Strategic influence with ethical professional standards
 
-### HUMAN VOICE INTEGRATION:
-- Strategic use of contractions: "I'm," "you're," "we'll"
-- Natural interjections: "Actually," "By the way," "Quick question"
-- Varied sentence structure and length patterns
-- Authentic phrasing that reflects real human speech
-- Personal pronouns used strategically and appropriately
+**PROFESSIONAL & FORMAL EXCELLENCE (${tone === 'professional' || tone === 'formal' ? 'ACTIVE IMPLEMENTATION' : 'STANDARD PROFESSIONALISM'}):**
+- Polished, authoritative business communication
+- Traditional business structure with modern professional language
+- Respectful professional distance with clear communication
+- Executive-level business communication standards
+- Formal professional relationship maintenance
 
-## 🎭 ADVANCED TONE MASTERY:
+## 🎯 CONTEXT-SPECIFIC PROFESSIONAL EXCELLENCE STANDARDS:
 
-### FRIENDLY & APPROACHABLE TONE (${tone === 'friendly' ? 'ACTIVE' : 'INACTIVE'}):
-- Warm, personable, relationship-focused
-- Conversational language with strategic contractions
-- Genuine enthusiasm without exaggeration
-- Professional respect without cold formality
-- Builds rapport while maintaining business appropriateness
-- Example phrases: "I'd love to help with," "Happy to discuss," "Looking forward to connecting"
+### PROMOTION & RECOGNITION COMMUNICATIONS:
+- Formal organizational announcement structure
+- Clear, specific achievement recognition and celebration
+- Professional pride and organizational appreciation tone
+- Detailed new responsibility or opportunity explanation
+- Forward-looking organizational contribution language
+- Professional development and growth orientation
 
-### CASUAL & CONVERSATIONAL TONE (${tone === 'casual' ? 'ACTIVE' : 'INACTIVE'}):
-- Relaxed, direct, informal but professional
-- Everyday language and natural speech patterns
-- More personal and direct communication style
-- Professionalism maintained through content, not formality
-- Feels like a real conversation between colleagues
-- Example phrases: "Quick update," "Wanted to share," "Let me know your thoughts"
+### CLIENT & CUSTOMER COMMUNICATIONS:
+- Professional service excellence language
+- Clear value delivery and partnership mindset
+- Respectful client relationship maintenance
+- Specific, actionable information and guidance
+- Professional call-to-action with client success focus
+- Service excellence and commitment demonstration
 
-### PERSUASIVE & COMPELLING TONE (${tone === 'persuasive' ? 'ACTIVE' : 'INACTIVE'}):
-- Confident, benefit-focused, action-oriented
-- Strong, clear language that builds logical arguments
-- Emotional appeal balanced with rational benefits
-- Creates natural urgency and desire for action
-- Authority established through expertise, not arrogance
-- Example phrases: "This could transform," "Imagine achieving," "The opportunity here"
+### INTERNAL TEAM & ORGANIZATIONAL COMMUNICATIONS:
+- Clear, direct organizational information sharing
+- Appropriate formality level for internal audience
+- Professional team leadership and guidance
+- Specific action items and expectation communication
+- Organizational unity and collective purpose tone
+- Professional internal relationship maintenance
 
-### PROFESSIONAL & FORMAL TONE (${tone === 'professional' || tone === 'formal' ? 'ACTIVE' : 'INACTIVE'}):
-- Clear, direct, authoritative but human
-- Polished language without corporate stiffness
-- Expertise demonstrated through clarity, not complexity
-- Respectful communication that values the recipient's time
-- Professionalism maintained through precision, not distance
-- Example phrases: "I'm writing to discuss," "We should consider," "The next steps would be"
+### EXTERNAL BUSINESS DEVELOPMENT & OUTREACH:
+- Professional introduction and value proposition structure
+- Clear relevance and mutual benefit communication
+- Respectful business development relationship building
+- Specific, appropriate professional call-to-action
+- Strategic partnership and collaboration tone
+- Professional first impression creation
 
-## 🏗️ CONTEXT-SPECIFIC ARCHITECTURE:
+## 🔧 TECHNICAL EXECUTION & QUALITY ASSURANCE PROTOCOLS:
 
-### FOR PROMOTION COMMUNICATIONS:
-- Focus on recognition and career advancement
-- Celebrate achievements and future potential
-- Maintain professional pride and enthusiasm
-- Clear explanation of new responsibilities or opportunities
-- Appropriate tone of celebration and forward momentum
+### PROFESSIONAL LAYOUT VALIDATION CHECKPOINTS:
+1. Subject Line: 4-8 words, title case, purpose-driven, professional
+2. Salutation: Relationship-appropriate, professional, properly addressed
+3. Paragraph 1: Clear purpose statement, professional tone establishment
+4. Paragraph 2: Detailed information, professional elaboration, value communication
+5. Paragraph 3: Supporting rationale, benefit orientation, strategic alignment
+6. Paragraph 4: Clear action orientation, professional next steps, closing transition
+7. Closing: Professional sign-off, name/position, company affiliation when appropriate
+8. Formatting: Zero markdown, symbols, or unprofessional elements
 
-### FOR CLIENT UPDATES:
-- Transparent information sharing
-- Clear status reporting and next steps
-- Professional reassurance and support
-- Respect for client time and investment
-- Collaborative tone for partnership continuation
+### ADVANCED CONTENT VALIDATION MATRIX:
+- Every sentence strategically serves "${context}" purpose
+- Language authentically reflects "${business}" identity and perspective
+- Tone consistently maintains professional standards while honoring ${tone} requirement
+- Structure follows proven business communication best practices
+- Relationship dynamics feel authentic, professional, and context-appropriate
+- Professional boundaries maintained while building appropriate connection
 
-### FOR INTERNAL COMMUNICATIONS:
-- Direct, clear information delivery
-- Appropriate level of detail for audience
-- Clear action items and responsibilities
-- Professional respect for colleagues' time
-- Team-oriented language and perspective
+### READABILITY & ENGAGEMENT OPTIMIZATION:
+- Strategic paragraph length management (3-5 sentences optimal)
+- Sophisticated sentence structure variation for natural professional rhythm
+- Clear, logical transitions between ideas and paragraphs
+- Industry-appropriate professional vocabulary and terminology
+- Business-appropriate language throughout with strategic word choice
+- Professional engagement maintenance through content quality
 
-### FOR EXTERNAL OUTREACH:
-- Value-focused communication
-- Clear relevance to recipient's interests
-- Professional respect for boundaries
-- Specific, compelling value proposition
-- Appropriate call-to-action for relationship stage
+## 🎯 ULTIMATE OUTPUT REQUIREMENTS & EXCELLENCE BENCHMARK:
 
-## 🔧 TECHNICAL EXECUTION:
+Generate ONLY the email content starting with "Subject:" following this EXACT professional structure with zero deviations:
 
-### CONCISENESS ENGINEERING:
-- Every word must serve "${context}" purpose
-- Eliminate all filler phrases and redundant statements
-- Strategic information density within ${emailLength} constraints
-- Progressive disclosure of information
-- Quality of communication over quantity of words
+Subject: [Professionally Crafted, Purpose-Driven Subject Line]
 
-### SPECIFICITY MANDATE:
-- Concrete details relevant to "${business}"
-- Tangible examples within provided context
-- Clear, specific language that avoids vagueness
-- Authentic references that respect truth boundaries
-- Precision in communication that builds credibility
+[Relationship-Appropriate Professional Salutation]
 
-### READABILITY OPTIMIZATION:
-- Varied sentence structure for natural rhythm
-- Strategic paragraph breaks for visual appeal
-- Logical flow that serves "${context}" purpose
-- Natural transitions that feel conversational
-- White space used strategically for emphasis
+[Paragraph 1: Executive purpose statement and professional context establishment]
 
-### AUTHENTICITY PRESERVATION:
-- Language that reflects real human communication
-- Tone that matches "${business}" identity
-- Content that serves "${context}" honestly
-- Approach that respects recipient intelligence
-- Communication that builds genuine connection
+[Paragraph 2: Detailed information delivery and professional elaboration]
 
-## 🎯 FINAL OUTPUT REQUIREMENTS:
+[Paragraph 3: Supporting rationale and strategic value communication]
 
-### STRUCTURAL MANDATES:
-- Start immediately with "Subject: [Context-Relevant Subject]"
-- Use plain text only - NO formatting, markdown, or symbols
-- Normal paragraph breaks (empty line between paragraphs)
-- Appropriate sign-off that matches ${tone}
-- Professional but human closing
+[Paragraph 4: Clear action orientation and professional next steps]
 
-### CONTENT VALIDATION:
-Before generating, verify:
-1. This email serves "${context}" purpose specifically
-2. This sounds like "${business}" would communicate
-3. This maintains ${tone} tone consistently
-4. This respects ${emailLength} length constraints
-5. This uses authentically human language patterns
+[Professional Sign-Off Selection]
+[Appropriate Name/Position Presentation]
+[Relevant Company Affiliation]
 
-### EXCELLENCE BENCHMARK:
-The final output should feel like it was written by a top-tier communication expert who:
-- Understands "${business}" deeply
-- Respects "${context}" purpose completely
-- Masters ${tone} tone authentically
-- Communicates with strategic precision
-- Builds genuine human connection
+### FINAL EXCELLENCE VALIDATION:
+Before delivery, confirm this email represents the absolute highest standard of professional business communication that would be approved by executive leadership, respected by recipients, and effectively achieves the "${context}" purpose for "${business}" while perfectly executing ${tone} tone within professional boundaries.
 
-Generate ONLY the email content starting with "Subject:". Every word must reflect "${business}" writing "${context}" in ${tone} tone.
+Remember: Professional layout and structure are ABSOLUTELY NON-NEGOTIABLE. The AI must demonstrate sophisticated understanding of business relationships and maintain impeccable professional standards regardless of tone selection.
 `;
-
     console.log("📝 Generating email for user:", user.id);
 
     const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
