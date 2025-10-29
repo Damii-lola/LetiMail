@@ -495,6 +495,21 @@ function cleanAIResponse(content) {
     .replace(/CC:.*$/gim, '')
     .replace(/Implementation Details:[\s\S]*?(?=What's Next:|$)/gi, '')
     
+    // === NEW ADDITIONS TO FIX THE FORMATTING ===
+    // Remove the specific formatting patterns from your output
+    .replace(/Opener:\s*/gi, '') // Remove "Opener:" labels
+    .replace(/Body:\s*/gi, '') // Remove "Body:" labels  
+    .replace(/Proof:\s*/gi, '') // Remove "Proof:" labels
+    .replace(/CTA:\s*/gi, '') // Remove "CTA:" labels
+    .replace(/What's Next:\s*/gi, '') // Remove "What's Next:" labels
+    .replace(/\*\*Empower\*\*.*$/gim, '') // Remove "**Empower**" lines
+    .replace(/\*\*Acknowledge\*\*.*$/gim, '') // Remove "**Acknowledge**" lines
+    .replace(/\*\*Clearly communicate\*\*.*$/gim, '') // Remove formatting lines
+    .replace(/\*\*Encourage\*\*.*$/gim, '') // Remove "**Encourage**" lines
+    
+    // Remove the numbered list at the end
+    .replace(/\n\s*\d+\.\s*\*\*[A-Za-z]+\*\*[\s\S]*?(?=\n\n|$)/g, '')
+    
     // CLEAN UP RANDOM FORMATTING ARTIFACTS
     .replace(/\*\*/g, '') // Remove any remaining **
     .replace(/\*/g, '') // Remove any remaining *
@@ -519,9 +534,11 @@ function cleanAIResponse(content) {
     .filter(line => {
       const trimmed = line.trim();
       // Remove lines that are clearly formatting commands
-      if (trimmed.match(/^(\d+\.\s*")|(The tone is)|(Implementation Details:)|(What's Next:)|(CC:)/i)) return false;
+      if (trimmed.match(/^(\d+\.\s*")|(The tone is)|(Implementation Details:)|(What's Next:)|(CC:)|(Opener:)|(Body:)|(Proof:)|(CTA:)/i)) return false;
       // Remove lines that are just single words in caps
       if (trimmed.match(/^[A-Z\s]{2,}$/) && trimmed.length < 20) return false;
+      // Remove lines that are just formatting labels with **
+      if (trimmed.match(/^\*\*[A-Za-z]+\s[A-Za-z]+\*\*$/)) return false;
       return true;
     })
     .join('\n')
@@ -530,7 +547,6 @@ function cleanAIResponse(content) {
   
   return cleaned || content;
 }
-
 app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, res) => {
   const { business, context, tone, emailLength, stylePrompt } = req.body;
   
