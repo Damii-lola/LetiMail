@@ -809,6 +809,35 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
 - Business-appropriate language throughout with strategic word choice
 - Professional engagement maintenance through content quality
 
+## 🔄 CREATIVE VARIABILITY & NATURAL VARIATION:
+
+### STRATEGIC VARIATION REQUIREMENTS:
+- Generate DIFFERENT but equally professional versions on each generation
+- Vary sentence structure, word choice, and phrasing while maintaining quality
+- Use different professional synonyms and equivalent expressions
+- Create natural human variation in communication style
+- Maintain professional standards while allowing for personal expression differences
+
+### VARIATION PERMITTED AREAS:
+- Synonym selection for common business terms
+- Sentence structure and length patterns
+- Paragraph transition phrasing
+- Professional expression variations
+- Equivalent business terminology
+
+### VARIATION PROHIBITED AREAS:
+- Professional layout and structure
+- Core message and purpose
+- Business context accuracy  
+- Professional standards
+- Relationship appropriateness
+
+### NATURAL HUMAN WRITING PATTERNS:
+- Different professionals express the same idea differently
+- Variety in communication style reflects real human teams
+- Multiple valid ways to convey professional messages
+- Diversity in expression within professional boundaries
+
 ## 🎯 ULTIMATE OUTPUT REQUIREMENTS & EXCELLENCE BENCHMARK:
 
 Generate ONLY the email content starting with "Subject:" following this EXACT professional structure with zero deviations:
@@ -845,11 +874,11 @@ Remember: Professional layout and structure are ABSOLUTELY NON-NEGOTIABLE. The A
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.4,             // Balanced creativity/consistency
-        max_tokens: 800,             // Much longer for detailed prompts
-        top_p: 0.3,
-        frequency_penalty: 0.7,       // Stronger penalty for repetition
-        presence_penalty: 0.6,
+        temperature: 0.75,             // Balanced creativity/consistency
+        max_tokens: 1500,             // Much longer for detailed prompts
+        top_p: 0.8,
+        frequency_penalty: 0.4,       // Stronger penalty for repetition
+        presence_penalty: 0.4,
       }),
     });
 
@@ -922,8 +951,8 @@ Return ONLY the polished email, nothing else.`;
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",  // CRITICAL - much more capable model
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.4,             // Balanced creativity/consistency
-        max_tokens: 1000,             // Much longer for detailed prompts
+        temperature: 0.75,             // Balanced creativity/consistency
+        max_tokens: 1500,             // Much longer for detailed prompts
       }),
     });
 
