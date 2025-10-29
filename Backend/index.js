@@ -845,9 +845,9 @@ BENCHMARK QUESTION: Would the actual business owner send this exact email to ach
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.9,             // Balanced creativity/consistency
+        temperature: 0.4,             // Balanced creativity/consistency
         max_tokens: 800,             // Much longer for detailed prompts
-        top_p: 0.0,
+        top_p: 0.3,
         frequency_penalty: 0.5,       // Stronger penalty for repetition
         presence_penalty: 0.5,
       }),
