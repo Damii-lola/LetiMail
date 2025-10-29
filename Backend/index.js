@@ -153,7 +153,7 @@ app.post("/api/auth/register", async (req, res) => {
     // Create user directly
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      `INSERT INTO users (name, email, password, plan, emails_used, emails_left, daily_emails_used, last_reset_date)
+      `INSERT INTO users (name, email, password, plan, emails_used, emails_left)
        VALUES ($1, $2, $3, 'free', 0, 10)
        RETURNING id, name, email, plan, emails_used, emails_left, created_at`,
       [name, email, hashedPassword]
