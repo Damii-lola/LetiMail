@@ -473,74 +473,116 @@ function rateLimit(maxRequests = 10, windowMs = 60000) {
 // ============================================
 
 function cleanAIResponse(content) {
-  if (!content) return content;
+  if (!content) return "Subject: Error generating email.\n\nPlease try again.";
 
-  console.log("🔍 RAW AI OUTPUT:", content); // Debug line
+  console.log("🔍 RAW AI OUTPUT:", content);
 
-  let cleaned = content
-    // REMOVE ALL AI COMMENTARY AND THINKING
-    .replace(/^.*?(?=Subject:)/i, '') // Remove everything before "Subject:"
-    .replace(/Based on the provided.*?specifications.*?/gi, '')
-    .replace(/I will generate.*?email content.*?/gi, '')
-    .replace(/following the exact professional structure.*?/gi, '')
-    .replace(/with zero deviations.*?/gi, '')
-    .replace(/Here is.*?email.*?/gi, '')
-    .replace(/Here's.*?email.*?/gi, '')
-    .replace(/The email content.*?/gi, '')
-    .replace(/Starting with.*?Subject:.*?/gi, '')
-    
-    // REMOVE ALL MARKDOWN AND FORMATTING
-    .replace(/\*\*/g, '')
-    .replace(/\*/g, '')
-    .replace(/`/g, '')
-    .replace(/#{1,6}\s?/g, '')
-    
-    // REMOVE ANY REMAINING AI SELF-REFERENCE
-    .replace(/As an AI.*?/gi, '')
-    .replace(/I have.*?/gi, '')
-    .replace(/This email.*?/gi, '')
-    .replace(/Note:.*$/gim, '')
-    .replace(/Please note:.*$/gim, '')
-    
-    // NORMALIZE WHITESPACE
-    .replace(/\n\s*\n\s*\n/g, '\n\n')
-    .replace(/^\s+|\s+$/g, '')
-    .trim();
+  let cleaned = content;
 
-  // FORCE PROPER START WITH SUBJECT
-  if (!cleaned.startsWith('Subject:')) {
-    const subjectMatch = cleaned.match(/(?:^|\n)Subject:\s*(.*?)(?:\n|$)/i);
-    if (subjectMatch) {
-      cleaned = 'Subject: ' + subjectMatch[1].trim() + '\n\n' + cleaned.replace(/(?:^|\n)Subject:\s*(.*?)(?:\n|$)/i, '');
-    } else {
-      // If no subject found, extract first meaningful line
-      const lines = cleaned.split('\n').filter(line => line.trim().length > 0);
-      if (lines.length > 0 && lines[0].length < 100) {
-        cleaned = 'Subject: ' + lines[0].trim() + '\n\n' + lines.slice(1).join('\n');
+  // FIRST: Remove everything before "Subject:" if AI added preamble
+  const subjectIndex = cleaned.indexOf('Subject:');
+  if (subjectIndex > 0) {
+    cleaned = cleaned.substring(subjectIndex);
+  }
+
+  // Remove AI commentary that comes AFTER the email
+  // Look for common patterns that indicate the end of the actual email
+  const endOfEmailPatterns = [
+    // Pattern 1: After signature with [Your Name]
+    /(Best regards,|Sincerely,|Kind regards,|Regards,|Thanks,|Thank you,)\s*\n\s*\[?Your Name\]?[\s\S]*$/i,
+    
+    // Pattern 2: After signature with actual name/position
+    /(Best regards,|Sincerely,|Kind regards,|Regards,|Thanks,|Thank you,)\s*\n\s*.*?\n\s*.*?[\s\S]*$/i,
+    
+    // Pattern 3: AI self-evaluation patterns
+    /meets all the requirements specified.*$/im,
+    /including:.*$/im,
+    /professionally crafted subject line.*$/im,
+    
+    // Pattern 4: Bullet points or lists that are commentary
+    /\n\s*[•\-]\s.*$/im
+  ];
+
+  let emailEndIndex = cleaned.length;
+
+  // Find where the actual email ends
+  for (let pattern of endOfEmailPatterns) {
+    const match = cleaned.match(pattern);
+    if (match) {
+      // For signature patterns, keep the signature but remove everything after
+      if (pattern.source.includes('regards') || pattern.source.includes('thanks')) {
+        emailEndIndex = Math.min(emailEndIndex, match.index + match[0].indexOf(']') + 1 || match.index + match[0].length);
       } else {
-        cleaned = "Subject: Professional Communication\n\n" + cleaned;
+        // For commentary patterns, remove everything from the start of the pattern
+        emailEndIndex = Math.min(emailEndIndex, match.index);
       }
     }
   }
 
-  // FINAL CLEANUP - REMOVE ANY REMAINING COMMENTARY LINES
+  // If we found where email ends, cut everything after it
+  if (emailEndIndex < cleaned.length) {
+    cleaned = cleaned.substring(0, emailEndIndex).trim();
+  }
+
+  // Remove specific AI commentary lines while preserving email content
+  const lines = cleaned.split('\n');
+  let resultLines = [];
+  let inEmailContent = true;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Skip empty lines at the beginning
+    if (resultLines.length === 0 && line === '') continue;
+    
+    // Stop processing if we hit AI commentary
+    if (line.match(/meets all the requirements|including:|professionally crafted|relationship-appropriate|executive purpose|detailed information|supporting rationale|strategic value|clear action|professional next|sign-off selection|name.*position|company affiliation/i)) {
+      break;
+    }
+    
+    // Stop if we hit bullet points that are commentary
+    if (line.match(/^\s*[•\-]\s/)) {
+      break;
+    }
+    
+    // Add the line to result
+    resultLines.push(lines[i]);
+  }
+
+  cleaned = resultLines.join('\n');
+
+  // Ensure it starts with Subject: and has basic email structure
+  if (!cleaned.startsWith('Subject:')) {
+    // Try to find Subject: in the content
+    const subjectMatch = cleaned.match(/(?:^|\n)(Subject:\s*.+)/i);
+    if (subjectMatch) {
+      cleaned = subjectMatch[1] + '\n\n' + cleaned.replace(subjectMatch[0], '').trim();
+    } else {
+      // Last resort: create basic subject
+      cleaned = "Subject: Professional Communication\n\n" + cleaned;
+    }
+  }
+
+  // Final cleanup of excessive whitespace
   cleaned = cleaned
-    .split('\n')
-    .filter(line => {
-      const trimmed = line.trim();
-      // Remove AI commentary lines
-      if (trimmed.match(/^(Based on|I will|following|with zero|Here is|Here's|The email|Starting with)/i)) return false;
-      // Remove lines that are clearly AI thinking
-      if (trimmed.match(/^As an AI|I have|This email|Note:|Please note:/i)) return false;
-      return true;
-    })
-    .join('\n')
     .replace(/\n\s*\n\s*\n/g, '\n\n')
+    .replace(/^\s+|\s+$/g, '')
     .trim();
 
-  console.log("✅ CLEANED OUTPUT:", cleaned);
+  // SAFETY CHECK: If we removed too much content, return the original but clean it minimally
+  if (cleaned.length < 50 || cleaned === "Subject: Professional Communication") {
+    console.log("⚠️  Content too short, using minimal cleaning");
+    // Minimal cleaning - just remove obvious AI commentary
+    cleaned = content
+      .replace(/meets all the requirements specified.*$/im, '')
+      .replace(/including:.*$/im, '')
+      .replace(/\n\s*[•\-]\s.*$/im, '')
+      .replace(/\n\s*\n\s*\n/g, '\n\n')
+      .trim();
+  }
 
-  return cleaned || "Subject: Professional Communication\n\nI apologize, there was an issue generating this email. Please try again.";
+  console.log("✅ CLEANED OUTPUT:", cleaned);
+  return cleaned || "Subject: Professional Communication\n\nThank you for your message.";
 }
 
 app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, res) => {
