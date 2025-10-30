@@ -1513,6 +1513,12 @@ function showSendEmailModal() {
     return;
   }
 
+  // Remove any existing modal first
+  const existingModal = document.getElementById('sendEmailModal');
+  if (existingModal) {
+    document.body.removeChild(existingModal);
+  }
+
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
   modal.id = 'sendEmailModal';
@@ -1542,7 +1548,7 @@ function showSendEmailModal() {
       
       <div class="modal-actions">
         <button class="settings-btn secondary" onclick="closeSendModal()">Cancel</button>
-        <button class="settings-btn primary" onclick="confirmSendEmail()" id="sendEmailBtn">
+        <button class="settings-btn primary" id="sendEmailConfirmBtn">
           <i class="fas fa-paper-plane"></i> Send Email
         </button>
       </div>
@@ -1551,6 +1557,9 @@ function showSendEmailModal() {
 
   document.body.appendChild(modal);
   modal.style.display = 'flex';
+  
+  // ADD THIS CRITICAL LINE - Add event listener to the button INSIDE the modal
+  document.getElementById('sendEmailConfirmBtn').addEventListener('click', confirmSendEmail);
   
   // Focus on the first input field
   setTimeout(() => {
