@@ -474,79 +474,75 @@ function rateLimit(maxRequests = 10, windowMs = 60000) {
 
 function cleanAIResponse(content) {
   if (!content) return content;
-  
+
+  console.log("🔍 RAW AI OUTPUT:", content); // Debug line
+
   let cleaned = content
-    // REMOVE ALL INTERNAL THINKING/REASONING BLOCKS
-    .replace(/\*\*.*?:\*\*[\s\S]*?(?=\n\n|$)/g, '') // Remove "**Proof:**" etc. blocks
-    .replace(/\*{2}[\s\S]*?\*{2}/g, '') // Remove any **bold** formatting
-    .replace(/\*([^*]+)\*/g, '$1') // Remove *italic* formatting  
-    .replace(/_{2}([^_]+)_{2}/g, '$1') // Remove __underline__
-    .replace(/`{3}[\s\S]*?`{3}/g, '') // Remove ```code blocks```
-    .replace(/`([^`]+)`/g, '$1') // Remove `inline code`
+    // REMOVE ALL AI COMMENTARY AND THINKING
+    .replace(/^.*?(?=Subject:)/i, '') // Remove everything before "Subject:"
+    .replace(/Based on the provided.*?specifications.*?/gi, '')
+    .replace(/I will generate.*?email content.*?/gi, '')
+    .replace(/following the exact professional structure.*?/gi, '')
+    .replace(/with zero deviations.*?/gi, '')
+    .replace(/Here is.*?email.*?/gi, '')
+    .replace(/Here's.*?email.*?/gi, '')
+    .replace(/The email content.*?/gi, '')
+    .replace(/Starting with.*?Subject:.*?/gi, '')
     
-    // REMOVE ALL NUMBERED/BULLETED LISTS THAT ARE FORMATTING
-    .replace(/\n\s*\d+\.\s*\*\*[^*]+\*\*[\s\S]*?(?=\n\n|$)/g, '')
-    .replace(/\n\s*•\s*\*\*[^*]+\*\*[\s\S]*?(?=\n\n|$)/g, '')
-    .replace(/\n\s*[-*•]\s*/g, '\n') // Clean bullet points
+    // REMOVE ALL MARKDOWN AND FORMATTING
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/`/g, '')
+    .replace(/#{1,6}\s?/g, '')
     
-    // REMOVE AI SELF-REFERENCE AND INSTRUCTIONS
-    .replace(/\n\s*\d+\.\s*"[^"]+"[\s\S]*?(?=\n\n|$)/g, '')
-    .replace(/The tone is[\s\S]*?corporate-speak\./g, '')
-    .replace(/CC:.*$/gim, '')
-    .replace(/Implementation Details:[\s\S]*?(?=What's Next:|$)/gi, '')
-    
-    // === NEW ADDITIONS TO FIX THE FORMATTING ===
-    // Remove the specific formatting patterns from your output
-    .replace(/Opener:\s*/gi, '') // Remove "Opener:" labels
-    .replace(/Body:\s*/gi, '') // Remove "Body:" labels  
-    .replace(/Proof:\s*/gi, '') // Remove "Proof:" labels
-    .replace(/CTA:\s*/gi, '') // Remove "CTA:" labels
-    .replace(/What's Next:\s*/gi, '') // Remove "What's Next:" labels
-    .replace(/\*\*Empower\*\*.*$/gim, '') // Remove "**Empower**" lines
-    .replace(/\*\*Acknowledge\*\*.*$/gim, '') // Remove "**Acknowledge**" lines
-    .replace(/\*\*Clearly communicate\*\*.*$/gim, '') // Remove formatting lines
-    .replace(/\*\*Encourage\*\*.*$/gim, '') // Remove "**Encourage**" lines
-    
-    // Remove the numbered list at the end
-    .replace(/\n\s*\d+\.\s*\*\*[A-Za-z]+\*\*[\s\S]*?(?=\n\n|$)/g, '')
-    
-    // CLEAN UP RANDOM FORMATTING ARTIFACTS
-    .replace(/\*\*/g, '') // Remove any remaining **
-    .replace(/\*/g, '') // Remove any remaining *
-    .replace(/_{2}/g, '') // Remove any remaining __
+    // REMOVE ANY REMAINING AI SELF-REFERENCE
+    .replace(/As an AI.*?/gi, '')
+    .replace(/I have.*?/gi, '')
+    .replace(/This email.*?/gi, '')
+    .replace(/Note:.*$/gim, '')
+    .replace(/Please note:.*$/gim, '')
     
     // NORMALIZE WHITESPACE
     .replace(/\n\s*\n\s*\n/g, '\n\n')
     .replace(/^\s+|\s+$/g, '')
     .trim();
 
+  // FORCE PROPER START WITH SUBJECT
   if (!cleaned.startsWith('Subject:')) {
     const subjectMatch = cleaned.match(/(?:^|\n)Subject:\s*(.*?)(?:\n|$)/i);
     if (subjectMatch) {
       cleaned = 'Subject: ' + subjectMatch[1].trim() + '\n\n' + cleaned.replace(/(?:^|\n)Subject:\s*(.*?)(?:\n|$)/i, '');
     } else {
-      cleaned = "Subject: Professional Communication\n\n" + cleaned;
+      // If no subject found, extract first meaningful line
+      const lines = cleaned.split('\n').filter(line => line.trim().length > 0);
+      if (lines.length > 0 && lines[0].length < 100) {
+        cleaned = 'Subject: ' + lines[0].trim() + '\n\n' + lines.slice(1).join('\n');
+      } else {
+        cleaned = "Subject: Professional Communication\n\n" + cleaned;
+      }
     }
   }
 
+  // FINAL CLEANUP - REMOVE ANY REMAINING COMMENTARY LINES
   cleaned = cleaned
     .split('\n')
     .filter(line => {
       const trimmed = line.trim();
-      // Remove lines that are clearly formatting commands
-      if (trimmed.match(/^(\d+\.\s*")|(The tone is)|(Implementation Details:)|(What's Next:)|(CC:)|(Opener:)|(Body:)|(Proof:)|(CTA:)/i)) return false;
-      // Remove lines that are just single words in caps
-      if (trimmed.match(/^[A-Z\s]{2,}$/) && trimmed.length < 20) return false;
-      // Remove lines that are just formatting labels with **
-      if (trimmed.match(/^\*\*[A-Za-z]+\s[A-Za-z]+\*\*$/)) return false;
+      // Remove AI commentary lines
+      if (trimmed.match(/^(Based on|I will|following|with zero|Here is|Here's|The email|Starting with)/i)) return false;
+      // Remove lines that are clearly AI thinking
+      if (trimmed.match(/^As an AI|I have|This email|Note:|Please note:/i)) return false;
       return true;
     })
     .join('\n')
     .replace(/\n\s*\n\s*\n/g, '\n\n')
     .trim();
-  
-  return cleaned || content;
+
+  console.log("✅ CLEANED OUTPUT:", cleaned);
+
+  return cleaned || "Subject: Professional Communication\n\nI apologize, there was an issue generating this email. Please try again.";
 }
+
 app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, res) => {
   const { business, context, tone, emailLength, stylePrompt } = req.body;
   
@@ -837,6 +833,25 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
 - Variety in communication style reflects real human teams
 - Multiple valid ways to convey professional messages
 - Diversity in expression within professional boundaries
+
+## 🎯 STRICT OUTPUT FORMAT - NO COMMENTARY:
+
+### ABSOLUTE OUTPUT RULES:
+- Generate ONLY the email content starting with "Subject:"
+- NO introductory phrases, explanations, or commentary
+- NO "Based on the provided specifications" or similar phrases
+- NO "I will generate" or "Here is the email"
+- NO thinking out loud or process description
+- Start immediately with "Subject: [Your Subject Line]"
+- The first line after "Subject:" should be the actual email content
+
+### OUTPUT VALIDATION:
+Before finalizing, remove any:
+- Introductory sentences
+- Process descriptions  
+- AI self-reference
+- Explanatory commentary
+- Thinking out loud text
 
 ## 🎯 ULTIMATE OUTPUT REQUIREMENTS & EXCELLENCE BENCHMARK:
 
