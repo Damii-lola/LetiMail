@@ -1523,19 +1523,23 @@ function showSendEmailModal() {
       </button>
       <h3>Send Email</h3>
       <p class="modal-description">Send your generated email directly from LetiMail.</p>
+      
       <div class="input-group">
         <label for="recipientEmail">Recipient Email</label>
         <input type="email" id="recipientEmail" class="auth-input" placeholder="recipient@example.com" required>
       </div>
+      
       <div class="input-group">
         <label for="businessName">Business Name</label>
         <input type="text" id="businessName" class="auth-input" placeholder="Your Business Name" value="${currentUser?.name || ''}" required>
       </div>
+      
       <div class="input-group">
         <label for="replyToEmail">Reply-To Email</label>
         <input type="email" id="replyToEmail" class="auth-input" placeholder="your-email@example.com" value="${currentUser?.email || ''}" required>
         <span class="input-hint">Replies will be sent directly to this email</span>
       </div>
+      
       <div class="modal-actions">
         <button class="settings-btn secondary" onclick="closeSendModal()">Cancel</button>
         <button class="settings-btn primary" onclick="confirmSendEmail()" id="sendEmailBtn">
@@ -1547,6 +1551,12 @@ function showSendEmailModal() {
 
   document.body.appendChild(modal);
   modal.style.display = 'flex';
+  
+  // Focus on the first input field
+  setTimeout(() => {
+    const recipientInput = document.getElementById('recipientEmail');
+    if (recipientInput) recipientInput.focus();
+  }, 100);
 }
 
 async function confirmSendEmail() {
@@ -1556,21 +1566,24 @@ async function confirmSendEmail() {
   const outputDiv = document.getElementById('output');
   const emailContent = outputDiv?.innerText;
 
-  console.log('📧 Send Email Data:', { to, businessName, replyToEmail });
+  console.log('📧 Send Email Data:', { to, businessName, replyToEmail, hasContent: !!emailContent });
 
-  // Check if fields exist and have values
+  // IMPROVED VALIDATION - Check if fields exist first
   if (!to) {
     showNotification('Error', 'Please enter a recipient email', 'error');
+    console.error('❌ Missing recipient email');
     return;
   }
 
   if (!businessName) {
     showNotification('Error', 'Please enter your business name', 'error');
+    console.error('❌ Missing business name');
     return;
   }
 
   if (!replyToEmail) {
     showNotification('Error', 'Please enter a reply-to email', 'error');
+    console.error('❌ Missing reply-to email');
     return;
   }
 
@@ -1591,6 +1604,7 @@ async function confirmSendEmail() {
 
   if (!emailContent || emailContent.includes('Your personalized email will appear here')) {
     showNotification('Error', 'No email content to send', 'error');
+    console.error('❌ No email content');
     return;
   }
 
@@ -1640,6 +1654,7 @@ async function confirmSendEmail() {
     }
   }
 }
+
 // Smart Reply Feature
 function showSmartReplyModal() {
   const modal = document.createElement('div');
