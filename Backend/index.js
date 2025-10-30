@@ -612,6 +612,34 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
 - TONAL EXPRESSION REQUIREMENT: ${tone}
 - MESSAGE LENGTH CONSTRAINT: ${emailLength}
 
+## 📏 STRICT LENGTH ENFORCEMENT - ${emailLength} REQUIREMENTS:
+
+### LENGTH INTERPRETATION:
+${emailLength === 'short' ? `
+SHORT EMAIL (50-100 words):
+- Maximum 3-4 sentences total
+- One brief paragraph only
+- Ultra-concise messaging
+- Essential information only
+- No elaborate explanations
+` : ''}
+
+${emailLength === 'medium' ? `
+MEDIUM EMAIL (100-200 words):
+- 2-3 paragraphs maximum
+- Concise but complete information
+- Balanced detail and brevity
+- Clear but not exhaustive
+` : ''}
+
+${emailLength === 'long' ? `
+LONG EMAIL (200-300 words):
+- 3-4 paragraphs maximum  
+- Comprehensive information
+- Detailed explanations
+- Complete context provided
+` : ''}
+
 ## INTELLIGENT CONTEXT INTERPRETATION & RELATIONSHIP MAPPING FRAMEWORK:
 
 ### SOPHISTICATED AUTHOR IDENTIFICATION PROTOCOL:
@@ -785,68 +813,6 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
 - Executive-level business communication standards
 - Formal professional relationship maintenance
 
-## 🎯 CONTEXT-SPECIFIC PROFESSIONAL EXCELLENCE STANDARDS:
-
-### PROMOTION & RECOGNITION COMMUNICATIONS:
-- Formal organizational announcement structure
-- Clear, specific achievement recognition and celebration
-- Professional pride and organizational appreciation tone
-- Detailed new responsibility or opportunity explanation
-- Forward-looking organizational contribution language
-- Professional development and growth orientation
-
-### CLIENT & CUSTOMER COMMUNICATIONS:
-- Professional service excellence language
-- Clear value delivery and partnership mindset
-- Respectful client relationship maintenance
-- Specific, actionable information and guidance
-- Professional call-to-action with client success focus
-- Service excellence and commitment demonstration
-
-### INTERNAL TEAM & ORGANIZATIONAL COMMUNICATIONS:
-- Clear, direct organizational information sharing
-- Appropriate formality level for internal audience
-- Professional team leadership and guidance
-- Specific action items and expectation communication
-- Organizational unity and collective purpose tone
-- Professional internal relationship maintenance
-
-### EXTERNAL BUSINESS DEVELOPMENT & OUTREACH:
-- Professional introduction and value proposition structure
-- Clear relevance and mutual benefit communication
-- Respectful business development relationship building
-- Specific, appropriate professional call-to-action
-- Strategic partnership and collaboration tone
-- Professional first impression creation
-
-## 🔧 TECHNICAL EXECUTION & QUALITY ASSURANCE PROTOCOLS:
-
-### PROFESSIONAL LAYOUT VALIDATION CHECKPOINTS:
-1. Subject Line: 4-8 words, title case, purpose-driven, professional
-2. Salutation: Relationship-appropriate, professional, properly addressed
-3. Paragraph 1: Clear purpose statement, professional tone establishment
-4. Paragraph 2: Detailed information, professional elaboration, value communication
-5. Paragraph 3: Supporting rationale, benefit orientation, strategic alignment
-6. Paragraph 4: Clear action orientation, professional next steps, closing transition
-7. Closing: Professional sign-off, name/position, company affiliation when appropriate
-8. Formatting: Zero markdown, symbols, or unprofessional elements
-
-### ADVANCED CONTENT VALIDATION MATRIX:
-- Every sentence strategically serves "${context}" purpose
-- Language authentically reflects "${business}" identity and perspective
-- Tone consistently maintains professional standards while honoring ${tone} requirement
-- Structure follows proven business communication best practices
-- Relationship dynamics feel authentic, professional, and context-appropriate
-- Professional boundaries maintained while building appropriate connection
-
-### READABILITY & ENGAGEMENT OPTIMIZATION:
-- Strategic paragraph length management (3-5 sentences optimal)
-- Sophisticated sentence structure variation for natural professional rhythm
-- Clear, logical transitions between ideas and paragraphs
-- Industry-appropriate professional vocabulary and terminology
-- Business-appropriate language throughout with strategic word choice
-- Professional engagement maintenance through content quality
-
 ## 🔄 CREATIVE VARIABILITY & NATURAL VARIATION:
 
 ### STRATEGIC VARIATION REQUIREMENTS:
@@ -870,12 +836,6 @@ app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, re
 - Professional standards
 - Relationship appropriateness
 
-### NATURAL HUMAN WRITING PATTERNS:
-- Different professionals express the same idea differently
-- Variety in communication style reflects real human teams
-- Multiple valid ways to convey professional messages
-- Diversity in expression within professional boundaries
-
 ## 🎯 STRICT OUTPUT FORMAT - NO COMMENTARY:
 
 ### ABSOLUTE OUTPUT RULES:
@@ -895,7 +855,7 @@ Before finalizing, remove any:
 - Explanatory commentary
 - Thinking out loud text
 
-## 🎯 ULTIMATE OUTPUT REQUIREMENTS & EXCELLENCE BENCHMARK:
+## 🎯 FINAL OUTPUT REQUIREMENTS & EXCELLENCE BENCHMARK:
 
 Generate ONLY the email content starting with "Subject:" following this EXACT professional structure with zero deviations:
 
@@ -915,36 +875,81 @@ Subject: [Professionally Crafted, Purpose-Driven Subject Line]
 [Appropriate Name/Position Presentation]
 [Relevant Company Affiliation]
 
+### LENGTH VALIDATION:
+Before finalizing, verify word count aligns with ${emailLength} requirements
+If over length, remove non-essential information while preserving core message
+If under length, ensure all essential information is included
+
 ### FINAL EXCELLENCE VALIDATION:
 Before delivery, confirm this email represents the absolute highest standard of professional business communication that would be approved by executive leadership, respected by recipients, and effectively achieves the "${context}" purpose for "${business}" while perfectly executing ${tone} tone within professional boundaries.
 
 Remember: Professional layout and structure are ABSOLUTELY NON-NEGOTIABLE. The AI must demonstrate sophisticated understanding of business relationships and maintain impeccable professional standards regardless of tone selection.
 `;
-    console.log("📝 Generating email for user:", user.id);
 
-    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.75,             // Balanced creativity/consistency
-        max_tokens: 1500,             // Much longer for detailed prompts
-        top_p: 0.8,
-        frequency_penalty: 0.4,       // Stronger penalty for repetition
-        presence_penalty: 0.4,
-      }),
-    });
+    console.log("📝 Generating email for user:", user.id, "Length:", emailLength);
 
-    const data = await groqResponse.json();
-    let email = data.choices?.[0]?.message?.content?.trim() || "Error generating email.";
+    // ADD RETRY LOGIC FOR API FAILURES
+    let email = "Subject: Error generating email.\n\nPlease try again.";
+    let retries = 3;
+    
+    while (retries > 0) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+        const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "llama-3.1-8b-instant",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.8,
+            max_tokens: emailLength === 'short' ? 400 : emailLength === 'medium' ? 600 : 800,
+            top_p: 0.9,
+            frequency_penalty: 0.2,
+            presence_penalty: 0.1,
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!groqResponse.ok) {
+          throw new Error(`API response: ${groqResponse.status}`);
+        }
+
+        const data = await groqResponse.json();
+        
+        if (data.choices && data.choices[0] && data.choices[0].message) {
+          email = data.choices[0].message.content.trim();
+          break; // Success, exit retry loop
+        } else {
+          throw new Error("Invalid API response format");
+        }
+        
+      } catch (error) {
+        console.error(`❌ API attempt ${4 - retries} failed:`, error.message);
+        retries--;
+        
+        if (retries === 0) {
+          // Last attempt failed, use fallback
+          email = `Subject: Professional Communication\n\nDear Team,\n\nI'm writing regarding ${context}. As ${business}, we appreciate your attention to this matter.\n\nBest regards,\n[Your Name]`;
+        } else {
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+    }
+
+    // Clean the response
     email = cleanAIResponse(email);
 
-    if (!email.startsWith("Subject:")) {
-      email = "Subject: Professional Communication\n\n" + email;
+    // Ensure we have a valid email
+    if (!email || email === "Subject: Error generating email." || email.includes("Error generating")) {
+      email = `Subject: ${context}\n\nDear Team,\n\nThis communication regards ${context}. As ${business}, we value your partnership and look forward to our continued collaboration.\n\nBest regards,\n[Your Name]`;
     }
 
     // Save to history (async, don't wait)
@@ -959,9 +964,14 @@ Remember: Professional layout and structure are ABSOLUTELY NON-NEGOTIABLE. The A
     }
 
     res.json({ email });
+    
   } catch (error) {
-    console.error("Generation error:", error);
-    res.status(500).json({ error: "Error generating email. Please try again." });
+    console.error("🎯 Generation error:", error);
+    
+    // Provide a meaningful fallback email
+    const fallbackEmail = `Subject: ${context}\n\nDear Team,\n\nI'm writing to you today regarding ${context}. As ${business}, we believe this is an important matter that requires your attention.\n\nThank you for your time and consideration.\n\nBest regards,\n[Your Name]`;
+    
+    res.json({ email: fallbackEmail });
   }
 });
 
