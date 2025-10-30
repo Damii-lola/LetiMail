@@ -904,7 +904,7 @@ Remember: Professional layout and structure are ABSOLUTELY NON-NEGOTIABLE. The A
             Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
           },
           body: JSON.stringify({
-            model: "llama-3.1-8b-instant",
+            model: "meta-llama/llama-4-maverick-17b-128e-instruct",
             messages: [{ role: "user", content: prompt }],
             temperature: 0.8,
             max_tokens: emailLength === 'short' ? 400 : emailLength === 'medium' ? 600 : 800,
@@ -1016,7 +1016,7 @@ Return ONLY the polished email, nothing else.`;
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",  // CRITICAL - much more capable model
+        model: "meta-llama/llama-4-maverick-17b-128e-instruct",  // CRITICAL - much more capable model
         messages: [{ role: "user", content: prompt }],
         temperature: 0.75,             // Balanced creativity/consistency
         max_tokens: 1500,             // Much longer for detailed prompts
