@@ -63,8 +63,12 @@ function ipRateLimit(max = 10, windowMs = 60000) {
 function cleanAIResponse(content) {
   if (!content) return "Subject: Error generating email.\n\nPlease try again.";
   let cleaned = content;
-  const subjectIndex = cleaned.indexOf('Subject:');
-  if (subjectIndex > 0) cleaned = cleaned.substring(subjectIndex);
+
+  // Remove everything before the first "Subject:" line
+  const subjectIndex = cleaned.search(/(^|\n)Subject:/i);
+  if (subjectIndex !== -1) {
+    cleaned = cleaned.substring(subjectIndex).replace(/^\s*\n?/, '');
+  }
 
   const lines = cleaned.split('\n');
   const filtered = [];
@@ -75,20 +79,26 @@ function cleanAIResponse(content) {
     if (trimmed.match(/^Subject:/i)) started = true;
     if (!started) continue;
 
-    if (trimmed.match(/^(Here is|Here's|meets all the|including:|professionally crafted|relationship-appropriate|executive purpose)/i)) break;
+    // Stop at any AI commentary markers
+    if (trimmed.match(/^(Here is|Here's|meets all the|including:|professionally crafted|relationship-appropriate|executive purpose|I hope this helps|Let me know if you need)/i)) break;
     if (trimmed.match(/^[•\-]\s/)) break;
 
     filtered.push(line);
   }
   cleaned = filtered.join('\n').trim();
-  if (!cleaned.startsWith('Subject:')) {
+
+  // Make sure it starts with Subject:
+  if (!cleaned.match(/^Subject:/i)) {
     cleaned = 'Subject: Professional Communication\n\n' + cleaned;
   }
+
+  // Basic formatting
   cleaned = cleaned
     .replace(/\n{3,}/g, '\n\n')
     .replace(/^\s+|\s+$/g, '')
     .replace(/\$\$?/g, '')
     .trim();
+
   return cleaned || "Subject: Professional Communication\n\nThank you for your message.";
 }
 
@@ -104,57 +114,83 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-// ⭐ Email generation – now with STRICT tone & length control
+// ⭐ Email generation – strict tone & length with examples
 app.post("/api/generate", ipRateLimit(10, 60000), async (req, res) => {
   const { business, context, tone, emailLength } = req.body;
   if (!business || !context) {
     return res.status(400).json({ email: "Business description and context are required." });
   }
 
-  // Map lengths to target sentence counts and token limits
+  // Map lengths to sentence targets and token limits
   const lengthSettings = {
-    short:   { sentences: "exactly 15-17 sentences", tokens: 600 },
-    medium:  { sentences: "18-21 sentences",          tokens: 1000 },
-    long:    { sentences: "21+ sentences",           tokens: 1400 }
+    short:  { sentences: "15-20 sentences", tokens: 400 },
+    medium: { sentences: "20-25 sentences", tokens: 800 },
+    long:   { sentences: "25+ sentences",  tokens: 1200 }
   };
   const selectedLength = lengthSettings[emailLength] || lengthSettings.medium;
 
-  const prompt = `
-You are a world‑class email copywriter. Write an email based EXACTLY on these requirements.
+  // Few-shot examples for tone & length (using a neutral business context)
+  const toneExamples = {
+    friendly: `Subject: Catching up!
+Hey Alex,
 
-🔹 TONE: "${tone}"
-Follow these specific tone rules:
-- Friendly: warm, conversational, use "you" often, include one light-hearted phrase.
-- Professional: formal but approachable, no slang, clear structure, neutral language.
-- Casual: very relaxed, short sentences, maybe a contraction, like chatting with a friend.
-- Formal: strict business etiquette, full words (no contractions), polite, impersonal (e.g., "I would like to request...").
-- Persuasive: commanding, uses power words, creates urgency, benefits-focused.
+Hope you’re having a fantastic week! I just wanted to touch base about the collaboration we discussed. It’s been a while and I miss our chats. Let me know when you’re free for a quick call – I’d love to hear how things are going on your end.
 
-🔹 LENGTH: "${emailLength}"
-Your email must contain ${selectedLength.sentences}. Each sentence should be meaningful. Do not exceed this length.
+Take care,
+[Your Name]`,
+    professional: `Subject: Follow-Up on Proposed Collaboration
+Dear Alex,
 
-🔹 BUSINESS CONTEXT:
-${business}
+I hope this message finds you well. I am writing to follow up regarding the collaboration opportunity we previously discussed. I would appreciate the chance to align our next steps and clarify any outstanding points.
 
-🔹 WHAT TO COMMUNICATE:
-${context}
+Please let me know a convenient time for a brief call or if you prefer to communicate via email. Thank you for your time and consideration.
 
-🔹 STRUCTURE:
-Start with "Subject: [concise subject line]".
-Then a salutation (e.g., "Dear [Name],")
-Then the body, following the tone and length.
-End with a closing (e.g., "Best regards,") and "[Your Name]".
+Best regards,
+[Your Name]`,
+    casual: `Subject: Hey! Quick check in
+Hey Alex,
 
-🔹 CRITICAL RULES:
-- The subject line must match the tone and context.
-- The body MUST sound exactly like the specified tone.
-- Keep the email within the required number of sentences.
-- Do NOT add any commentary or text outside the email.
-- Do NOT include bullet points or numbered lists.
-- Return ONLY the email, nothing else.
+Just wanted to drop you a line and see how things are going. Haven't heard from you in a bit, so thought I’d say hi. Let me know what's new when you have a sec.
 
-Write the email now:
-`;
+Cheers,
+[Your Name]`,
+    formal: `Subject: Request for Confirmation of Meeting
+Dear Mr. Smith,
+
+I am writing to formally request confirmation of the meeting scheduled for next Tuesday at 10:00 AM GMT. I would be grateful if you could confirm your availability at your earliest convenience.
+
+Should any adjustments be required, please do not hesitate to inform me. I look forward to our discussion.
+
+Yours sincerely,
+[Your Name]`,
+    persuasive: `Subject: Don’t Miss Out – Limited Opportunity
+Hi Alex,
+
+Time is running out! I wanted to personally make sure you saw this incredible opportunity that could double your results in just 30 days. Over 500 businesses have already signed up and are seeing immediate ROI – you can’t afford to be left behind.
+
+Click the link below to secure your spot before the deadline. Let me know if you have any questions – I’m here to help you succeed.
+
+Act now,
+[Your Name]`
+  };
+
+  // Use a system message to seed the AI with exact expectations
+  const systemMessage = `You are a world‑class email copywriter who strictly follows instructions.
+You will receive a business context, communication purpose, desired tone, and length.
+You must produce ONLY the finished email, with no extra text, exactly matching the tone and length.
+The email must start with "Subject: " followed by the subject line, then a blank line, then the body.
+Do NOT include any explanations, introductions, or closing remarks like "I hope this helps".
+Below are exact examples of each tone (these are only examples; do NOT reuse their content, just mimic the style and structure).`;
+
+  const userMessage = `BUSINESS CONTEXT: ${business}
+COMMUNICATION PURPOSE: ${context}
+TONE: ${tone} (${toneExamples[tone] ? 'see example below' : ''})
+LENGTH: ${emailLength} – ${selectedLength.sentences}
+
+EXAMPLE OF A ${tone.toUpperCase()} EMAIL (for style only, not for reuse):
+${toneExamples[tone] || 'No example available, but strictly follow the tone definition.'}
+
+Write the complete email now. Remember: ${selectedLength.sentences}, ${tone} tone, and no extra words.`;
 
   let email = "Subject: Error generating email.\n\nPlease try again.";
   let retries = 2;
@@ -162,10 +198,7 @@ Write the email now:
   while (retries > 0) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      // Use the more capable llama3-70b for better quality
-      const model = process.env.AI_MODEL || "llama3-70b-8192";
+      const timeoutId = setTimeout(() => controller.abort(), 40000);
 
       const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -174,13 +207,14 @@ Write the email now:
           Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: model,
-          messages: [{ role: "user", content: prompt }],
+          model: "llama-3.3-70b-versatile",   // ★ latest, best LLaMA on Groq
+          messages: [
+            { role: "system", content: systemMessage },
+            { role: "user", content: userMessage }
+          ],
           temperature: 0.7,
           max_tokens: selectedLength.tokens,
           top_p: 0.95,
-          frequency_penalty: 0.1,
-          presence_penalty: 0.1,
         }),
         signal: controller.signal,
       });
@@ -189,7 +223,7 @@ Write the email now:
       const data = await groqResponse.json();
       if (data.choices?.[0]?.message?.content) {
         email = data.choices[0].message.content.trim();
-        // Rough validation: if it's too short, retry
+        // Quick validation
         const sentenceCount = email.split(/[.!?]+/).filter(Boolean).length;
         if (emailLength === 'short' && sentenceCount < 3) throw new Error("Too short");
         if (emailLength === 'long' && sentenceCount < 10) throw new Error("Too short for long");
@@ -201,19 +235,32 @@ Write the email now:
       console.error(`❌ Attempt ${3 - retries} failed:`, error.message);
       retries--;
       if (retries === 0) {
-        // Fallback email that still respects tone & length
+        // Fallback that respects tone and length
         const fallbackSubject = `Re: ${context.substring(0, 50)}`;
         let fallbackBody = '';
-        if (emailLength === 'short') {
-          fallbackBody = `I wanted to touch base regarding ${context}. Let me know your thoughts.`;
-        } else if (emailLength === 'medium') {
-          fallbackBody = `I hope this message finds you well. I am reaching out to discuss ${context}. Please let me know a convenient time to connect.`;
-        } else {
-          fallbackBody = `I am writing to follow up on our previous conversation about ${context}. As we discussed, there are several important aspects to consider, and I would appreciate your input on the next steps. Please feel free to reply with your availability, and I will ensure everything is aligned. Looking forward to hearing from you.`;
+        switch (emailLength) {
+          case 'short':
+            fallbackBody = tone === 'friendly' ? `Hey, just checking on ${context}. Let me know!` :
+                           tone === 'professional' ? `I wanted to follow up regarding ${context}. Please advise.` :
+                           tone === 'formal' ? `I am writing to inquire about ${context}. I await your response.` :
+                           `Wanted to reach out about ${context}. Talk soon!`;
+            break;
+          case 'medium':
+            fallbackBody = tone === 'friendly' ? `Hi! Hope you're great. I'm reaching out about ${context}. Let's catch up soon.` :
+                           tone === 'professional' ? `I am following up on ${context} and would appreciate your feedback. Please let me know a convenient time to discuss.` :
+                           tone === 'formal' ? `I would like to formally request an update regarding ${context}. I look forward to your reply.` :
+                           `I'm circling back on ${context}. If you need more info, just reply.`;
+            break;
+          case 'long':
+            fallbackBody = tone === 'friendly' ? `Hey, I've been thinking about ${context} and would love to dive deeper. Let's schedule a proper chat.` :
+                           tone === 'professional' ? `I am writing to provide a comprehensive follow-up on ${context}. As previously discussed, there are several action items we need to address.` :
+                           tone === 'formal' ? `I am writing to formally address the matter of ${context}. I would be grateful if you could provide a detailed response at your earliest convenience.` :
+                           `I've been meaning to touch base about ${context} – it's important and I'd love to hear your perspective.`;
+            break;
         }
         email = `Subject: ${fallbackSubject}\n\nDear [Recipient],\n\n${fallbackBody}\n\nBest regards,\n[Your Name]`;
       } else {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
   }
@@ -223,7 +270,7 @@ Write the email now:
   res.json({ email });
 });
 
-// Polish email
+// ── Polish email (unchanged) ─────────────────────────
 app.post("/api/polish-email", async (req, res) => {
   const { originalEmail, editedEmail } = req.body;
   if (!originalEmail || !editedEmail) return res.status(400).json({ error: "Both emails required" });
@@ -253,7 +300,7 @@ Return ONLY the polished email, nothing else.
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama3-70b-8192",
+        model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 1500,
@@ -269,7 +316,7 @@ Return ONLY the polished email, nothing else.
   }
 });
 
-// Send email
+// ── Send email (unchanged) ───────────────────────────
 app.post("/api/send-email", async (req, res) => {
   const { to, subject, content, businessName, replyToEmail } = req.body;
   if (!to || !subject || !content || !businessName || !replyToEmail) {
@@ -341,7 +388,7 @@ app.post("/api/send-email", async (req, res) => {
   }
 });
 
-// Smart reply
+// ── Smart reply (unchanged) ──────────────────────────
 app.post("/api/smart-reply", ipRateLimit(20, 60000), async (req, res) => {
   const { emailContent, context } = req.body;
   if (!emailContent) return res.status(400).json({ error: "Email content required" });
@@ -369,7 +416,7 @@ Return ONLY the 3 reply options, nothing else.`;
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama3-70b-8192",
+        model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 1000,
