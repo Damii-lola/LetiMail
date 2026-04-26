@@ -2,7 +2,7 @@
 // LETIMAIL – INSTANT ACCESS (no signup required)
 // ====================================================================
 
-const BACKEND_URL = 'https://letimail-backend.onrender.com';  // ⬅️ your Render service URL
+const BACKEND_URL = 'https://letimail.onrender.com';  // ⬅️ your Render service URL
 let authToken = null;
 let currentUser = null;
 
