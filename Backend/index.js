@@ -4,7 +4,7 @@ import fetch from "node-fetch";
 import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';   // <-- add to package.json: "uuid"
+import { v4 as uuidv4 } from 'uuid';   // <-- add "uuid" to package.json dependencies
 
 const { Pool } = pkg;
 const app = express();
@@ -32,7 +32,8 @@ app.use(cors({
   methods: ['GET','POST','PUT','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization']
 }));
-app.options('*', cors());
+// ❌ Removed: app.options('*', cors()); – was overriding good CORS settings
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
