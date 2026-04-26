@@ -4,56 +4,48 @@ import fetch from "node-fetch";
 import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';   // <-- add to package.json: "uuid"
 
 const { Pool } = pkg;
 const app = express();
 
-// CORS configuration for Render
+// ── CORS Configuration ───────────────────────────────
 const allowedOrigins = [
-  'https://damii-lola.github.io',
-  'https://damii-lola.github.io/LetiMail',
+  'https://damii-lola.github.io',          // your GitHub Pages origin (no path)
   'http://localhost:3000',
   'http://localhost:5500',
   'http://127.0.0.1:5500'
 ];
-
 if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error('CORS not allowed'));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization']
+}));
+app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// PostgreSQL connection for Render
+// ── Database ─────────────────────────────────────────
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// JWT Secret - Change in production!
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+// JWT Secret – definitely set in production!
+const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production-please';
 
-// ============================================
-// DATABASE INITIALIZATION
-// ============================================
-
+// ── Initialize Database Tables ───────────────────────
 async function initializeDatabase() {
   try {
     await pool.query(`
@@ -90,49 +82,39 @@ async function initializeDatabase() {
       )
     `);
 
-    // Create indexes for better performance
+    // Indexes
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_history_user ON email_history(user_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_history_created ON email_history(created_at)`);
 
-    console.log('✅ Database tables initialized successfully');
-  } catch (error) {
-    console.error('❌ Error initializing database:', error);
+    console.log('✅ Database tables ready');
+  } catch (e) {
+    console.error('❌ Database init error:', e);
   }
 }
 
-// Test database connection and initialize tables
-pool.connect(async (err, client, release) => {
+// Test connection & init
+pool.connect((err, client, done) => {
   if (err) {
-    console.error('❌ Error connecting to the database', err.stack);
+    console.error('❌ DB connection error:', err.stack);
   } else {
-    console.log('✅ Database connected successfully');
-    release();
-    await initializeDatabase();
+    console.log('✅ Database connected');
+    done();
+    initializeDatabase();
   }
 });
 
-// ============================================
-// AUTHENTICATION MIDDLEWARE
-// ============================================
-
+// ── Auth Middleware ──────────────────────────────────
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
+  if (!token) return res.status(401).json({ error: 'Access token required' });
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const result = await pool.query('SELECT * FROM users WHERE id = \$1', [decoded.userId]);
-
-    if (result.rows.length === 0) {
-      return res.status(403).json({ error: 'User not found' });
-    }
-
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
+    if (result.rows.length === 0) return res.status(403).json({ error: 'User not found' });
     req.user = result.rows[0];
     next();
   } catch (error) {
@@ -140,48 +122,89 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// ============================================
-// AUTH ENDPOINTS - SIMPLE REGISTRATION & LOGIN
-// ============================================
-
-// Register new user - NO OTP REQUIRED
-app.post("/api/auth/register", async (req, res) => {
-  const { name, email, password } = req.body;
-
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'All fields are required' });
-  }
-
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  }
-
-  try {
-    console.log('📝 Registration attempt for:', email);
-
-    // Check if user already exists
-    const existingUser = await pool.query('SELECT * FROM users WHERE email = \$1', [email]);
-    if (existingUser.rows.length > 0) {
-      console.log('❌ Email already registered');
-      return res.status(400).json({ error: 'Email already registered' });
+// ── Rate Limiter ─────────────────────────────────────
+const rateLimitStore = new Map();
+function rateLimit(maxRequests = 10, windowMs = 60000) {
+  return (req, res, next) => {
+    const identifier = req.user?.id || req.ip;
+    const now = Date.now();
+    if (!rateLimitStore.has(identifier)) rateLimitStore.set(identifier, []);
+    const requests = rateLimitStore.get(identifier);
+    const recentRequests = requests.filter(time => now - time < windowMs);
+    if (recentRequests.length >= maxRequests) {
+      return res.status(429).json({
+        error: 'Too many requests. Please try again later.',
+        retryAfter: Math.ceil((recentRequests[0] + windowMs - now) / 1000)
+      });
     }
+    recentRequests.push(now);
+    rateLimitStore.set(identifier, recentRequests);
+    next();
+  };
+}
 
-    // Create user directly
-    const hashedPassword = await bcrypt.hash(password, 10);
+// ── AI Response Cleaner (fixed) ──────────────────────
+function cleanAIResponse(content) {
+  if (!content) return "Subject: Error generating email.\n\nPlease try again.";
+
+  let cleaned = content;
+
+  // Remove everything before "Subject:"
+  const subjectIndex = cleaned.indexOf('Subject:');
+  if (subjectIndex > 0) cleaned = cleaned.substring(subjectIndex);
+
+  // Remove any line that starts with typical AI commentary
+  const lines = cleaned.split('\n');
+  const filtered = [];
+  let started = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!started && trimmed === '') continue;
+    if (trimmed.match(/^Subject:/i)) started = true;
+    if (!started) continue;
+
+    // Stop if we encounter AI commentary lines
+    if (trimmed.match(/^(Here is|Here's|meets all the|including:|professionally crafted|relationship-appropriate|executive purpose)/i)) break;
+    if (trimmed.match(/^[•\-]\s/)) break;   // bullet points
+
+    filtered.push(line);
+  }
+  cleaned = filtered.join('\n').trim();
+
+  // Ensure it starts with Subject:
+  if (!cleaned.startsWith('Subject:')) {
+    cleaned = 'Subject: Professional Communication\n\n' + cleaned;
+  }
+
+  // Basic sanitation
+  cleaned = cleaned
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^\s+|\s+$/g, '')
+    .replace(/\$\$?/g, '')   // remove stray dollar signs
+    .trim();
+
+  return cleaned || "Subject: Professional Communication\n\nThank you for your message.";
+}
+
+// ── GUEST LOGIN (automatic) ──────────────────────────
+app.post("/api/auth/guest", async (req, res) => {
+  try {
+    const guestId = uuidv4();
+    const guestEmail = `guest_${guestId}@letimail.local`;
+    const guestName = 'Guest';
+    // Password never verified, but column requires a value
+    const placeholderPassword = await bcrypt.hash(guestId, 10);
+
     const result = await pool.query(
-      `INSERT INTO users (name, email, password, plan, emails_used, emails_left, default_tone, email_length, auto_save, spell_check)
-       VALUES (\$1, \$2, \$3, 'free', 0, 10, 'friendly', 'medium', true, true)
-       RETURNING id, name, email, plan, company, role, emails_used, emails_left, default_tone, email_length`,
-      [name, email, hashedPassword]
+      `INSERT INTO users (name, email, password, plan, emails_used, emails_left)
+       VALUES ($1, $2, $3, 'free', 0, 10)
+       RETURNING *`,
+      [guestName, guestEmail, placeholderPassword]
     );
-
     const user = result.rows[0];
-    console.log('✅ User created:', user.id);
-
-    // Generate JWT
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
-    console.log('✅ User registered successfully');
+    console.log('✅ Guest user created:', user.id);
 
     res.json({
       success: true,
@@ -191,8 +214,6 @@ app.post("/api/auth/register", async (req, res) => {
         name: user.name,
         email: user.email,
         plan: user.plan,
-        company: user.company,
-        role: user.role,
         emails_used: user.emails_used,
         emails_left: user.emails_left,
         default_tone: user.default_tone,
@@ -200,105 +221,44 @@ app.post("/api/auth/register", async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Registration error:', error);
-    res.status(500).json({ error: 'Registration failed: ' + error.message });
+    console.error('❌ Guest creation error:', error);
+    res.status(500).json({ error: 'Failed to create guest session' });
   }
 });
 
-// Login user
-app.post("/api/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password required' });
-  }
-
-  try {
-    const result = await pool.query('SELECT * FROM users WHERE email = \$1', [email]);
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const user = result.rows[0];
-    const validPassword = await bcrypt.compare(password, user.password);
-
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        plan: user.plan,
-        company: user.company,
-        role: user.role,
-        emails_used: user.emails_used,
-        emails_left: user.emails_left
-      }
-    });
-  } catch (error) {
-    console.error('❌ Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
-  }
-});
-
-// Get current user
+// ── User Profile Endpoints (kept for future use) ─────
 app.get("/api/auth/me", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, plan, company, role, emails_used, emails_left, default_tone, email_length, auto_save, spell_check FROM users WHERE id = \$1',
+      'SELECT id, name, email, plan, company, role, emails_used, emails_left, default_tone, email_length, auto_save, spell_check FROM users WHERE id = $1',
       [req.user.id]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const user = result.rows[0];
-    res.json({ user });
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ user: result.rows[0] });
   } catch (error) {
     console.error('❌ Get user error:', error);
     res.status(500).json({ error: 'Failed to get user data' });
   }
 });
 
-// Update user profile
 app.put("/api/auth/profile", authenticateToken, async (req, res) => {
   const { name, company, role } = req.body;
-
-  if (!name || name.trim().length === 0) {
-    return res.status(400).json({ error: 'Name is required' });
-  }
+  if (!name || name.trim().length === 0) return res.status(400).json({ error: 'Name is required' });
 
   try {
     const result = await pool.query(
-      'UPDATE users SET name = \$1, company = \$2, role = \$3, updated_at = CURRENT_TIMESTAMP WHERE id = \$4 RETURNING id, name, email, plan, company, role',
+      'UPDATE users SET name = $1, company = $2, role = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING id, name, email, plan, company, role',
       [name.trim(), company || '', role || '', req.user.id]
     );
-
-    console.log('✅ Profile updated for user:', req.user.id);
-
-    res.json({
-      success: true,
-      user: result.rows[0]
-    });
+    res.json({ success: true, user: result.rows[0] });
   } catch (error) {
     console.error('❌ Profile update error:', error);
     res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 
-// Save user preferences
 app.put("/api/auth/preferences", authenticateToken, async (req, res) => {
   const { defaultTone, emailLength, autoSave, spellCheck } = req.body;
-
   try {
     const preferences = {
       defaultTone: defaultTone || 'friendly',
@@ -306,20 +266,10 @@ app.put("/api/auth/preferences", authenticateToken, async (req, res) => {
       autoSave: autoSave !== undefined ? autoSave : true,
       spellCheck: spellCheck !== undefined ? spellCheck : true
     };
-
     await pool.query(
-      `UPDATE users SET
-        default_tone = \$1,
-        email_length = \$2,
-        auto_save = \$3,
-        spell_check = \$4,
-        updated_at = CURRENT_TIMESTAMP
-       WHERE id = \$5`,
+      `UPDATE users SET default_tone = $1, email_length = $2, auto_save = $3, spell_check = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5`,
       [preferences.defaultTone, preferences.emailLength, preferences.autoSave, preferences.spellCheck, req.user.id]
     );
-
-    console.log('✅ Preferences saved for user:', req.user.id);
-
     res.json({ success: true, preferences });
   } catch (error) {
     console.error('❌ Preferences save error:', error);
@@ -327,96 +277,63 @@ app.put("/api/auth/preferences", authenticateToken, async (req, res) => {
   }
 });
 
-// Change password
 app.put("/api/auth/password", authenticateToken, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
-
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ error: 'Current and new password are required' });
-  }
-
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters' });
-  }
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Current and new password required' });
+  if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
   try {
-    // Verify current password
-    const result = await pool.query('SELECT password FROM users WHERE id = \$1', [req.user.id]);
-    const user = result.rows[0];
+    const result = await pool.query('SELECT password FROM users WHERE id = $1', [req.user.id]);
+    const valid = await bcrypt.compare(currentPassword, result.rows[0].password);
+    if (!valid) return res.status(401).json({ error: 'Current password incorrect' });
 
-    const validPassword = await bcrypt.compare(currentPassword, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Current password is incorrect' });
-    }
-
-    // Update password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query(
-      'UPDATE users SET password = \$1, updated_at = CURRENT_TIMESTAMP WHERE id = \$2',
-      [hashedPassword, req.user.id]
-    );
-
-    console.log('✅ Password changed for user:', req.user.id);
-
-    res.json({ success: true, message: 'Password updated successfully' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [hashed, req.user.id]);
+    res.json({ success: true, message: 'Password updated' });
   } catch (error) {
     console.error('❌ Password change error:', error);
     res.status(500).json({ error: 'Failed to change password' });
   }
 });
 
-// Delete account
 app.delete("/api/auth/delete-account", authenticateToken, async (req, res) => {
   try {
-    await pool.query('DELETE FROM users WHERE id = \$1', [req.user.id]);
-    res.json({ success: true, message: 'Account deleted successfully' });
+    await pool.query('DELETE FROM users WHERE id = $1', [req.user.id]);
+    res.json({ success: true, message: 'Account deleted' });
   } catch (error) {
     console.error('❌ Delete account error:', error);
     res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 
-// ============================================
-// EMAIL HISTORY ENDPOINTS
-// ============================================
-
-// Save email to history
+// ── Email History ────────────────────────────────────
 async function saveEmailToHistory(userId, business, context, tone, generatedEmail) {
   try {
     await pool.query(
       `INSERT INTO email_history (user_id, business_context, email_context, tone, generated_email)
-       VALUES (\$1, \$2, \$3, \$4, \$5)`,
+       VALUES ($1, $2, $3, $4, $5)`,
       [userId, business, context, tone, generatedEmail]
     );
   } catch (error) {
-    console.error('Failed to save email history:', error);
+    console.error('Failed to save history:', error);
   }
 }
 
-// Get user's email history
 app.get("/api/email-history", authenticateToken, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 20;
     const offset = parseInt(req.query.offset) || 0;
-
     const result = await pool.query(
       `SELECT id, business_context, email_context, tone, generated_email, created_at
-       FROM email_history
-       WHERE user_id = \$1
-       ORDER BY created_at DESC
-       LIMIT \$2 OFFSET \$3`,
+       FROM email_history WHERE user_id = $1
+       ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
     );
-
-    const countResult = await pool.query(
-      'SELECT COUNT(*) FROM email_history WHERE user_id = \$1',
-      [req.user.id]
-    );
-
+    const count = await pool.query('SELECT COUNT(*) FROM email_history WHERE user_id = $1', [req.user.id]);
     res.json({
       success: true,
       emails: result.rows,
-      total: parseInt(countResult.rows[0].count),
+      total: parseInt(count.rows[0].count),
       limit,
       offset
     });
@@ -426,177 +343,44 @@ app.get("/api/email-history", authenticateToken, async (req, res) => {
   }
 });
 
-// Delete email from history
 app.delete("/api/email-history/:id", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      'DELETE FROM email_history WHERE id = \$1 AND user_id = \$2 RETURNING id',
+      'DELETE FROM email_history WHERE id = $1 AND user_id = $2 RETURNING id',
       [req.params.id, req.user.id]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Email not found or unauthorized' });
-    }
-
-    res.json({ success: true, message: 'Email deleted from history' });
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Email not found' });
+    res.json({ success: true });
   } catch (error) {
     console.error('❌ Delete history error:', error);
     res.status(500).json({ error: 'Failed to delete email' });
   }
 });
 
-// ============================================
-// RATE LIMITING MIDDLEWARE
-// ============================================
-
-const rateLimitStore = new Map();
-
-function rateLimit(maxRequests = 10, windowMs = 60000) {
-  return (req, res, next) => {
-    const identifier = req.user?.id || req.ip;
-    const now = Date.now();
-
-    if (!rateLimitStore.has(identifier)) {
-      rateLimitStore.set(identifier, []);
-    }
-
-    const requests = rateLimitStore.get(identifier);
-    const recentRequests = requests.filter(time => now - time < windowMs);
-
-    if (recentRequests.length >= maxRequests) {
-      return res.status(429).json({
-        error: 'Too many requests. Please try again later.',
-        retryAfter: Math.ceil((recentRequests[0] + windowMs - now) / 1000)
-      });
-    }
-
-    recentRequests.push(now);
-    rateLimitStore.set(identifier, recentRequests);
-
-    next();
-  };
-}
-
-// ============================================
-// EMAIL GENERATION WITH ADVANCED PROMPTING
-// ============================================
-
-function cleanAIResponse(content) {
-  if (!content) return "Subject: Error generating email.\n\nPlease try again.";
-
-  console.log("🔍 RAW AI OUTPUT:", content);
-
-  let cleaned = content;
-
-  // Remove everything before "Subject:" if AI added preamble
-  const subjectIndex = cleaned.indexOf('Subject:');
-  if (subjectIndex > 0) {
-    cleaned = cleaned.substring(subjectIndex);
-  }
-
-  // Remove AI commentary that comes AFTER the email
-  const endOfEmailPatterns = [
-    /(Best regards,|Sincerely,|Kind regards,|Regards,|Thanks,|Thank you,)\s*\n\s*$$
-?Your Name
-$$?[\s\S]*\$/i,
-    /meets all the requirements specified.*$/im,
-    /including:.*$/im,
-    /professionally crafted subject line.*\$/im,
-    /\n\s*[•\-]\s.*\$/im
-  ];
-
-  let emailEndIndex = cleaned.length;
-
-  for (let pattern of endOfEmailPatterns) {
-    const match = cleaned.match(pattern);
-    if (match) {
-      emailEndIndex = Math.min(emailEndIndex, match.index);
-    }
-  }
-
-  if (emailEndIndex < cleaned.length) {
-    cleaned = cleaned.substring(0, emailEndIndex).trim();
-  }
-
-  // Remove specific AI commentary lines while preserving email content
-  const lines = cleaned.split('\n');
-  let resultLines = [];
-  let inEmailContent = true;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-
-    if (resultLines.length === 0 && line === '') continue;
-
-    if (line.match(/meets all the requirements|including:|professionally crafted|relationship-appropriate|executive purpose/im)) {
-      break;
-    }
-
-    if (line.match(/^\s*[•\-]\s/)) {
-      break;
-    }
-
-    resultLines.push(lines[i]);
-  }
-
-  cleaned = resultLines.join('\n');
-
-  // Ensure it starts with Subject: and has basic email structure
-  if (!cleaned.startsWith('Subject:')) {
-    const subjectMatch = cleaned.match(/(?:^|\n)(Subject:\s*.+)/i);
-    if (subjectMatch) {
-      cleaned = subjectMatch[1] + '\n\n' + cleaned.replace(subjectMatch[0], '').trim();
-    } else {
-      cleaned = "Subject: Professional Communication\n\n" + cleaned;
-    }
-  }
-
-  cleaned = cleaned
-    .replace(/\n\s*\n\s*\n/g, '\n\n')
-    .replace(/^\s+|\s+\$/g, '')
-    .trim();
-
-  // SAFETY CHECK
-  if (cleaned.length < 50 || cleaned === "Subject: Professional Communication") {
-    cleaned = content
-      .replace(/meets all the requirements specified.*\$/im, '')
-      .replace(/including:.*\$/im, '')
-      .replace(/\n\s*[•\-]\s.*\$/im, '')
-      .replace(/\n\s*\n\s*\n/g, '\n\n')
-      .trim();
-  }
-
-  console.log("✅ CLEANED OUTPUT:", cleaned);
-  return cleaned || "Subject: Professional Communication\n\nThank you for your message.";
-}
-
+// ── Email Generation ─────────────────────────────────
 app.post("/api/generate", authenticateToken, rateLimit(5, 60000), async (req, res) => {
   const { business, context, tone, emailLength } = req.body;
-
   if (!business || !context) {
     return res.status(400).json({ email: "Business description and context are required." });
   }
 
   try {
     const user = req.user;
-
     if (user.plan === 'free' && user.emails_used >= 10) {
-      return res.status(400).json({
-        email: "❌ You've used all 10 free emails! Upgrade to Premium for unlimited emails."
-      });
+      return res.status(400).json({ email: "You've used all 10 free emails. Upgrade for more." });
     }
 
     const prompt = `
 # ULTIMATE PROFESSIONAL EMAIL ARCHITECTURE SYSTEM
 
 ## BUSINESS CONTEXT:
-\${business}
+${business}
 
 ## COMMUNICATION PURPOSE:
-\${context}
+${context}
 
-## TONE REQUIREMENT: \${tone}
-## LENGTH CONSTRAINT: \${emailLength}
+## TONE REQUIREMENT: ${tone}
+## LENGTH CONSTRAINT: ${emailLength}
 
 ## STRICT OUTPUT REQUIREMENTS:
 - Generate ONLY the email starting with "Subject:"
@@ -626,9 +410,6 @@ Subject: [Professional, context-appropriate subject line]
 Generate ONLY the email content starting with "Subject:" following all requirements above.
 `;
 
-    console.log("📝 Generating email for user:", user.id);
-
-    // Enhanced email generation with retry logic
     let email = "Subject: Error generating email.\n\nPlease try again.";
     let retries = 3;
 
@@ -652,7 +433,7 @@ Generate ONLY the email content starting with "Subject:" following all requireme
             frequency_penalty: 0.1,
             presence_penalty: 0.1,
           }),
-          signal: controller.signal
+          signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
@@ -662,14 +443,12 @@ Generate ONLY the email content starting with "Subject:" following all requireme
         }
 
         const data = await groqResponse.json();
-
         if (data.choices?.[0]?.message?.content) {
           email = data.choices[0].message.content.trim();
           break;
         } else {
           throw new Error("Invalid API response format");
         }
-
       } catch (error) {
         console.error(`❌ API attempt ${4 - retries} failed:`, error.message);
         retries--;
@@ -681,40 +460,27 @@ Generate ONLY the email content starting with "Subject:" following all requireme
       }
     }
 
-    // Clean and validate the response
     email = cleanAIResponse(email);
-
-    if (!email || email === "Subject: Error generating email." || email.includes("Error generating")) {
-      email = `Subject: ${context}\n\nHi there,\n\nThis email pertains to ${context} as ${business}.\n\nRegards,\nSender`;
-    }
 
     // Save to history
     saveEmailToHistory(user.id, business, context, tone, email);
 
-    // Update email count for free users
+    // Update count for free users
     if (user.plan === 'free') {
-      await pool.query(
-        'UPDATE users SET emails_used = emails_used + 1 WHERE id = \$1',
-        [user.id]
-      );
+      await pool.query('UPDATE users SET emails_used = emails_used + 1 WHERE id = $1', [user.id]);
     }
 
     res.json({ email });
-
   } catch (error) {
     console.error("🎯 Generation error:", error);
-    const fallbackEmail = `Subject: ${context}\n\nHello,\n\nI hope this email finds you well regarding ${context}. Let me know if you have any questions.\n\nBest regards`;
-    res.json({ email: fallbackEmail });
+    res.json({ email: `Subject: ${context}\n\nHello,\n\nI hope this email finds you well regarding ${context}. Let me know if you have any questions.\n\nBest regards` });
   }
 });
 
-// Polish edited email endpoint
+// ── Polish Email ─────────────────────────────────────
 app.post("/api/polish-email", authenticateToken, async (req, res) => {
   const { originalEmail, editedEmail } = req.body;
-
-  if (!originalEmail || !editedEmail) {
-    return res.status(400).json({ error: "Both original and edited email are required" });
-  }
+  if (!originalEmail || !editedEmail) return res.status(400).json({ error: "Both emails required" });
 
   try {
     const prompt = `
@@ -727,10 +493,10 @@ Your job is to:
 5. Return ONLY the polished email
 
 ORIGINAL:
-\${originalEmail}
+${originalEmail}
 
 EDITED:
-\${editedEmail}
+${editedEmail}
 
 RULES:
 - Preserve user's intended changes completely
@@ -755,24 +521,19 @@ Return ONLY the polished email, nothing else.
         max_tokens: 1500,
       }),
     });
-
     const data = await groqResponse.json();
-    let polishedEmail = data.choices?.[0]?.message?.content?.trim() || editedEmail;
+    let polished = data.choices?.[0]?.message?.content?.trim() || editedEmail;
+    polished = polished.replace(/^(Here is|Here's) (the )?(polished|refined) (version of the )?email:\s*/i, '');
+    polished = polished.replace(/^(Based on your edits, here( is|'s))?/i, '').trim();
 
-    // Clean up any AI prefixes
-    polishedEmail = polishedEmail.replace(/^(Here is|Here's) (the )?(polished|refined) (version of the )?email:\s*/i, '');
-    polishedEmail = polishedEmail.replace(/^(Based on your edits, here( is|'s))?/i, '');
-    polishedEmail = polishedEmail.trim();
-
-    res.json({ polishedEmail: polishedEmail || editedEmail, success: true });
-
+    res.json({ polishedEmail: polished || editedEmail, success: true });
   } catch (error) {
     console.error("Polish error:", error);
     res.json({ polishedEmail: editedEmail, success: false, message: "Polishing failed, returning your edits" });
   }
 });
 
-// Send email endpoint
+// ── Send Email ───────────────────────────────────────
 app.post("/api/send-email", authenticateToken, async (req, res) => {
   const { to, subject, content, businessName, replyToEmail } = req.body;
 
@@ -785,32 +546,17 @@ app.post("/api/send-email", authenticateToken, async (req, res) => {
     if (!content) missing.push('content');
     if (!businessName) missing.push('business name');
     if (!replyToEmail) missing.push('reply-to email');
-
-    console.error('❌ Missing fields:', missing);
     return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
   }
 
-  // Email validation
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-
-  if (!emailRegex.test(to)) {
-    console.error('❌ Invalid recipient email:', to);
-    return res.status(400).json({ error: `Invalid recipient email format: ${to}` });
-  }
-
-  if (!emailRegex.test(replyToEmail)) {
-    console.error('❌ Invalid reply-to email:', replyToEmail);
-    return res.status(400).json({ error: `Invalid reply-to email format: ${replyToEmail}` });
-  }
+  if (!emailRegex.test(to)) return res.status(400).json({ error: `Invalid recipient email: ${to}` });
+  if (!emailRegex.test(replyToEmail)) return res.status(400).json({ error: `Invalid reply-to email: ${replyToEmail}` });
 
   try {
-    console.log('📤 Sending via SendGrid...');
-
-    // Format email content for SendGrid
     let formattedContent = content.replace(/^Subject:\s*.+\n?/i, '').trim();
     const emailSubject = content.match(/^Subject:\s*(.+)/i)?.[1]?.trim() || subject;
 
-    // Simple HTML conversion for better email formatting
     const htmlContent = formattedContent
       .replace(/\n\n/g, '</p><p>')
       .replace(/\n/g, '<br>')
@@ -873,24 +619,18 @@ app.post("/api/send-email", authenticateToken, async (req, res) => {
       console.error("❌ SendGrid Error:", errorData);
       res.status(500).json({ error: "Failed to send email via SendGrid" });
     }
-
   } catch (error) {
     console.error("❌ Send Email Error:", error);
     res.status(500).json({ error: "Internal server error: " + error.message });
   }
 });
 
-// Smart Reply - Generate reply suggestions
+// ── Smart Reply ──────────────────────────────────────
 app.post("/api/smart-reply", authenticateToken, rateLimit(10, 60000), async (req, res) => {
   const { emailContent, context } = req.body;
-
-  if (!emailContent) {
-    return res.status(400).json({ error: "Email content is required" });
-  }
+  if (!emailContent) return res.status(400).json({ error: "Email content is required" });
 
   try {
-    console.log('🤖 Generating smart reply...');
-
     const prompt = `You are an email reply assistant. Read the email below and generate 3 different reply options.
 
 EMAIL:
@@ -921,12 +661,9 @@ Return ONLY the 3 reply options, nothing else.`;
     });
 
     const data = await groqResponse.json();
-    let replies = data.choices?.[0]?.message?.content?.trim() || "Error generating replies.";
-
-    // Parse replies into array
+    let repliesText = data.choices?.[0]?.message?.content?.trim() || "Error generating replies.";
     const replyOptions = [];
-    const replyMatches = replies.match(/Reply Option \d+:([\s\S]*?)(?=Reply Option \d+:|$)/gi);
-
+    const replyMatches = repliesText.match(/Reply Option \d+:([\s\S]*?)(?=Reply Option \d+:|$)/gi);
     if (replyMatches) {
       replyMatches.forEach((match, index) => {
         const replyText = match.replace(/Reply Option \d+:/i, '').trim();
@@ -937,21 +674,16 @@ Return ONLY the 3 reply options, nothing else.`;
         });
       });
     } else {
-      replyOptions.push({ id: 1, type: 'general', content: replies });
+      replyOptions.push({ id: 1, type: 'general', content: repliesText });
     }
-
     res.json({ success: true, replies: replyOptions });
-
   } catch (error) {
     console.error("Smart reply error:", error);
-    res.status(500).json({
-      error: "Failed to generate replies. Please try again.",
-      success: false
-    });
+    res.status(500).json({ error: "Failed to generate replies", success: false });
   }
 });
 
-// Health check endpoint
+// ── Health Checks ────────────────────────────────────
 app.get("/api/health", async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -963,25 +695,16 @@ app.get("/api/health", async (req, res) => {
       memory: process.memoryUsage()
     });
   } catch (error) {
-    res.status(500).json({
-      status: "error",
-      database: "disconnected",
-      error: error.message
-    });
+    res.status(500).json({ status: "error", database: "disconnected", error: error.message });
   }
 });
 
-// Health check root endpoint
 app.get("/", (req, res) => {
-  res.send("✅ LetiMail backend running - Simple registration, AI polish feature included");
+  res.send("✅ LetiMail backend running – Guest access enabled");
 });
 
-// ============================================
-// SERVER CONFIGURATION
-// ============================================
-
+// ── Server Start ─────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-
 const server = app.listen(PORT, () => {
   console.log(`🚀 LetiMail backend running on port ${PORT}`);
   console.log(`🔗 Backend URL: ${process.env.RENDER_BACKEND_URL || 'http://localhost:' + PORT}`);
@@ -989,22 +712,20 @@ const server = app.listen(PORT, () => {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, starting graceful shutdown');
+  console.log('SIGTERM received, shutting down gracefully');
   server.close(() => {
-    console.log('🛑 Server closed');
     pool.end(() => {
-      console.log('🗄️  Database connections closed');
+      console.log('🛑 Server closed');
       process.exit(0);
     });
   });
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, starting graceful shutdown');
+  console.log('SIGINT received, shutting down gracefully');
   server.close(() => {
-    console.log('🛑 Server closed');
     pool.end(() => {
-      console.log('🗄️  Database connections closed');
+      console.log('🛑 Server closed');
       process.exit(0);
     });
   });
@@ -1021,32 +742,17 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-// ============================================
-// FINAL CONFIGURATION & EXPORTS
-// ============================================
-
-// Export the app for Render deployment
-export default app;
-
-// Environment validation
+// Final log
 if (process.env.NODE_ENV === 'production') {
   console.log('🌐 Running in PRODUCTION mode');
-  console.log('📦 Render Backend:', process.env.RENDER_BACKEND_URL);
-  console.log('🗄️  Database:', process.env.DATABASE_URL ? 'Configured' : 'Not configured');
+  console.log('📦 Database:', process.env.DATABASE_URL ? 'Configured' : 'Missing');
   console.log('🤖 AI Provider: Groq API');
   console.log('📧 Email Service: SendGrid');
 } else {
   console.log('🛠️  Running in DEVELOPMENT mode');
-  console.log('📦 Local Backend URL will be used');
   console.log('⚠️  JWT Secret:', JWT_SECRET.substring(0, 8) + '...');
   console.log('⚠️  GROQ_API_KEY:', process.env.GROQ_API_KEY ? 'Configured' : 'Not configured');
   console.log('⚠️  SENDGRID_API_KEY:', process.env.SENDGRID_API_KEY ? 'Configured' : 'Not configured');
 }
 
-// ============================================
-// STARTUP COMPLETE
-// ============================================
-
-console.log('✅ LetiMail Backend v2.0.0 Initialized Successfully!');
-console.log('🔧 All systems ready for Render deployment');
-console.log('📡 Ready to handle API requests on port', PORT);
+console.log('✅ LetiMail Backend v2.0.0 (Guest Access) Initialized');
