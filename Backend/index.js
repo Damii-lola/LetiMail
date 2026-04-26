@@ -104,99 +104,123 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-// Email generation
+// ⭐ Email generation – now with STRICT tone & length control
 app.post("/api/generate", ipRateLimit(10, 60000), async (req, res) => {
   const { business, context, tone, emailLength } = req.body;
   if (!business || !context) {
     return res.status(400).json({ email: "Business description and context are required." });
   }
 
-  try {
-    const prompt = `
-# ULTIMATE PROFESSIONAL EMAIL ARCHITECTURE SYSTEM
-## BUSINESS CONTEXT:
+  // Map lengths to target sentence counts and token limits
+  const lengthSettings = {
+    short:   { sentences: "exactly 4-6 sentences", tokens: 400 },
+    medium:  { sentences: "8-12 sentences",          tokens: 800 },
+    long:    { sentences: "15+ sentences",           tokens: 1200 }
+  };
+  const selectedLength = lengthSettings[emailLength] || lengthSettings.medium;
+
+  const prompt = `
+You are a world‑class email copywriter. Write an email based EXACTLY on these requirements.
+
+🔹 TONE: "${tone}"
+Follow these specific tone rules:
+- Friendly: warm, conversational, use "you" often, include one light-hearted phrase.
+- Professional: formal but approachable, no slang, clear structure, neutral language.
+- Casual: very relaxed, short sentences, maybe a contraction, like chatting with a friend.
+- Formal: strict business etiquette, full words (no contractions), polite, impersonal (e.g., "I would like to request...").
+- Persuasive: commanding, uses power words, creates urgency, benefits-focused.
+
+🔹 LENGTH: "${emailLength}"
+Your email must contain ${selectedLength.sentences}. Each sentence should be meaningful. Do not exceed this length.
+
+🔹 BUSINESS CONTEXT:
 ${business}
 
-## COMMUNICATION PURPOSE:
+🔹 WHAT TO COMMUNICATE:
 ${context}
 
-## TONE REQUIREMENT: ${tone}
-## LENGTH CONSTRAINT: ${emailLength}
+🔹 STRUCTURE:
+Start with "Subject: [concise subject line]".
+Then a salutation (e.g., "Dear [Name],")
+Then the body, following the tone and length.
+End with a closing (e.g., "Best regards,") and "[Your Name]".
 
-## STRICT OUTPUT REQUIREMENTS:
-- Generate ONLY the email starting with "Subject:"
-- NO introductory phrases, explanations, or commentary
-- NO "Here is your email" or similar text
-- Start immediately with "Subject: [Subject Line]"
+🔹 CRITICAL RULES:
+- The subject line must match the tone and context.
+- The body MUST sound exactly like the specified tone.
+- Keep the email within the required number of sentences.
+- Do NOT add any commentary or text outside the email.
+- Do NOT include bullet points or numbered lists.
+- Return ONLY the email, nothing else.
 
-## PERFECT EMAIL STRUCTURE:
-Subject: [Professional, context-appropriate subject line]
-[Professional salutation]
-[Paragraph 1: Clear purpose statement]
-[Paragraph 2: Supporting details and context]
-[Paragraph 3: Action items or next steps]
-[Professional closing]
-[Sender name and position]
-
-## PROHIBITED CONTENT:
-- No bullet points or numbered lists
-- No emojis or symbols
-- No corporate buzzwords
-- No excessive punctuation
-- No informal greetings without proper addressing
-
-Generate ONLY the email content starting with "Subject:" following all requirements above.
+Write the email now:
 `;
 
-    let email = "Subject: Error generating email.\n\nPlease try again.";
-    let retries = 3;
-    while (retries > 0) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
-        const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "llama-3.2-11b-text-preview",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.7,
-            max_tokens: emailLength === 'short' ? 400 : emailLength === 'medium' ? 600 : 800,
-            top_p: 0.9,
-            frequency_penalty: 0.1,
-            presence_penalty: 0.1,
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (!groqResponse.ok) throw new Error(`API response: ${groqResponse.status}`);
-        const data = await groqResponse.json();
-        if (data.choices?.[0]?.message?.content) {
-          email = data.choices[0].message.content.trim();
-          break;
+  let email = "Subject: Error generating email.\n\nPlease try again.";
+  let retries = 2;
+
+  while (retries > 0) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      // Use the more capable llama3-70b for better quality
+      const model = process.env.AI_MODEL || "llama3-70b-8192";
+
+      const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.7,
+          max_tokens: selectedLength.tokens,
+          top_p: 0.95,
+          frequency_penalty: 0.1,
+          presence_penalty: 0.1,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!groqResponse.ok) throw new Error(`API response: ${groqResponse.status}`);
+      const data = await groqResponse.json();
+      if (data.choices?.[0]?.message?.content) {
+        email = data.choices[0].message.content.trim();
+        // Rough validation: if it's too short, retry
+        const sentenceCount = email.split(/[.!?]+/).filter(Boolean).length;
+        if (emailLength === 'short' && sentenceCount < 3) throw new Error("Too short");
+        if (emailLength === 'long' && sentenceCount < 10) throw new Error("Too short for long");
+        break;
+      } else {
+        throw new Error("Invalid API response format");
+      }
+    } catch (error) {
+      console.error(`❌ Attempt ${3 - retries} failed:`, error.message);
+      retries--;
+      if (retries === 0) {
+        // Fallback email that still respects tone & length
+        const fallbackSubject = `Re: ${context.substring(0, 50)}`;
+        let fallbackBody = '';
+        if (emailLength === 'short') {
+          fallbackBody = `I wanted to touch base regarding ${context}. Let me know your thoughts.`;
+        } else if (emailLength === 'medium') {
+          fallbackBody = `I hope this message finds you well. I am reaching out to discuss ${context}. Please let me know a convenient time to connect.`;
         } else {
-          throw new Error("Invalid API response format");
+          fallbackBody = `I am writing to follow up on our previous conversation about ${context}. As we discussed, there are several important aspects to consider, and I would appreciate your input on the next steps. Please feel free to reply with your availability, and I will ensure everything is aligned. Looking forward to hearing from you.`;
         }
-      } catch (error) {
-        console.error(`❌ API attempt ${4 - retries} failed:`, error.message);
-        retries--;
-        if (retries === 0) {
-          email = `Subject: ${context}\n\nDear Team,\n\nRegarding ${context}, I'm writing from ${business} to discuss this matter.\n\nBest regards,\n[Your Name]`;
-        } else {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
+        email = `Subject: ${fallbackSubject}\n\nDear [Recipient],\n\n${fallbackBody}\n\nBest regards,\n[Your Name]`;
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
     }
-    email = cleanAIResponse(email);
-    console.log(`Generated email for IP ${req.ip}`);
-    res.json({ email });
-  } catch (error) {
-    console.error("🎯 Generation error:", error);
-    res.json({ email: `Subject: ${context}\n\nHello,\n\nI hope this email finds you well regarding ${context}. Let me know if you have any questions.\n\nBest regards` });
   }
+
+  email = cleanAIResponse(email);
+  console.log(`Generated email (${tone}/${emailLength})`);
+  res.json({ email });
 });
 
 // Polish email
@@ -220,12 +244,6 @@ ${originalEmail}
 EDITED:
 ${editedEmail}
 
-RULES:
-- Preserve user's intended changes completely
-- Only fix grammar, punctuation, and flow
-- Do NOT rewrite user's edits
-- Blend edited sections seamlessly
-- Maintain tone and formality
 Return ONLY the polished email, nothing else.
 `;
     const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -235,7 +253,7 @@ Return ONLY the polished email, nothing else.
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama-3.2-11b-text-preview",
+        model: "llama3-70b-8192",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 1500,
@@ -351,7 +369,7 @@ Return ONLY the 3 reply options, nothing else.`;
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama-3.2-11b-text-preview",
+        model: "llama3-70b-8192",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 1000,
