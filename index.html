@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LetiMail — AI Email Assistant That Sounds Like You</title>
+  <title>LetiMail — AI Email Assistant</title>
   <link rel="stylesheet" href="Frontend/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-  <!-- Notification System -->
+  <!-- Notification -->
   <div id="notification" class="notification">
     <div class="notification-content">
       <div class="notification-icon"></div>
@@ -17,16 +17,11 @@
         <div class="notification-title"></div>
         <div class="notification-message"></div>
       </div>
-      <button class="notification-close">
-        <i class="fas fa-times"></i>
-      </button>
+      <button class="notification-close"><i class="fas fa-times"></i></button>
     </div>
   </div>
 
-  <!-- Auth Modals -->
-  <div id="authModals"></div>
-
-  <!-- Navigation -->
+  <!-- Header -->
   <header class="navbar">
     <div class="nav-container">
       <div class="logo">
@@ -37,390 +32,125 @@
         </div>
       </div>
       <div class="nav-actions">
-        <div id="userMenu" class="user-menu" style="display: none;">
+        <div id="userMenu" class="user-menu">
           <button class="user-avatar" id="userAvatar">
-            <span id="avatarText">U</span>
+            <span id="avatarText">G</span>
           </button>
-          <div class="dropdown-menu">
-            <a href="app.html" class="dropdown-item">
-              <i class="fas fa-envelope"></i>Email Generator
-            </a>
-            <a href="settings.html" class="dropdown-item">
-              <i class="fas fa-cog"></i>Settings
-            </a>
-            <div class="dropdown-divider"></div>
-            <button id="logoutBtn" class="dropdown-item logout">
-              <i class="fas fa-sign-out-alt"></i>Logout
-            </button>
+          <div class="dropdown-menu" id="userDropdown">
+            <button id="settingsBtn" class="dropdown-item"><i class="fas fa-cog"></i> Settings</button>
+            <button id="clearSessionBtn" class="dropdown-item logout"><i class="fas fa-trash"></i> Clear Session</button>
           </div>
-        </div>
-        <div id="authButtons" class="auth-buttons">
-          <button id="loginBtn" class="login-btn">Login</button>
-          <button id="signupBtn" class="signup-btn">Sign Up</button>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- Hero Section -->
-  <section class="hero">
-    <div class="hero-container">
-      <div class="hero-content">
-        <div class="hero-badge">
-          <span class="badge-icon">✨</span>
-          AI-Powered Email Assistant
-        </div>
-        <h1 class="hero-title">
-          Write emails that sound<br>
-          <span class="gradient-text">exactly like you</span>
-        </h1>
-        <p class="hero-description">
-          Stop struggling with email composition and focus on what truly matters - building relationships and growing your business.
-        </p>
-        <div class="hero-cta">
-          <button class="primary-cta" onclick="handleGetStarted()">Start 5-Day Free Trial</button>
-          <a href="#features" class="secondary-cta">Learn More</a>
-        </div>
-        <div class="hero-stats">
-          <div class="stat">
-            <div class="stat-number">10x</div>
-            <div class="stat-label">Faster Writing</div>
-          </div>
-          <div class="stat-divider"></div>
-          <div class="stat">
-            <div class="stat-number">100%</div>
-            <div class="stat-label">Your Voice</div>
-          </div>
-          <div class="stat-divider"></div>
-          <div class="stat">
-            <div class="stat-number">Adaptable</div>
-            <div class="stat-label">AI Technology</div>
-          </div>
-        </div>
+  <!-- Main App -->
+  <main class="app-main">
+    <div class="app-container">
+      <div class="app-header">
+        <h1>AI Email Generator</h1>
+        <p>Describe what you need, and LetiMail writes it for you</p>
       </div>
-      <div class="hero-visual">
-        <div class="floating-card card-1">
-          <div class="card-header">
-            <div class="card-dot"></div>
-            <div class="card-dot"></div>
-            <div class="card-dot"></div>
-          </div>
-          <div class="card-content">
-            <div class="typing-indicator">Generating your email...</div>
-          </div>
-        </div>
-        <div class="floating-card card-2">
-          <div class="email-preview">
-            <div class="preview-line long"></div>
-            <div class="preview-line medium"></div>
-            <div class="preview-line short"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <!-- Problem Section -->
-  <section class="problem-section section">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-label">The Challenge</span>
-        <h2>The Email Struggle is Real</h2>
-        <p>Business professionals waste countless hours crafting the perfect email</p>
-      </div>
-      <div class="problem-grid">
-        <div class="problem-card">
-          <div class="problem-icon-wrapper">
-            <div class="problem-icon">⏰</div>
+      <div class="app-workspace">
+        <!-- Input Panel -->
+        <div class="input-panel">
+          <div class="panel-header">
+            <h2>Email Brief</h2>
+            <span class="step-indicator">Step 1</span>
           </div>
-          <h3>Time-Consuming</h3>
-          <p>Professionals spend countless hours crafting emails that balance professionalism with authenticity.</p>
-        </div>
-        <div class="problem-card">
-          <div class="problem-icon-wrapper">
-            <div class="problem-icon">🤖</div>
+          <div class="input-group">
+            <label><i class="fas fa-briefcase"></i> Business Description</label>
+            <textarea id="businessDesc" placeholder="e.g. I run a web design agency..."></textarea>
           </div>
-          <h3>Generic Content</h3>
-          <p>Current AI tools produce robotic, "one-size-fits-all" content that lacks your personal nuance.</p>
-        </div>
-        <div class="problem-card">
-          <div class="problem-icon-wrapper">
-            <div class="problem-icon">✍️</div>
+          <div class="input-group">
+            <label><i class="fas fa-envelope-open-text"></i> What to communicate</label>
+            <textarea id="context" placeholder="e.g. Follow up after a client meeting..."></textarea>
           </div>
-          <h3>Editing Overload</h3>
-          <p>You end up spending more time editing AI content than writing from scratch.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Solution Section -->
-  <section class="solution-section section" id="features">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-label">The LetiMail Difference</span>
-        <h2>AI that learns your unique style</h2>
-        <p>Experience the magic of personalized communication</p>
-      </div>
-      <div class="solution-grid">
-        <div class="solution-card">
-          <div class="solution-number">01</div>
-          <div class="solution-icon">🎯</div>
-          <h3>Intelligent Email Generation</h3>
-          <p>Simply describe what you want to communicate in plain English, and LetiMail instantly creates professional, context-aware emails ready to send.</p>
-        </div>
-        <div class="solution-card">
-          <div class="solution-number">02</div>
-          <div class="solution-icon">💬</div>
-          <h3>Personalized Tone Matching</h3>
-          <p>LetiMail learns and replicates your personal writing style. Provide writing examples during setup, and our AI analyzes your patterns to ensure every email sounds authentically like you.</p>
-        </div>
-        <div class="solution-card">
-          <div class="solution-number">03</div>
-          <div class="solution-icon">📤</div>
-          <h3>Seamless Sending Platform</h3>
-          <p>Generate, refine, and send messages directly from our platform. All replies route straight to your primary inbox - no switching between apps.</p>
-        </div>
-        <div class="solution-card">
-          <div class="solution-number">04</div>
-          <div class="solution-icon">💡</div>
-          <h3>Smart Reply Assistance</h3>
-          <p>Forward emails to LetiMail and get multiple thoughtful reply options. Our AI analyzes context and generates responses that fit perfectly.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Who Benefits Section -->
-  <section class="benefits-section section">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-label">Perfect For</span>
-        <h2>Who Benefits from LetiMail</h2>
-      </div>
-      <div class="benefits-grid">
-        <div class="benefit-item">
-          <div class="benefit-icon">📊</div>
-          <h4>Sales Professionals</h4>
-          <p>Craft personalized outreach at scale</p>
-        </div>
-        <div class="benefit-item">
-          <div class="benefit-icon">💼</div>
-          <h4>Busy Executives</h4>
-          <p>Manage high-volume communication efficiently</p>
-        </div>
-        <div class="benefit-item">
-          <div class="benefit-icon">🚀</div>
-          <h4>Freelancers & Consultants</h4>
-          <p>Maintain consistent client communication</p>
-        </div>
-        <div class="benefit-item">
-          <div class="benefit-icon">🏢</div>
-          <h4>Small Business Owners</h4>
-          <p>Wear multiple hats with efficient solutions</p>
-        </div>
-        <div class="benefit-item">
-          <div class="benefit-icon">🎯</div>
-          <h4>Marketing Teams</h4>
-          <p>Ensure brand voice consistency</p>
-        </div>
-        <div class="benefit-item">
-          <div class="benefit-icon">⭐</div>
-          <h4>Career Professionals</h4>
-          <p>Make every communication count</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Pricing Section -->
-  <section class="pricing-section section">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-label">Pricing Plans</span>
-        <h2>Try LetiMail Risk-Free</h2>
-        <p>Start with our 5-day free trial - no credit card required</p>
-      </div>
-      <div class="pricing-grid">
-        <!-- Free Trial -->
-        <div class="pricing-card featured">
-          <div class="plan-badge featured-badge">Start Here</div>
-          <h3 class="plan-name">5-Day Free Trial</h3>
-          <div class="plan-price">
-            <span class="price">$0</span>
-            <span class="period">for 5 days</span>
-          </div>
-          <p class="plan-description">Experience the full power of LetiMail</p>
-          <ul class="plan-features">
-            <li><span class="check">✓</span> 3 emails per day during trial</li>
-            <li><span class="check">✓</span> Full tone learning features</li>
-            <li><span class="check">✓</span> Email generation and sending</li>
-            <li><span class="check">✓</span> Smart reply assistance</li>
-            <li><span class="check">✓</span> No credit card required</li>
-            <li><span class="check">✓</span> Cancel anytime</li>
-          </ul>
-          <button class="plan-button plan-button-primary" onclick="showSignupModal()">Start Free Trial</button>
-        </div>
-
-        <!-- Premium Plan -->
-        <div class="pricing-card">
-          <div class="plan-badge">Most Popular</div>
-          <h3 class="plan-name">Premium</h3>
-          <div class="plan-price">
-            <span class="price">$9.99</span>
-            <span class="period">/month</span>
-          </div>
-          <p class="plan-description">For professionals who need unlimited access</p>
-          <ul class="plan-features">
-            <li><span class="check">✓</span> Unlimited email generation</li>
-            <li><span class="check">✓</span> Unlimited sending</li>
-            <li><span class="check">✓</span> Full tone learning & personalization</li>
-            <li><span class="check">✓</span> Priority reply generation</li>
-            <li><span class="check">✓</span> All advanced features</li>
-            <li><span class="check">✓</span> Cancel anytime</li>
-          </ul>
-          <button class="plan-button plan-button-outline" onclick="showSignupModal()">Upgrade to Premium</button>
-        </div>
-
-        <!-- Business Plan -->
-        <div class="pricing-card">
-          <div class="plan-badge">For Teams</div>
-          <h3 class="plan-name">Business</h3>
-          <div class="plan-price">
-            <span class="price">$29</span>
-            <span class="period">/month</span>
-          </div>
-          <p class="plan-description">For teams that need collaboration</p>
-          <ul class="plan-features">
-            <li><span class="check">✓</span> Everything in Premium</li>
-            <li><span class="check">✓</span> Up to 5 team members</li>
-            <li><span class="check">✓</span> Shared templates</li>
-            <li><span class="check">✓</span> Team analytics</li>
-            <li><span class="check">✓</span> Custom integrations</li>
-            <li><span class="check">✓</span> Dedicated support</li>
-          </ul>
-          <button class="plan-button plan-button-outline" onclick="showSignupModal()">Contact Sales</button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Workflow Section -->
-  <section class="workflow-section section">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-label">How It Works</span>
-        <h2>Simple Yet Powerful Workflow</h2>
-      </div>
-      <div class="workflow-steps">
-        <div class="workflow-step">
-          <div class="step-number">1</div>
-          <div class="step-content">
-            <h3>Start 5-Day Trial</h3>
-            <p>No credit card needed - experience LetiMail's full power</p>
-          </div>
-        </div>
-        <div class="workflow-step">
-          <div class="step-number">2</div>
-          <div class="step-content">
-            <h3>Describe Your Goal</h3>
-            <p>Tell LetiMail what you need to communicate in plain English</p>
-          </div>
-        </div>
-        <div class="workflow-step">
-          <div class="step-number">3</div>
-          <div class="step-content">
-            <h3>Personalize</h3>
-            <p>Let our AI adapt to your unique writing style</p>
-          </div>
-        </div>
-        <div class="workflow-step">
-          <div class="step-number">4</div>
-          <div class="step-content">
-            <h3>Review & Send</h3>
-            <p>Deliver professional communication instantly</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA Section -->
-  <section class="cta-section section">
-    <div class="container">
-      <div class="cta-content">
-        <h2>Ready to Transform Your Email Workflow?</h2>
-        <p>Spend less time writing emails and more time building your business with LetiMail</p>
-        <button class="cta-button" onclick="handleGetStarted()">
-          Start Your Free Trial
-          <span class="cta-arrow">→</span>
-        </button>
-        <div class="cta-features">
-          <div class="cta-feature">
-            <span class="feature-check">✓</span>
-            No credit card required
-          </div>
-          <div class="cta-feature">
-            <span class="feature-check">✓</span>
-            5-day free trial
-          </div>
-          <div class="cta-feature">
-            <span class="feature-check">✓</span>
-            Cancel anytime
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-content">
-        <div class="footer-brand">
-          <div class="footer-logo">
-            <div class="logo-mark">L</div>
-            <div>
-              <h3>LetiMail</h3>
-              <p>Your Voice, AI Powered</p>
+          <div class="input-row" style="display:flex; gap:12px">
+            <div class="input-group" style="flex:1">
+              <label>Tone</label>
+              <select id="tone">
+                <option value="friendly">Friendly</option>
+                <option value="professional">Professional</option>
+                <option value="casual">Casual</option>
+                <option value="formal">Formal</option>
+                <option value="persuasive">Persuasive</option>
+              </select>
+            </div>
+            <div class="input-group" style="flex:1">
+              <label>Length</label>
+              <select id="emailLength">
+                <option value="short">Short</option>
+                <option value="medium" selected>Medium</option>
+                <option value="long">Long</option>
+              </select>
             </div>
           </div>
-          <p class="footer-description">
-            Experience the future of business communication - where technology enhances your authentic voice rather than replacing it.
-          </p>
+          <button class="generate-btn" id="generateBtn">
+            <span class="btn-icon">✨</span> Generate My Email
+          </button>
         </div>
-        <div class="footer-links">
-          <div class="footer-column">
-            <h4>Product</h4>
-            <a href="#features">Features</a>
-            <a href="#pricing">Pricing</a>
-            <a href="app.html">Get Started</a>
+
+        <!-- Output Panel -->
+        <div class="output-panel">
+          <div class="panel-header">
+            <h2>Your Email</h2>
+            <span class="quality-badge">AI Powered</span>
           </div>
-          <div class="footer-column">
-            <h4>Company</h4>
-            <a href="#">About</a>
-            <a href="#">Blog</a>
-            <a href="#">Contact</a>
+          <div id="output" class="output-text">
+            <div class="output-placeholder">
+              <div class="placeholder-animation">
+                <div class="animation-ring"></div>
+                <div class="placeholder-icon">✉️</div>
+              </div>
+              <p>Your email will appear here</p>
+            </div>
           </div>
-          <div class="footer-column">
-            <h4>Legal</h4>
-            <a href="#">Privacy</a>
-            <a href="#">Terms</a>
-            <a href="#">Security</a>
+          <div id="actionButtons" class="action-buttons" style="display:none">
+            <button id="copyBtn" class="action-btn copy-btn"><i class="far fa-copy"></i> Copy</button>
+            <button id="editBtn" class="action-btn edit-btn"><i class="far fa-edit"></i> Edit</button>
+            <button id="sendBtn" class="action-btn send-btn"><i class="fas fa-paper-plane"></i> Send</button>
           </div>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>&copy; 2025 LetiMail. All rights reserved.</p>
-        <div class="footer-social">
-          <a href="#"><i class="fab fa-twitter"></i></a>
-          <a href="#"><i class="fab fa-linkedin"></i></a>
-          <a href="#"><i class="fab fa-github"></i></a>
         </div>
       </div>
     </div>
-  </footer>
+  </main>
 
-  <script src="Frontend/script.js?v=2.0.2"></script>
+  <!-- Settings Modal (hidden by default) -->
+  <div id="settingsModal" class="modal-overlay" style="display:none">
+    <div class="modal-content">
+      <button class="modal-close" id="closeSettingsModal"><i class="fas fa-times"></i></button>
+      <h3>Preferences</h3>
+      <form id="preferencesForm" class="settings-form">
+        <div class="form-group">
+          <label>Default Tone</label>
+          <select id="defaultTone" class="settings-select">
+            <option value="friendly">Friendly</option>
+            <option value="professional">Professional</option>
+            <option value="casual">Casual</option>
+            <option value="formal">Formal</option>
+            <option value="persuasive">Persuasive</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Email Length</label>
+          <select id="defaultEmailLength" class="settings-select">
+            <option value="short">Short</option>
+            <option value="medium">Medium</option>
+            <option value="long">Long</option>
+          </select>
+        </div>
+        <button type="submit" class="settings-btn primary">Save Preferences</button>
+      </form>
+      <hr style="margin:20px 0; border-color:var(--border-subtle)">
+      <button id="clearSessionBtn2" class="settings-btn secondary" style="width:100%">
+        <i class="fas fa-trash"></i> Start New Guest Session
+      </button>
+    </div>
+  </div>
+
+  <script src="Frontend/script.js"></script>
 </body>
 </html>
