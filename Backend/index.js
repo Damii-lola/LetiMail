@@ -113,9 +113,9 @@ app.post("/api/generate", ipRateLimit(10, 60000), async (req, res) => {
 
   // Map lengths to target sentence counts and token limits
   const lengthSettings = {
-    short:   { sentences: "exactly 4-6 sentences", tokens: 400 },
-    medium:  { sentences: "8-12 sentences",          tokens: 800 },
-    long:    { sentences: "15+ sentences",           tokens: 1200 }
+    short:   { sentences: "exactly 15-17 sentences", tokens: 600 },
+    medium:  { sentences: "18-21 sentences",          tokens: 1000 },
+    long:    { sentences: "21+ sentences",           tokens: 1400 }
   };
   const selectedLength = lengthSettings[emailLength] || lengthSettings.medium;
 
